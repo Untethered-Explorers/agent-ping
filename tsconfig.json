@@ -47,6 +47,7 @@
     "src/**/*.mts",
     "tests/**/*.ts",
     "tests/**/*.tsx",
+    "vite.config.ts",
     "vitest.config.ts"
   ],
   "exclude": ["node_modules", "dist", "build", "test-results", "playwright-report"]

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>agent-ping dashboard prototype</title>
+    <style>
+      /* The prototype is one page, one column, no chrome and no navigation.
+         Colours mirror PROTOTYPE_COLORS in scene.ts, so the page background and
+         the canvas background are the same surface rather than two shades. */
+      :root {
+        color-scheme: dark;
+        --page-background: #0f1115;
+      }
+
+      html,
+      body {
+        height: 100%;
+      }
+
+      body {
+        margin: 0;
+        background: var(--page-background);
+        overflow: hidden;
+        /* The prototype exists to be looked at as a picture; a text cursor or a
+           selection over the canvas would only get in the way of the review. */
+        user-select: none;
+      }
+
+      [data-dashboard-root] {
+        position: absolute;
+        inset: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <main data-dashboard-root></main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

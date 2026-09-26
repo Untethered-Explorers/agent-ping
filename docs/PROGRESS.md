@@ -3,8 +3,8 @@
 ## Current State
 **Phase**: DASHBOARD-DESIGN-PROTOTYPE-1
 **Status**: In Progress
-**Validation Gaps**: 2 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-26T11:07:25.393Z
+**Validation Gaps**: 6 unverified check(s) - see "Validation Gaps"
+**Last Updated**: 2026-09-26T11:29:17.819Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -12,6 +12,8 @@
 ## Completed Tasks
 - [x] Phase DASHBOARD-DESIGN-PROTOTYPE-1, Task DP-1: Establish toolchain and test-runner convention (@tooling-engineer)
   - Files: package.json, tsconfig.json, vitest.config.ts, eslint.config.js, tests/tooling/runner-convention.test.ts, .gitignore, package-lock.json, scripts/build.mjs, scripts/run-tests.mjs, tsconfig.build.json
+- [x] Phase DASHBOARD-DESIGN-PROTOTYPE-1, Task DP-2: Render the static mock dashboard page (@dashboard-engineer)
+  - Files: vite.config.ts, src/dashboard/prototype/index.html, src/dashboard/prototype/main.ts, src/dashboard/prototype/scene.ts, src/dashboard/prototype/mock-data.ts, tests/dashboard/prototype-scene.test.ts, package-lock.json, package.json, tsconfig.json
 
 ## Current Task
 - None currently running
@@ -45,6 +47,10 @@
 ## Validation Gaps
 - Task DP-1: No product, dashboard, store, hub or CLI source exists yet, so npm run build reports its tsc and Vite steps as skipped rather than compiling anything; the build wiring itself is exercised only as far as the empty source set allows.
 - Task DP-1: The Playwright e2e project is not created or exercised here: playwright.config.ts is owned by qa-engineer under LD-4. Only the dispatch behaviour is verified, and it fails loudly as required.
+- Task DP-2: The committed test suite cannot execute the real renderer: jsdom provides no 2D or WebGL context, so Application.init() does not resolve there. The real PixiJS host is exercised through its own seam with a fake Application that records its init and destroy arguments, and the painter is exercised against real PixiJS Container, Graphics, Rectangle and Text objects. Actual pixels are proven by the Vite build plus a headless Chrome run, both reported above.
+- Task DP-2: The APX-CON-11 first-paint budget of 1 s from warm cache is not measured here. The built entry chunk is 283 kB raw and 85 kB gzipped with six lazy chunks, but no timing harness exists yet; measuring it belongs to the LD-4 browser suite.
+- Task DP-2: Mouse hover was driven through CDP Input.dispatchMouseEvent rather than a real device, and the browser run was headless with software WebGL. The design verdicts in DP-4 and LD-5 remain unperformed and are not claimed here.
+- Task DP-2: docs/EXECUTION-AUDIT.jsonl and docs/WORKFLOW-STATE.json show as modified in git status; those are the engine's own files and I did not touch them.
 
 ## Notes
 - Workflow engine run 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
