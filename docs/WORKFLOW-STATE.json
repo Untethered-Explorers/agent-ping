@@ -1,12 +1,12 @@
 {
   "runId": "7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8",
   "startedAt": "2026-09-26T10:43:05.421Z",
-  "lastUpdatedAt": "2026-09-26T11:29:17.813Z",
+  "lastUpdatedAt": "2026-09-26T11:48:40.549Z",
   "manifestPath": "/home/mcfuzzysquirrel/Projects/agent-ping/docs/EXECUTION-MANIFEST.json",
   "manifestVersion": "1.0",
   "harness": "opencode",
   "status": "running",
-  "currentPhase": "DASHBOARD-DESIGN-PROTOTYPE-1",
+  "currentPhase": "EVENT-MODEL-AND-DURABLE-LOG-1",
   "tasks": {
     "DP-1": {
       "taskId": "DP-1",
@@ -105,10 +105,37 @@
     },
     "EL-1": {
       "taskId": "EL-1",
-      "status": "pending",
+      "status": "complete",
       "ownerAgent": "domain-engineer",
-      "attempt": 0,
-      "outputFiles": []
+      "attempt": 1,
+      "outputFiles": [
+        "src/storage/schema.sql",
+        "src/storage/db.ts",
+        "src/storage/paths.ts",
+        "src/storage/eventStore.ts",
+        "tests/storage/schema.test.ts",
+        "tests/storage/eventStore.test.ts",
+        "package-lock.json",
+        "package.json"
+      ],
+      "startedAt": "2026-09-26T11:29:17.859Z",
+      "attemptHistory": [
+        {
+          "attempt": 1,
+          "outcome": "passed",
+          "resultPath": "docs/artifacts/EL-1.2026-09-26T11-48-40-548Z.attempt-1.result.json"
+        }
+      ],
+      "completedAt": "2026-09-26T11:48:40.549Z",
+      "agentOutput": "I'll start by reading the execution file to understand the task scope.\nNow I have the full picture. Let me set up my task list and start building.\nNow the schema test — the privacy mechanism itself:\nNow let's run the tests:\nNow the store's class validation:\nNow the test fixes:\nNow fix the missing type import in the store:\nOne real defect to fix — the rebuild path leaks the failed handle before deleting the file:\nThe descriptor test passed without the fix — the corruption path throws inside `connect`, which already closes. Let me cover the statement-level failure too, where the leak actually happens:\nEL-1 is complete. Everything I promised is implemented and verified against a real `better-sqlite3` file.\n\n## Files created\n\n| File | What it is |\n|---|---|\n| `src/storage/paths.ts` | The one path-resolution point: `AGENT_PING_STATE_DIR` override over the platform location (XDG / `Library/Application Support` / `LOCALAPPDATA`), owner-only directory (`0o700`) and file (`0o600`), and the database + WAL/SHM file list |\n| `src/storage/schema.sql` | The durable schema as one versioned, forward-only migration, with the privacy and identity rules written into the file itself |\n| `src/storage/db.ts` | Migration parsing and idempotent application, the version record, and open-with-rebuild-instead-of-refusing |\n| `src/storage/eventStore.ts` | The typed accessors and nothing else |\n| `tests/storage/schema.test.ts` | 21 tests: the exact column set, table list, index list, version record, migration discipline, enforced enumerations, and the guard's own falsifiability |\n| `tests/storage/eventStore.test.ts` | 30 tests: path resolution, permissions, idempotent reopen, corruption rebuild, descriptor hygiene, round trip, read-shape field sets, dedupe, resolution/acknowledgement idempotency |\n\n**Changed:** `package.json`, `package-lock.json` — added `better-sqlite3` `13.0.3` as a runtime dependency (exact, not a bump) and `@types/better-sqlite3` `9.6.0` as a dev dependency, since the driver ships no types.\n\n## Columns added — the full privacy surface\n\n- `sessions`: `session_id` (PK), `harness`, `repo_short_name`, `repo_full_path`, `first_seen_at`, `last_seen_at`, `state`, `work_signal`\n- `events`: `event_id` (PK), `session_id` (FK → sessions), `class`, `subtype`, `raw_event_type`, `occurred_at`, `received_at`, `dedupe_key`, `ack_state`, `resolution_state`\n- `counters`: `name` (PK), `value`, `updated_at`\n- `schema_version`: `version` (PK), `applied_at` — written only by the runner, never by a migration\n- Indexes: `idx_events_session_occurred (session_id, occurred_at)`, `idx_events_class_ack (class, ack_state)`, `ux_events_dedupe_key (dedupe_key)` UNIQUE, `idx_sessions_repo_short_name (repo_short_name)`\n\nNo envelope field was added; the envelope is EL-3's, and `NewEvent` is structurally exactly the EL-FR-01 field set so an envelope passes through unchanged.\n\n## Two things worth your attention\n\n**The schema test can fail.** It is not a denylist: it compares a literal expected set per table, including type, nullability and key position, and four separate tests prove the guard throws — a real `ALTER TABLE ADD COLUMN excerpt`, a neutral-sounding `token_total`, a table created outside the migration set, and a retyped column. I also verified the descriptor-leak test fails when the fix is removed (3 leaked descriptors), because a guard that cannot fail is not a guard.\n\n**One follow-up, owned elsewhere.** The tsc build emits JavaScript only, so `schema.sql` is not copied to `dist/main/storage/`; running the *built* store fails with an explicit message naming the remedy. That file is `scripts/build.mjs` (tooling-engineer, DP-1) and the package `files` allowlist (packaging-engineer, IO-1), both outside this task's outputs, so I did not touch them. Fix is a copy step from `src/storage/schema.sql` to `dist/main/storage/schema.sql`.\n\n```forge-result\n{\"summary\":\"Implemented the content-free durable schema, the versioned migration runner with rebuild-on-unreadable recovery, and the five-accessor typed store, with 51 tests across the two storage suites all passing. Verified: npm test -- tests/storage/schema.test.ts tests/storage/eventStore.test.ts exits 0 (51 tests), npm run typecheck, npm run lint and npm run build exit 0, and the whole suite exits 0 (85 tests). All four acceptance criteria are covered by real-database tests: an exact column-set assertion that is proven to fail on an added column, an idempotent second open of the same temporary path, a corruption test asserting the store rebuilds from migrations, and a round trip from insert to session summary to pending row.\",\"unresolved\":[],\"decisions\":[\"Pinned better-sqlite3 to exactly 13.0.3 (PRD 6.1) and added @types/better-sqlite3 9.6.0 as a dev-only types package, because the driver ships no TypeScript declarations.\",\"State directory resolution lives only in src/storage/paths.ts behind AGENT_PING_STATE_DIR, so tests, qa-engineer's verification scripts and packaging-engineer share one resolution point rather than two.\",\"schema_version is created by the migration runner rather than by a migration, because the runner must read it to know what is pending; its column set is asserted exactly like every other table's and the file states it must never gain a third column.\",\"Session state and the turn work signal are derived from the class of the stored event (needs-you -> blocked/0, finished -> finished/1, fyi -> running/1) as a data table, and a resolution or acknowledgement leaves that state alone because the state is observed, not owned.\",\"events.event_id is generated by the store at insert time, so the insert input is exactly the EL-FR-01 envelope field set and the ack route addresses a real row key.\",\"Acknowledging a block the harness already resolved returns the distinguishable conflict outcome and changes nothing (HC-FR-05); an already-acknowledged block returns unchanged even if resolved since, so no double count is possible (EL-FR-08).\",\"Did not add acknowledgement or resolution timestamp columns: the two states record the facts, and nothing in v1 renders a timestamp for either (LD-FR-08). The feature document's Open Questions 2 is therefore met at the state level, with the timestamps named in schema.sql as a later contract change.\"],\"tests\":[\"npm test -- tests/storage/schema.test.ts tests/storage/eventStore.test.ts: exit 0, 51 tests (engine-verified)\",\"npm run typecheck: exit 0 (engine-verified)\",\"npm run lint: exit 0 (engine-verified)\",\"npm test (whole suite): exit 0, 85 tests (engine-verified)\",\"npm run build: exit 0, main tsc built 3 storage sources (engine-verified)\",\"Falsifiability checks: removing the close-on-failed-migration path makes the descriptor test fail with 3 leaked descriptors; a real ALTER TABLE adding excerpt or token_total makes the schema guard throw\"],\"warnings\":[\"The tsc build emits JavaScript only, so src/storage/schema.sql is not copied to dist/main/storage/ and running the built store from dist fails with an explicit message naming the remedy. scripts/build.mjs (tooling-engineer, DP-1) needs a copy step and the package files allowlist (packaging-engineer, IO-1) must include the .sql; neither file is in this task's outputs, so neither was modified. The store works from source, which is how every test and a development hub run.\",\"better-sqlite3 is a new native runtime dependency; it was installed from a prebuilt binary for Node 22.22.2 and loads correctly, but a platform that cannot obtain the prebuild falls back to a source compile.\",\"@types/better-sqlite3 is not listed in PRD 6.1 and is a types-only dev dependency, so it adds no runtime dependency the supported Node line must satisfy.\"],\"validationLimitations\":[\"The descriptor-leak test reads /proc/self/fd and is skipped where that directory does not exist; the owner-only mode tests are skipped on Windows. Both skips are visible in the reporter output rather than silent.\",\"The macOS and Windows state-directory layouts are asserted through the pure resolveStateDir(env, platform, home) function rather than on those machines, which remains the documented APX-CON-06 manual-gate path.\"]}\n```\n",
+      "validationLimitations": [
+        "The descriptor-leak test reads /proc/self/fd and is skipped where that directory does not exist; the owner-only mode tests are skipped on Windows. Both skips are visible in the reporter output rather than silent.",
+        "The macOS and Windows state-directory layouts are asserted through the pure resolveStateDir(env, platform, home) function rather than on those machines, which remains the documented APX-CON-06 manual-gate path."
+      ],
+      "artifactId": "work-el-1-001",
+      "inputArtifactIds": [
+        "work-dp-1-001"
+      ]
     },
     "EL-2": {
       "taskId": "EL-2",
