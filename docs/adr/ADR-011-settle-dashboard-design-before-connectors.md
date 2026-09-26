@@ -3,7 +3,20 @@
 - **Status:** Accepted
 - **Date:** 2026-09-26
 - **Decision owners:** Project author (settled with the user via `forge-grill-idea`)
-- **Implementation state:** Not started. The prototype does not exist.
+- **Implementation state:** **Fulfilled — the decision was a sequencing
+  constraint, and the sequence held.** The prototype was built first: the
+  toolchain and test-runner convention (DP-1), the static three-row page (DP-2),
+  the non-colour urgency encoding, keyboard order and DOM mirror (DP-3), and the
+  human design review (DP-4, `docs/reviews/DP-4-console-review.md`,
+  **approved**). The first connector task, OA-1, came after the prototype and its
+  review. The convention the decision was really buying is in force and
+  self-enforcing: `tests/tooling/runner-convention.test.ts` asserts that a named
+  path selecting zero test files exits non-zero, so "tests passed" cannot mean
+  "nothing ran".
+  The toolchain risk this decision named also materialised and was recorded
+  rather than absorbed silently: the build pinned **TypeScript 5.9.3** instead of
+  the PRD's recorded 7.0.2 (see the divergence table in
+  [ADR-007](ADR-007-single-node-typescript-toolchain.md)).
 
 ## Context
 
@@ -48,6 +61,8 @@ The prototype, per its feature document:
 It is ordered first among the eight features, alongside the event model, with
 no prerequisites. The recorded expectation is that it is **accepted with minor
 changes**; a rejection reopens the design work before the live dashboard starts.
+**Outcome: approved, with no conditions** — see
+[docs/reviews/DP-4-console-review.md](../reviews/DP-4-console-review.md).
 
 The same reasoning produced the Copilot spike (ADR-005): where an outcome is
 genuinely unknown, the response is a small, cheap, evidence-producing step whose
@@ -122,5 +137,9 @@ assumption.
 - Originating rationale: [IDEA.md — Open Questions](../IDEA.md#open-questions),
   "What the dashboard looks like", including the note that this "should be built
   first, before any connector work".
-- Planned paths (**do not exist yet**): `src/dashboard/`, plus the `package.json`
-  and `tsconfig.json` this feature establishes.
+- Paths: `src/dashboard/prototype/`, `src/dashboard/a11y/`,
+  `src/dashboard/theme/motion.ts`, `tests/dashboard/`,
+  `tests/tooling/runner-convention.test.ts`, `package.json`, `tsconfig.json`,
+  `vitest.config.ts`, `eslint.config.js`, `scripts/`.
+- Open question 1 is **answered**: the design review approved the prototype, so
+  the dependency above did not fire and live dashboard work is unblocked.

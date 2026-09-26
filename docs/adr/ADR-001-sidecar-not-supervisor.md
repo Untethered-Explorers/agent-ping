@@ -3,7 +3,16 @@
 - **Status:** Accepted
 - **Date:** 2026-09-26
 - **Decision owners:** Project author (settled with the user via `forge-grill-idea`)
-- **Implementation state:** Not started. No code exists for this decision.
+- **Implementation state:** Implemented, and structural rather than policed.
+  Nothing under `src/` names a harness or agent process as something to start,
+  signal or attach to. The three places that do spawn a process are the toast
+  command (`src/notify/command.ts`, which kills only its own child), the plugin
+  installer's verification child
+  (`src/plugin/install/global-plugin.ts`), and `process.kill(pid, 0)` in
+  `src/hub/runtime-file.ts`, which is a liveness probe on a previous *hub* pid,
+  not a signal. A killed hub is reclaimed and restarted against the same log
+  (`tests/hub/delivery.test.ts` does this with a real `SIGKILL` of a real child
+  process).
 
 ## Context
 
@@ -84,6 +93,8 @@ Concretely, this decision binds the following:
   excludes supervising agent processes.
 - Originating rationale: [IDEA.md — How It Connects](../IDEA.md#how-it-connects)
   and [IDEA.md — Boundaries](../IDEA.md#boundaries).
-- Planned source locations (**do not exist yet**): `src/hub/`, `src/plugin/`.
-  See [ADR-002](ADR-002-loopback-only-single-mutating-route.md) for the API
-  surface this decision bounds.
+- Source locations: `src/hub/`, `src/plugin/`, `src/notify/`. The single
+  mutating route this decision bounds is
+  [`POST /api/ack/:eventId`](ADR-002-loopback-only-single-mutating-route.md);
+  the route registry in `src/hub/server.ts` refuses at registration time to
+  accept a second control surface.

@@ -3,8 +3,23 @@
 - **Status:** Accepted
 - **Date:** 2026-09-26
 - **Decision owners:** Project author (settled with the user via `forge-grill-idea`)
-- **Implementation state:** Not started. No adapter, hub, breadcrumb, or test
-  exists for this decision.
+- **Implementation state:** Implemented, and the failure is visible from all three
+  places a caller could look. The breadcrumb is `src/plugin/transport/breadcrumb.ts`
+  — one line per failed delivery, written through the harness's own log client,
+  carrying a level, one fixed sentence and closed tokens, with **no throttling and
+  no de-duplication** (a quiet log during an outage would be a silent failure
+  wearing a rate limit's clothes). The storage-failure path is
+  `src/hub/ingest-service.ts`, which records a dropped event rather than storing
+  it. On the hub side, `src/hub/delivery.ts` keeps a per-event ledger and a
+  `lastFailure`, `GET /api/health` reports `delivery.status`, and the
+  `toast_deliveries` counter moves only on a real `delivered` outcome — a failed
+  attempt is never counted as a delivery. A platform with no notifier is recorded
+  as `not-wired` from both ends rather than passing silently.
+  `tests/plugin/transport.test.ts` drives the failure table over **real loopback
+  failures**, not mocks. **Not yet verified live:** the breadcrumb path has been
+  exercised through a stub logging client and through a live opencode run that
+  never reached a hub; no real harness session has yet failed to deliver to a
+  real hub, and no desktop has been shown a real toast.
 
 ## Context
 
@@ -79,10 +94,12 @@ the harness reports it resolved or the developer acknowledges it, and it
 - **Raise an error that fails the harness session.** Rejected. This would make
   the notifier able to break the thing it observes — a direct violation of
   ADR-001. The user must never lose agent work because a notification failed.
-- **A repeating toast as the primary durability mechanism for needs-you.**
-  Retained only within the bounded, deduplicated form in ADR-004, because the
-  badge carries the durable signal. A repeating toast is a weak, annoying
-  substitute for a persistent count.
+- **A repeating toast as a primary durability mechanism for needs-you.**
+  Rejected, and the question is now closed rather than bounded. ADR-004
+  originally retained a bounded, deduplicated form of this; its
+  [amendment](ADR-004-three-loudness-classes.md) removed the repetition entirely.
+  The badge carries the durable signal, so a repeating toast is neither needed
+  nor wanted.
 
 ## Consequences
 
@@ -131,5 +148,11 @@ the harness reports it resolved or the developer acknowledges it, and it
 - Feature documents: [opencode Plugin Adapter](../features/opencode-plugin-adapter.md),
   [Hub Core and Delivery Policy](../features/hub-core-and-delivery-policy.md),
   [Notification and Tray Presence](../features/notification-and-tray-presence.md).
-- Planned source locations (**do not exist yet**): `src/plugin/`, `src/hub/`,
-  `src/domain/pending.ts`, `src/notify/`.
+- Source locations: `src/plugin/transport/breadcrumb.ts`,
+  `src/plugin/transport/http.ts`, `src/hub/delivery.ts`,
+  `src/hub/ingest-service.ts`, `src/domain/pending.ts`, `src/notify/policy.ts`,
+  `src/tray/badge.ts`, `src/hub/metrics.ts`, `tests/plugin/transport.test.ts`,
+  `tests/hub/delivery.test.ts`.
+- **Still owed:** `doctor`, the diagnostic command that turns this decision's
+  evidence into one readable answer, per
+  [Install, Autostart and Operations](../features/install-autostart-and-operations.md).

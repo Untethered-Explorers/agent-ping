@@ -4,9 +4,18 @@
 - **Date:** 2026-09-26
 - **Decision owners:** Project author (decided with the user; versions recorded
   in the PRD)
-- **Implementation state:** Not started. There is no `package.json`, no
-  `tsconfig.json`, and no lockfile. Every version below is a research finding
-  in the PRD, not an installed dependency.
+- **Implementation state:** **Partial, with one recorded divergence.** The
+  toolchain itself exists and is verified: `package.json` and `package-lock.json`
+  are the single package, `tsconfig.json` is `strict` with
+  `noUncheckedIndexedAccess`, and all three build entry points work —
+  `npm run build` compiles 30 Node-hosted sources with `tsc` to `dist/main` and
+  builds the dashboard with Vite, and `npm test` runs the whole Vitest suite
+  through `scripts/run-tests.mjs`. **Electron is not yet a dependency.** The
+  composition root in `src/main/index.ts` reaches it only through a dynamic
+  `import('electron')` behind an injectable bridge, which is what lets the real
+  entry point be started by a test on a machine with no display — but the
+  Electron main process, the tray, and `src/cli/` have never actually run inside
+  Electron, because the package is not installed. See the divergence table below.
 
 ## Context
 
@@ -110,6 +119,29 @@ Source layout, per the PRD, is organised by concern: `src/domain/`,
   verified fact. The PRD's recorded default is to pin 7.0.2 and fall back to the
   5.9.x line only if a concrete incompatibility with Vitest 5 or the build path
   appears, recording the fallback when it does. This is untested.
+
+  **Resolved in practice (2026-09-26):** the build pinned **5.9.3**, so the
+  documented fallback was taken. See the divergence table below.
+
+## Divergence from the recorded technology table
+
+The table above is the PRD's *recorded default*, researched from the npm
+registry. What `package.json` actually contains as of 2026-09-26 differs, and
+the differences are decisions rather than accidents:
+
+| Role | Recorded | Installed | Why |
+|------|----------|-----------|-----|
+| Language | TypeScript 7.0.2 | **5.9.3** | The documented fallback line. `npm run typecheck` and `npm run build` are green on it. |
+| Shell and tray host | Electron 44.4.5 | **not yet installed** | Reached only through a dynamic `import('electron')`, so the hub is testable headless. The tray is asserted against the `TrayBridge` interface. |
+| Payload validation | zod 4.6.5 | **not used** | Validation is hand-written closed schemas (`INGEST_SIGNAL_FIELDS`, `INGEST_ISSUE_CODES`, `presentedWriteToken`). A dependency is a stronger promise than the closed-union approach, and every refusal has a named code. |
+| opencode plugin types | `@opencode-ai/plugin` 1.18.32 | **structural types only** | The installed plugin file must load with nothing beside it, so the adapter mirrors the 1.18.32 declarations rather than importing them. Consequence: an upstream signature change is **not** caught by a compile error here. |
+| opencode client | `@opencode-ai/sdk` 1.18.32 | **not used** | Same reason, and nothing needs a client: delivery is a plain HTTP POST to loopback. |
+| ACP client | `@agentclientprotocol/sdk` 1.5.0 | **not yet installed** | Deferred with the Copilot spike (ADR-005). No ACP code exists. |
+| End-to-end tests | Playwright 1.63.0 | **not yet installed** | Owned by the live-dashboard feature. `scripts/run-tests.mjs` already dispatches `tests/e2e` to it and **fails loudly** when the CLI or config is absent, so the gap cannot be reported as a pass. |
+| — | not listed | eslint 10.11.0, typescript-eslint 8.70.1, `@types/node` | The lint configuration the toolchain feature added. |
+
+The single-toolchain constraint itself is intact: one language, one package, one
+type checker, one `npm` entry point per build step.
 - **Risk:** **Playwright browser download may fail** in a locked environment.
   The mitigation is that the dashboard is also served over loopback, so the
   journey can be driven in an existing browser; script failure is explicit and
@@ -139,5 +171,7 @@ Source layout, per the PRD, is organised by concern: `src/domain/`,
   (which also establishes the toolchain and the test-runner convention),
   [Live Dashboard](../features/live-dashboard.md),
   [Install, Autostart and Operations](../features/install-autostart-and-operations.md).
-- Planned paths (**do not exist yet**): `package.json`, `tsconfig.json`,
-  `src/`, `tests/`, `scripts/`.
+- Paths: `package.json`, `tsconfig.json`, `tsconfig.build.json`,
+  `vitest.config.ts`, `eslint.config.js`, `scripts/build.mjs`,
+  `scripts/run-tests.mjs`, `src/`, `tests/`. `src/cli/` is the one directory in
+  the agreed layout that does not exist yet.

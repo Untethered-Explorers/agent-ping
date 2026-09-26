@@ -1,121 +1,272 @@
-# agent-ping
+<div align="center">
+  <img src="assets/images/agent-ping-logo.png" width="96" alt="agent-ping logo">
 
-A local-only notification surface that watches long-lived coding-agent sessions
-across every repository on one machine, and tells you when a session is blocked
-waiting on you, or when it finished real work.
+  # agent-ping
 
-> **Status: requirements only — nothing is implemented.**
->
-> This repository currently contains **no `package.json`, no `src/`, no `tests/`,
-> no build scripts, and no release tag**. There is no installable package, no
-> runnable daemon, and no released version. Everything under `docs/` describes
-> intended behaviour, not observed behaviour.
->
-> `agent-ping` does not exist yet, and nothing here has been validated by a
-> build, a test run, or a live run against a real agent harness. Treat every
-> document in this repository as a plan.
->
-> There is also **no `CHANGELOG.md`, no user guide, and no administrator
-> guide** — those describe shipped behaviour, and there is none to describe.
-> See [Documentation](#documentation) for what does exist and why.
+  *Know when a coding agent is blocked on you — and when it is actually done.*
 
-## What it is meant to be
+  ![node](https://img.shields.io/badge/node-%3E%3D22.12-3c873a?style=flat-square)
+  ![typescript](https://img.shields.io/badge/typescript-strict-3178c6?style=flat-square)
+  ![pixi](https://img.shields.io/badge/pixijs-8-e91e63?style=flat-square)
+  ![platforms](https://img.shields.io/badge/platforms-linux%20%7C%20macos%20%7C%20windows-555?style=flat-square)
+  ![loopback](https://img.shields.io/badge/network-loopback%20only-2ea44f?style=flat-square)
 
-One person, one machine, on loopback. Not a team product, not a hosted service,
-not a remote agent monitor. There is no authentication because there is one
-user, and that user is at the keyboard.
+  [Status](#status) • [How it works](#how-it-works) • [Notifications](#notifications) • [Getting started](#getting-started) • [HTTP API](#http-api) • [Configuration](#configuration) • [Documentation](#documentation)
 
-The core design constraints, all deliberate:
+</div>
 
-- **Sidecar, never supervisor.** agent-ping observes agent processes and never
-  owns them. It can be killed and restarted at any moment without loss, and a
-  repository that was never configured still works.
-- **Read-only.** The surface shows state. Exactly one route mutates anything,
-  and it only marks a pending item acknowledged. Nothing can approve a
-  permission or steer a session.
-- **No content storage, ever.** It persists *that* something happened, never
-  *what* was said. No prompts, responses, tool output, or file contents — in
-  the log, in a log file, or in any request.
-- **Three loudness classes.** *Needs You* (blocked, OS toast, repeats until
-  acknowledged), *Finished* (idle after real work, one notification), and *FYI*
-  (errors, retries, long tool calls, compaction, token burn — in-app only).
-- **No sound in v1.** Deferred, not rejected, until the signal is trusted.
-- **One global install** covering every repository, with no per-repository
-  configuration and no registry to drift.
+You run several long-lived agent sessions at once, across several repositories, and
+you lose track of them. One blocks on a permission decision you never see, and you
+find out an hour later. agent-ping watches those sessions and tells you when one is
+waiting on you and when one finished real work — quietly enough that you are willing
+to leave it running.
 
-The full rationale, including the open questions left open on purpose, is in
-[docs/IDEA.md](docs/IDEA.md).
+It is a **local-only sidecar**: one global install, a loopback port, an OS toast and
+a tray badge. It never stores what your agents said, and it never drives them.
+
+## Status
+
+**Under active build.** The hub, the log, the notification path and the opencode
+adapter are implemented and covered by 877 tests. The packaged install, the command
+line and the live dashboard are not.
+
+| Area | State |
+|------|-------|
+| Content-free SQLite log, retention, local counters | Built, tested |
+| Loopback hub: reads, live stream, ingest, ack + security, delivery, restart replay, metrics, clean shutdown | Built, tested |
+| Notifiers for Linux, macOS and Windows; tray icon with pending badge | Built, tested |
+| opencode adapter: event translation, transport with visible failure, global plugin install | Built, tested |
+| PixiJS 8 dashboard prototype, DOM mirror, keyboard model | Built, reviewed |
+| Live dashboard wired to the hub (LD-1 → LD-4) | Not started |
+| CLI, npm package, autostart, `doctor` (IO-1 → IO-4) | Not started |
+| Polling fallback, live run against a real session (OA-4 → OA-6) | Not started |
+| GitHub Copilot CLI ACP spike (CP-1 → CP-2) | Not started |
+
+> [!IMPORTANT]
+> There is no `agent-ping` command to run yet, and no release. `package.json` carries
+> no `bin` entry, `src/cli` does not exist, and nothing has been installed globally.
+> [docs/PROGRESS.md](docs/PROGRESS.md) is the running build log, including every check
+> that is *not* yet verified against real software — the macOS and Windows notifiers
+> have never run on macOS or Windows, and the hub has never been driven by a live
+> opencode session.
+
+## How it works
+
+```text
+   opencode session
+         │
+         │  one global plugin file, every session, every repo
+         ▼
+  ┌────────────────────────────────────────────┐
+  │  hub  ·  127.0.0.1  ·  6 reads, 1 stream   │
+  │  classify → store → deliver                │
+  └───┬─────────────┬─────────────┬────────────┘
+     │             │             │
+     ▼             ▼             ▼
+   SQLite log     OS toast      tray badge
+   state only     needs-you /  durable pending
+                  finished      count
+     │
+     ▼
+   PixiJS 8 dashboard  ·  fed by the change stream
+```
+
+A globally installed opencode plugin translates harness events into one normalized
+envelope and posts it to the hub. The hub classifies the signal, writes it to a
+local SQLite log, and delivers what the class is worth. Watching dashboards update
+from the same change feed — so there is no per-repository configuration and no
+registry that can drift out of sync with reality.
+
+## Notifications
+
+Three classes, three levels of loudness. The design constraint is that this tool
+must never become the thing demanding your attention, so most signals stay inside
+the app.
+
+| Class | Trigger | What you get |
+|-------|---------|--------------|
+| **Needs you** | Session blocked on a permission decision or your input | Resident critical toast, never auto-dismissed. One toast per block — the badge and the history carry persistence, not a repeat timer. |
+| **Finished** | Session went idle *after doing real work* | One normal toast that expires. |
+| **FYI** | Errors, retries, long tool calls, compaction, token burn | Nothing. In-app only; the dashboard is where you read it. |
+
+Two rules that matter more than the table:
+
+- A session that goes idle having done **nothing** — opened, greeted, closed — fires
+  no event at all. That gate lives in the classifier, not in the notifier.
+- **No sound in v1.** Deferred rather than rejected, and structurally so: there is no
+  sound field anywhere on the notification path.
+
+## What agent-ping will not do
+
+These are enforced in code and asserted by tests, not conventions.
+
+- **Never store conversation content.** The event envelope is exactly ten fields —
+  harness, session id, repository name and path, raw event name, class, subtype, two
+  timestamps and a dedupe key. There is no field that *could* hold a prompt, a
+  response, tool output or a diff, and the test asserting that is an exact set rather
+  than a denylist, so adding a `snippet` field fails the suite.
+- **Never drive an agent.** No route spawns, steers, interrupts, prompts or approves
+  anything. `POST /api/ack/:eventId` is the only route that can change an existing
+  record, and it can only mark a block acknowledged. The route registry refuses at
+  registration time to accept a second one.
+- **Never bind wider than loopback.** The bind is `127.0.0.1`; the socket's remote
+  address is checked before routing; the one write route requires a per-install
+  token; the dashboard is served under a strict CSP; and no CORS header is ever sent.
+- **Never own a session.** It is a sidecar: kill it, restart it, lose the race with
+  it — no agent process is affected, and a repository that was never configured keeps
+  working.
+- **Never fail silently.** If the hub is down, the plugin leaves a breadcrumb in your
+  harness's own UI instead of swallowing the event. A delivery that fails is reported
+  on health, in the delivery ledger and in the metrics — never as a silent success.
+
+## Getting started
+
+Requires **Node.js 22.12 or newer**. This is a development checkout: there is nothing
+to install globally yet.
+
+```bash
+npm install          # one package; better-sqlite3 is the only runtime dependency
+npm test             # 877 tests across 29 files, on real loopback sockets
+npm run typecheck    # tsc --strict, noUncheckedIndexedAccess
+npm run lint
+npm run build        # tsc -> dist/main, Vite -> dist/dashboard
+```
+
+### The dashboard prototype
+
+The static prototype renders three mock rows in PixiJS with no hub, no plugin and no
+real data. It exists to settle the layout and the accessibility model before any
+connector work.
+
+```bash
+npx vite                                    # dev server on the prototype page
+npm run build:dashboard                     # -> dist/dashboard/index.html
+```
+
+### The hub, by hand
+
+There is no CLI yet, so the hub is started programmatically. `tsc` emits JavaScript
+only, so copy the schema beside it first (POSIX shells):
+
+```bash
+npm run build
+cp src/storage/schema.sql dist/main/storage/
+```
+
+```js
+import { startHub } from './dist/main/main/index.js'
+import { readFileSync } from 'node:fs'
+
+const hub = await startHub({ lifecycle: { installSignals: false } })
+const token = readFileSync(`${hub.stateDir}/hub-write-token`, 'utf8').trim()
+
+// A block reported by a harness adapter.
+await fetch(`${hub.origin}/api/ingest`, {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({
+    harness: 'opencode',
+    eventName: 'permission.asked',
+    sessionId: 'ses_demo',
+    repoFullPath: '/home/dev/Projects/agent-ping',
+    transitionId: 'blk_1',
+    occurredAt: new Date().toISOString(),
+  }),
+})
+
+const { items } = await (await fetch(`${hub.origin}/api/pending`)).json()
+
+// The one mutation a client can reach.
+await fetch(`${hub.origin}/api/ack/${items[0].eventId}`, {
+  method: 'POST',
+  headers: { 'x-agent-ping-token': token },
+})
+
+await hub.close()
+```
+
+## HTTP API
+
+Every route the product serves, in one table. The mutating set is a closed union:
+`POST /api/ack/:eventId` is the only control surface, and `POST /api/ingest` only
+appends a row.
+
+| Method | Path | What it does |
+|--------|------|--------------|
+| `GET` | `/api/sessions` | Every session, grouped by repository short name |
+| `GET` | `/api/sessions/:sessionId` | One session and its most recent events |
+| `GET` | `/api/pending` | The pending set — the same accessor the tray badge reads |
+| `GET` | `/api/events` | Bounded event history, optionally filtered by `sessionId` |
+| `GET` | `/api/metrics` | Four local counters and when each last moved |
+| `GET` | `/api/health` | Instance, database, server, dashboard and delivery status |
+| `GET` | `/api/stream` | Server-sent change frames: 25 s heartbeat, 5 min replay window |
+| `POST` | `/api/ingest` | Append one harness signal (append-only; no token) |
+| `POST` | `/api/ack/:eventId` | Mark one block acknowledged (requires the write token) |
+| `GET` | `/` | The built dashboard, under a strict content-security-policy |
+
+State directories, the database, the runtime file and the write token are all
+owner-only (`0700` directory, `0600` files).
+
+## Configuration
+
+| Variable | Effect |
+|----------|--------|
+| `AGENT_PING_STATE_DIR` | Redirects all state. The layout inside it is agent-ping's, on every platform. |
+| `XDG_CONFIG_HOME` | Where the opencode plugin is installed, as opencode itself resolves it. |
+
+```text
+$XDG_STATE_HOME/agent-ping/            # Linux
+~/Library/Application Support/agent-ping/   # macOS
+%LOCALAPPDATA%\agent-ping/             # Windows
+
+  agent-ping.db        durable log: sessions, events, counters
+  hub-runtime.json     the single-instance lock and the live port
+  hub-write-token      the per-install write token
+```
+
+## Project layout
+
+```text
+src/
+  domain/      the normalized envelope, the classifier, the pending lifecycle
+  storage/     the content-free SQLite schema, the store, retention, counters
+  hub/         the loopback server, routes, SSE feed, delivery, security, tray
+  notify/      the notifier interface and the Linux, macOS and Windows backends
+  plugin/      the opencode adapter, its transport, and the global installer
+  dashboard/   the PixiJS 8 prototype and its accessibility modules
+  main/        the composition root: the one place collaborators are wired
+tests/         one suite per area, run by scripts/run-tests.mjs
+scripts/       the build and test entry points
+docs/          the requirements, decisions, evidence and build log
+```
 
 ## Documentation
 
-### Architecture decisions
-
-[docs/adr/](docs/adr/README.md) — eleven ADRs covering the sidecar boundary, the
-loopback API surface, the content-free storage guarantee, the loudness policy,
-the ACP-typed connector interface, the global install, the toolchain, identity,
-the on-demand surface, visible failure, and build ordering. **All eleven are
-`Accepted` as design and `Not started` as implementation.**
-
-### Requirements
-
 | Document | What it is |
-|----------|-----------|
-| [docs/IDEA.md](docs/IDEA.md) | Idea of record, preserved unchanged. The product rationale and the boundaries. |
-| [docs/PRD.md](docs/PRD.md) | Product requirements: goals, non-goals, personas, constraints, architecture, risks, open questions, and the requirement-ID traceability matrix. |
-| [docs/features/](docs/features/) | Eight canonical feature documents, each with requirements, task contracts, testing strategy, and acceptance criteria. |
+|----------|------------|
+| [docs/IDEA.md](docs/IDEA.md) | The idea of record: the problem, the boundaries, the questions left open on purpose. |
+| [docs/PRD.md](docs/PRD.md) | Product requirements, constraints, risks and the requirement-ID matrix. |
+| [docs/adr/](docs/adr/) | Eleven architecture decision records: the sidecar boundary, the loopback surface, the content-free guarantee, the loudness policy, the connector interface, the global install, the toolchain, identity, the on-demand surface, visible failure, and build ordering. Each record separates whether the decision is in force from whether code exists for it. |
+| [docs/features/](docs/features/) | Eight canonical feature documents with requirements, task contracts, testing strategy and acceptance criteria. |
+| [docs/PROGRESS.md](docs/PROGRESS.md) | The running build log: completed tasks, remaining work, and every unverified check. |
+| [docs/reviews/](docs/reviews/) | Human review records for the completed design and hub gates. |
+| [docs/runbooks/](docs/runbooks/) | Operational notes, currently the per-platform notification behaviour. |
+| [docs/artifacts/](docs/artifacts/) | Per-task evidence captured by the build engine. |
 
-Feature documents, in dependency order:
+> [!NOTE]
+> The requirements documents in `docs/` were written before the build and are
+> **plans, not reports**. Read an ADR's *Implementation state* line and
+> [docs/PROGRESS.md](docs/PROGRESS.md) for what actually exists; where the two
+> disagree, those two are current and the requirements document is not.
 
-1. [Dashboard Design Prototype](docs/features/dashboard-design-prototype.md) — a static PixiJS page with three mock rows, to settle the design and the toolchain before any connector work.
-2. [Event Model and Durable Log](docs/features/event-model-and-durable-log.md) — the envelope, the three classes, the pending lifecycle, and the content-free SQLite log.
-3. [Hub Core and Delivery Policy](docs/features/hub-core-and-delivery-policy.md) — the daemon, the loopback API, ingest, streaming, and what gets delivered.
-4. [Notification and Tray Presence](docs/features/notification-and-tray-presence.md) — toasts per class, and the tray badge as the durable signal.
-5. [opencode Plugin Adapter](docs/features/opencode-plugin-adapter.md) — the global plugin, the breadcrumb on failure, and the polling fallback.
-6. [Live Dashboard](docs/features/live-dashboard.md) — the on-demand PixiJS surface wired to real state, with its DOM mirror.
-7. [Install, Autostart and Operations](docs/features/install-autostart-and-operations.md) — the global install, per-platform autostart, `doctor`, and uninstall.
-8. [Copilot CLI ACP Spike](docs/features/copilot-cli-acp-spike.md) — whether Copilot can report idle and permission signals, ending in a recorded gate decision.
+## Non-goals
 
-### Not present, and why
+Listed so they do not get quietly smuggled back in:
 
-| Artifact | Why it is absent |
-|----------|------------------|
-| `CHANGELOG.md` | No release exists, so there is no change history to record. Created by the first tag. |
-| `docs/releases/` | No versioned release to write notes for. |
-| `docs/user-guide.md` | Would have to document commands and UI that do not exist. Writing it now would be fiction. |
-| `docs/admin-guide.md` | Would have to document installing, configuring, and operating a daemon with no code. |
-| `AGENTS.md` | Not created. Documentation-upkeep rules for agents belong with a codebase that has code to keep documented. |
-
-## Repository layout
-
-```text
-docs/
-  IDEA.md        idea of record (preserved unchanged)
-  PRD.md         product requirements and traceability
-  adr/           architecture decision records
-  features/      eight canonical feature documents
-  research/      local model inventory (not a requirement source)
-.opencode/       MyForge authoring tooling (agents and skills), not product code
-```
-
-There is no `src/`, `tests/`, or `scripts/` yet. The intended layout is
-recorded in [PRD §6.2](docs/PRD.md#62-project-structure).
-
-## Status vocabulary
-
-Because this repository is pre-implementation, **two independent axes** are used
-throughout the documentation, and conflating them is the main way these documents
-could mislead:
-
-| Axis | Values | Question it answers |
-|------|--------|---------------------|
-| **Decision / document status** | Proposed, Accepted, Superseded, Deprecated | Is this decision in force? |
-| **Implementation state** | Not started, Partial, Complete | Does code exist? |
-
-Every ADR is currently **Accepted / Not started**.
-
-## Contributing
-
-There is no build, no test command, and no contribution guide, because there is
-no code. The intended toolchain is recorded in
-[ADR-007](docs/adr/ADR-007-single-node-typescript-toolchain.md): Node.js 22 LTS
-or newer, TypeScript, and npm, as a single package.
+- Multi-user, authentication, or any hosted or remote component.
+- Supervising agent processes — spawning, steering or killing sessions.
+- Write endpoints for approving permissions, sending prompts or remote control.
+- Transcript history or search over conversation content.
+- Sound.
+- An always-on-top ambient window (deferred to v2, not rejected).
+- Harnesses beyond opencode and Copilot CLI.

@@ -3,9 +3,20 @@
 - **Status:** Accepted
 - **Date:** 2026-09-26
 - **Decision owners:** Project author (settled with the user via `forge-grill-idea`)
-- **Implementation state:** Not started. No adapter, no envelope implementation,
-  and no ACP probe exists for this decision. The ACP version claims below are
-  research findings recorded in the PRD, not verified by this repository.
+- **Implementation state:** **Partial.** The interface exists — the normalized
+  envelope is `src/domain/envelope.ts` and the delivery sink is
+  `POST /api/ingest` — and opencode is a working reference adapter in
+  `src/plugin/opencode/`. What is missing is the second harness: no Copilot
+  adapter and no ACP probe exist yet, so the gate decision this ADR depends on
+  has not been made. The two things that keep the *decision* honest in the
+  meantime are already in place. `KNOWN_HARNESSES` is a closed union, so a
+  harness is a one-line addition rather than an edit. And the classifier's table
+  already carries eleven `copilot-cli` rows, marked `observed` or `unresolved`
+  where upstream is unresolved — the signals are recorded rather than invented,
+  which is what this ADR requires before the spike.
+  **The ACP version claims below remain research findings recorded in the PRD,
+  not verified by this repository**; nothing here has been confirmed against a
+  live ACP session.
 
 ## Context
 
@@ -127,5 +138,10 @@ exist.
 - Originating rationale: [IDEA.md — Scope](../IDEA.md#scope) and
   [IDEA.md — Open Questions](../IDEA.md#open-questions), which records the
   Copilot hook question as "a spike to run early, not a design decision".
-- Planned source locations (**do not exist yet**): `src/plugin/`, and an ACP
-  client dependency.
+- Source locations: `src/domain/envelope.ts`, `src/domain/classify.ts`,
+  `src/plugin/opencode/` (the reference adapter), `src/plugin/transport/`,
+  `src/hub/routes/ingest.ts`, `tests/plugin/opencode-translate.test.ts`.
+- **Still owed:** the Copilot CLI ACP spike and its recorded gate decision, per
+  [Copilot CLI ACP Spike](../features/copilot-cli-acp-spike.md). Until that
+  decision is recorded, the `copilot-cli` rows in the classifier must stay
+  marked unresolved rather than gain invented mappings.

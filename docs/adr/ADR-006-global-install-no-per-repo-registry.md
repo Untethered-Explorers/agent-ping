@@ -3,8 +3,19 @@
 - **Status:** Accepted
 - **Date:** 2026-09-26
 - **Decision owners:** Project author (settled with the user via `forge-grill-idea`)
-- **Implementation state:** Not started. No installer, no plugin file, and no
-  autostart unit exists for this decision.
+- **Implementation state:** **Partial — the mechanism is built, the commands are
+  not.** `src/plugin/install/global-plugin.ts` implements the whole of the
+  single-file global install: it resolves opencode's config root the way opencode
+  does, generates one self-contained plugin file by inlining the adapter's own
+  modules, **verifies that file loads and translates an event in a fresh Node
+  process before publishing it**, and records the product version and a `sha256`
+  of the emitted bytes so a second install is a no-op and a *different* installed
+  version is reportable rather than overwritable. It was exercised against a live
+  `opencode run` with the file in the real plugin directory. What does not exist
+  yet is anything a user can invoke: `src/cli/` is absent, so there is no
+  `agent-ping install` or `agent-ping uninstall`, and the per-platform autostart
+  units in the Decision below are unimplemented. The polling fallback is also
+  unbuilt — push is currently the only path.
 
 ## Context
 
@@ -95,9 +106,10 @@ anything which cannot push is not invisible.
   does mean the blast radius of a plugin bug is every session.
 - **Operational implication:** the hub's live port is written to a runtime file
   that the plugin reads, so a port collision with an existing default is
-  resolved without editing plugin configuration. The specific default and
-  collision behaviour remains an open question in the PRD, not a shipped
-  behaviour.
+  resolved without editing plugin configuration. This is shipped behaviour, not
+  an open question: the port is published only after the socket is bound, so an
+  adapter that finds a runtime file with no port in it sees a hub that is still
+  starting and can retry, and an adapter can never be pointed at a stale port.
 - **Risk:** A global plugin that throws could degrade opencode itself. The
   sidecar property in ADR-001 — sessions work identically with the plugin
   absent — is what bounds this, and it is a load-bearing dependency between
@@ -121,5 +133,9 @@ anything which cannot push is not invisible.
   [Install, Autostart and Operations](../features/install-autostart-and-operations.md).
 - Originating rationale: [IDEA.md — Scope](../IDEA.md#scope) and
   [IDEA.md — How It Connects](../IDEA.md#how-it-connects).
-- Planned source locations (**do not exist yet**): `src/cli/`, `src/plugin/`,
-  and per-platform autostart unit templates.
+- Source locations: `src/plugin/install/global-plugin.ts`,
+  `src/hub/runtime-file.ts`, `src/storage/paths.ts` (the two places a platform
+  directory is resolved), `tests/plugin/install.test.ts`.
+- **Still owed:** the `install` / `uninstall` / `status` / `doctor` commands in
+  `src/cli/`, and the per-platform autostart unit templates, per
+  [Install, Autostart and Operations](../features/install-autostart-and-operations.md).

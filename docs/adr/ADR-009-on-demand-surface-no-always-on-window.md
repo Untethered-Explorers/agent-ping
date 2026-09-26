@@ -3,8 +3,23 @@
 - **Status:** Accepted
 - **Date:** 2026-09-26
 - **Decision owners:** Project author (settled with the user via `forge-grill-idea`)
-- **Implementation state:** Not started. No dashboard, no prototype, and no
-  layout exists for this decision.
+- **Implementation state:** **Partial.** The on-demand half is built; the
+  surface it opens is not finished. The hub is a daemon with no window, the
+  notification is an OS toast, and the toast carries a deep link
+  (`DEEP_LINK_QUERY_KEY` = `session`, built from the live origin) that the tray
+  click also resolves. The badge is the durable signal and it is implemented,
+  including the cap this ADR leaves open: `src/tray/badge.ts` renders `1..99` as
+  the count, anything above `BADGE_CAP` as `99+`, and never as a wrong number.
+  The canvas-plus-DOM-mirror pairing exists and is tested:
+  `src/dashboard/prototype/scene.ts` draws with icon-plus-text state encoding
+  rather than colour alone, and `src/dashboard/a11y/dom-mirror.ts` pairs every
+  visible row with a visually hidden focusable entry keyed by row identity.
+  **What does not exist yet:** the live dashboard. The prototype renders mock
+  data with no hub behind it, so the page-header pending count beside the
+  connection state, the acknowledgement control on a blocked row, the copyable
+  handoff command, and the history panel are all unbuilt — they belong to the
+  live-dashboard feature. **No always-on window exists**, and no desktop has
+  displayed the tray icon.
 
 ## Context
 
@@ -104,10 +119,13 @@ actually happens.**
   this as unsettleable by discussion, which is why ADR-011 sequences a prototype
   first. Reduced-motion support is mandatory regardless of the outcome.
 - **Constraint carried forward:** Because nothing is ambient, the tray badge
-  must be correct at a glance without the dashboard being open. Badge rendering
-  for arbitrary counts on every desktop is an open question in the PRD; counts
-  above 99 are planned to render as a capped marker while the true count
-  remains available in the dashboard and in `status`.
+  must be correct at a glance without the dashboard being open. The open question
+  is now closed in code: `src/tray/badge.ts` caps at `BADGE_CAP = 99` and renders
+  `99+` above it, so a badge never claims a number it cannot legibly show. The
+  true count remains available through `GET /api/pending` and the dashboard, so
+  the badge is never the only place a number exists. **Whether a real desktop
+  renders a drawn badge legibly at its real tray size, and whether a click
+  reaches the handler, are unverified** — that is the NT-4 and NT-5 human gate.
 
 ## Implementation References
 
@@ -129,5 +147,8 @@ actually happens.**
   [Dashboard Design Prototype](../features/dashboard-design-prototype.md),
   [Notification and Tray Presence](../features/notification-and-tray-presence.md).
 - Originating rationale: [IDEA.md — Where The Surface Lives](../IDEA.md#where-the-surface-lives).
-- Planned source locations (**do not exist yet**): `src/dashboard/`,
-  `src/notify/`.
+- Source locations: `src/dashboard/prototype/`, `src/dashboard/a11y/`,
+  `src/dashboard/theme/motion.ts`, `src/tray/badge.ts`, `src/hub/tray.ts`,
+  `src/notify/policy.ts` (the deep link), `src/hub/server.ts` (the dashboard
+  document route and its CSP).
+- **Still owed:** the live page, per [Live Dashboard](../features/live-dashboard.md) — the header pending count, the ack control, the handoff command, the history panel, and the browser-driven journey that would prove them.

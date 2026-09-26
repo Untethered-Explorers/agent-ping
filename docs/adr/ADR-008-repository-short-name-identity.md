@@ -3,8 +3,15 @@
 - **Status:** Accepted
 - **Date:** 2026-09-26
 - **Decision owners:** Project author (settled with the user via `forge-grill-idea`)
-- **Implementation state:** Not started. No envelope, schema, or dashboard row
-  rendering exists for this decision.
+- **Implementation state:** Implemented. The short name is derived in exactly one
+  place — `src/domain/classify.ts` — so an adapter cannot get it wrong, and the
+  ingest route never accepts a `repoShortName` from a client: a post carrying one
+  is told the field is not accepted rather than quietly ignored. Both names are
+  carried, `repo_short_name` is indexed in `src/storage/schema.sql`, and every
+  read route returns both. The dashboard's grouping and ordering exist in the
+  prototype: `orderSessions` in `src/dashboard/prototype/scene.ts` sorts blocked
+  first and then by recency within a group, and the full path is the hover/focus
+  detail.
 
 ## Context
 
@@ -100,5 +107,6 @@ Sessions nest beneath it.
 - Originating rationale: [IDEA.md — Boundaries](../IDEA.md#boundaries), "The
   dashboard's question is 'which of my projects is asking for me', which is a
   repo-level question."
-- Planned source locations (**do not exist yet**): `src/domain/envelope.ts`,
-  `src/storage/`, `src/dashboard/`.
+- Source locations: `src/domain/classify.ts` (the derivation), 
+  `src/domain/envelope.ts`, `src/storage/schema.sql`, 
+  `src/storage/eventStore.ts`, `src/dashboard/prototype/scene.ts`.

@@ -3,8 +3,19 @@
 - **Status:** Accepted
 - **Date:** 2026-09-26
 - **Decision owners:** Project author (settled with the user via `forge-grill-idea`)
-- **Implementation state:** Not started. No classifier, notifier, or test exists
-  for this decision.
+- **Implementation state:** Implemented, with one platform gate still open. The
+  classifier table in `src/domain/classify.ts` is the single place a harness
+  event becomes a class, and it carries explicit `suppressed` rows for the
+  signals this ADR says must not fire — the idle-after-nothing gate is a row in
+  that table, not a branch in a notifier. The class *policy* is a second, pure
+  table in `src/notify/policy.ts` (`CLASS_POLICIES`), total over the class union,
+  where `fyi` is a **named refusal** rather than a no-op and no cell carries a
+  sound field. Both tables are enumerated by tests rather than restated:
+  `tests/domain/classify.test.ts` and `tests/notify/policy.test.ts`. **Not yet
+  verified on a real desktop:** `persistence: 'resident'` is a request to the
+  installed notification server, and only Linux has had a real binary run against
+  it. Whether a real notification server honours it is still the NT-4 human gate
+  (see the Consequences entry on platform sensitivity).
 
 ## Context
 
@@ -39,7 +50,7 @@ with a fixed delivery policy.
 
 | Class | Trigger | Delivery |
 |-------|---------|----------|
-| **Needs You** | Session blocked on a permission decision or user input | OS toast, non-auto-dismissing, repeats until acknowledged |
+| **Needs You** | Session blocked on a permission decision or user input | OS toast, non-auto-dismissing, one per block; persistence carried by the badge and the history |
 | **Finished** | Session went idle after doing real work | One notification per idle transition, then silent until the session resumes |
 | **FYI** | Errors, retries, long tool calls, compaction, token burn | In-app only; never leaves the app |
 
@@ -55,10 +66,31 @@ Binding rules:
 - **Per-block deduplication.** A block produces one needs-you event per
   unresolved block, deduplicated by session and block identifier. A second
   permission ask for the same block never produces a second event.
+- **One needs-you toast per block; no repeat timer.** See the amendment below.
+  Persistence across time is the badge and the dashboard history, not a second
+  toast.
 - **"Task done" and "session complete" are not separate events.** Per-subtask
   firing does not exist in this product.
 - **No sound in v1**: no audio, no terminal bell, no notification sound on any
   platform.
+
+## Amendment: needs-you no longer repeats (2026-09-26)
+
+This ADR originally specified that a needs-you notification "repeats until
+acknowledged", and the Consequences section flagged that as "a mild escalation
+loop … it must not become an unbounded retry". The notification feature
+requirement settled that open risk in the opposite direction: **NT-FR-08 forbids
+the repeat timer outright** — one needs-you toast per block, with the tray badge
+and the history carrying persistence instead.
+
+The decision is therefore **narrowed**, not reversed. The class, its trigger and
+its urgency are unchanged, and the badge already existed as the durable signal
+this ADR named in Alternatives Considered. What is removed is the repetition.
+
+The rule is now structural rather than documented: `CLASS_POLICIES` in
+`src/notify/policy.ts` has no repeat field, no timer and no re-fire path, and
+adding one means editing a table a test enumerates. `tests/notify/policy.test.ts`
+asserts the absence of a sound-capable argument and the single-toast property.
 
 ## Alternatives Considered
 
@@ -91,14 +123,19 @@ Binding rules:
 - **Cost:** The non-auto-dismissing toast for needs-you is platform-sensitive.
   The PRD records this as a live risk: the badge count, not the toast, is the
   durable signal, and per-platform implementations ship with scripted checks
-  whose human review gate can only be completed on that platform.
+  whose human review gate can only be completed on that platform. This is now
+  also the *only* persistence mechanism, since the amendment removed the repeat
+  timer — which raises the stakes of that gate.
 - **Cost:** The idle gate depends on reliably observing tool calls, edits, and
   todo updates for every harness. On a harness that cannot report these
   precisely, the gate is inferred — which is exactly the risk recorded for the
   Copilot adapter (see ADR-005).
-- **Risk:** "Repeats until acknowledged" for needs-you is a mild escalation
-  loop. It is bounded by deduplication and by acknowledgement clearing the
-  pending item; it must not become an unbounded retry.
+- **Resolved risk:** "Repeats until acknowledged" for needs-you was recorded here
+  as a mild escalation loop that "must not become an unbounded retry". The
+  amendment settled it by removing the repetition rather than bounding it. The
+  escalation loop no longer exists; the cost is that an unacknowledged block
+  depends on the developer noticing the badge, or a notification server that
+  honours `persistence: 'resident'`.
 
 ## Implementation References
 
@@ -114,5 +151,6 @@ Binding rules:
   and 3 in [PRD §16](../PRD.md#16-open-questions) on the exact per-platform
   mechanism for a non-auto-dismissing toast.
 - Originating rationale: [IDEA.md — What Earns An Interruption](../IDEA.md#what-earns-an-interruption).
-- Planned source locations (**do not exist yet**): `src/domain/classify.ts`,
-  `src/notify/`.
+- Source locations: `src/domain/classify.ts`, `src/notify/policy.ts`,
+  `src/notify/registry.ts`, `src/hub/delivery.ts`, `tests/domain/classify.test.ts`,
+  `tests/notify/policy.test.ts`, `tests/notify/registry-selection.test.ts`.

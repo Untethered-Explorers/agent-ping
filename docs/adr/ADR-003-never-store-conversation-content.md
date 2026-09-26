@@ -3,8 +3,15 @@
 - **Status:** Accepted
 - **Date:** 2026-09-26
 - **Decision owners:** Project author (settled with the user via `forge-grill-idea`)
-- **Implementation state:** Not started. No code, schema, or test exists for this
-  decision. In particular, the invariant test this ADR relies on does not exist.
+- **Implementation state:** Implemented, and the invariant test this ADR relies
+  on exists. `tests/storage/schema.test.ts` asserts the **exact column set of
+  every table** in `src/storage/schema.sql`, and `tests/domain/classify.test.ts`
+  asserts the exact ten-field envelope set against a runtime
+  `ENVELOPE_FIELDS` list and a `Record<keyof NormalizedEvent, true>` literal.
+  Both are exact-set assertions rather than denylists, so a `snippet` or `body`
+  field fails the suite rather than passing unnoticed. The ingest route's closed
+  wire schema (`INGEST_SIGNAL_FIELDS`) and the metrics payload's key set are
+  asserted the same way.
 
 ## Context
 
@@ -105,6 +112,6 @@ This is enforced as an **invariant, not a convention**:
   ingest payload test.
 - Originating rationale: [IDEA.md — Boundaries](../IDEA.md#boundaries), "No
   content storage, ever."
-- Planned source locations (**do not exist yet**): `src/storage/schema.sql`,
-  `src/storage/eventStore.ts`, `src/domain/envelope.ts`,
-  `tests/storage/schema.test.ts`.
+- Source locations: `src/storage/schema.sql`, `src/storage/eventStore.ts`,
+  `src/domain/envelope.ts`, `src/hub/routes/ingest.ts`,
+  `tests/storage/schema.test.ts`, `tests/domain/classify.test.ts`.
