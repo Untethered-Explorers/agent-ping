@@ -16,8 +16,9 @@
 //   - Every read shape has exactly the approved field set, which is the API half
 //     of the privacy boundary: the schema cannot hold content, and neither can
 //     anything this module hands out.
-//   - The accessor's surface is exactly the five accessors plus a close, so
-//     there is no raw query escape hatch to grow.
+//   - The accessor's surface is exactly the approved typed accessors plus a
+//     close, so there is no raw query escape hatch to grow. Two bounded reads
+//     (readSession, readEventHistory) were added for the read routes of HC-FR-02.
 //   - Resolution and acknowledgement are idempotent, and acknowledging a block
 //     the harness already resolved is refused distinguishably and changes
 //     nothing (HC-FR-05, EL-FR-08).
@@ -358,13 +359,18 @@ describe('resolving the database file (EL-FR-11, IO-FR-07)', () => {
 describe('the store surface', () => {
   it('exposes exactly the approved accessors, with no query escape hatch', () => {
     const store = openTemporaryStore()
+    // readSession and readEventHistory were added for the two bounded read routes
+    // of HC-FR-02 (`GET /api/sessions/:id` and `GET /api/events`). The list is
+    // still closed: two typed accessors grew, and no way to run a statement did.
     expect(Object.keys(store).sort()).toEqual([
       'close',
       'filePath',
       'insertEvent',
       'markAcknowledged',
       'markResolved',
+      'readEventHistory',
       'readPending',
+      'readSession',
       'readSessionSummaries',
       'rebuiltFromMigrations',
       'schemaVersion',
@@ -662,6 +668,150 @@ describe('resolution and acknowledgement (EL-FR-08, HC-FR-05)', () => {
     expect(store.markResolved('evt_missing')).toEqual({ outcome: 'not-found', event: null })
     expect(store.markAcknowledged('evt_missing')).toEqual({ outcome: 'not-found', event: null })
     expect(store.readPending()).toEqual([])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The two bounded reads HC-FR-02 needs
+// ---------------------------------------------------------------------------
+
+describe('one session with its recent events (HC-FR-02)', () => {
+  it('returns the same summary shape as the list route, plus newest-first recent events', () => {
+    const store = openTemporaryStore()
+    const block = store.insertEvent(needsYouBlock())
+    const idle = store.insertEvent(
+      finishedTurn({
+        sessionId: 'ses_block_01',
+        repoShortName: 'agent-ping',
+        repoFullPath: '/home/dev/Projects/agent-ping',
+        dedupeKey: 'opencode:ses_block_01:idle-1',
+        occurredAt: '2026-09-26T10:00:00.000Z',
+      }),
+    )
+    const retry = store.insertEvent(
+      finishedTurn({
+        sessionId: 'ses_block_01',
+        repoShortName: 'agent-ping',
+        repoFullPath: '/home/dev/Projects/agent-ping',
+        class: 'fyi',
+        subtype: 'retry',
+        dedupeKey: 'opencode:ses_block_01:retry-1',
+        occurredAt: '2026-09-26T11:00:00.000Z',
+      }),
+    )
+
+    const detail = store.readSession('ses_block_01')
+    const summary = store.readSessionSummaries()[0]
+
+    // The summary fields are the list route's fields, unchanged.
+    expect({ ...detail, recentEvents: undefined }).toEqual(summary)
+    expect(Object.keys(detail ?? {}).sort()).toEqual([
+      'firstSeenAt',
+      'harness',
+      'lastSeenAt',
+      'pendingCount',
+      'recentEvents',
+      'repoFullPath',
+      'repoShortName',
+      'sessionId',
+      'state',
+      'workSignal',
+    ])
+    // Newest first: the detail panel asks what just happened.
+    expect(detail?.recentEvents.map((event) => event.eventId)).toEqual([
+      retry.event.eventId,
+      idle.event.eventId,
+      block.event.eventId,
+    ])
+    // And the events are the same shape the bounded history returns.
+    expect(detail?.recentEvents[0]).toEqual(retry.event)
+  })
+
+  it('answers null for a session that does not exist, and reads nothing else', () => {
+    const store = openTemporaryStore()
+    store.insertEvent(needsYouBlock())
+    expect(store.readSession('ses_missing')).toBeNull()
+    expect(store.readSession('')).toBeNull()
+  })
+
+  it('does not leak one session into another', () => {
+    const store = openTemporaryStore()
+    const mine = store.insertEvent(needsYouBlock())
+    store.insertEvent(finishedTurn({ sessionId: 'ses_other' }))
+
+    expect(store.readSession('ses_block_01')?.recentEvents.map((event) => event.eventId)).toEqual([
+      mine.event.eventId,
+    ])
+  })
+})
+
+describe('bounded event history (HC-FR-02)', () => {
+  /** One session with `count` finished events, oldest first. */
+  function seedRun(store: EventStore, count: number): void {
+    for (let index = 0; index < count; index += 1) {
+      store.insertEvent(
+        finishedTurn({
+          sessionId: 'ses_run',
+          dedupeKey: `opencode:ses_run:idle-${index}`,
+          occurredAt: new Date(Date.UTC(2026, 8, 26, 0, 0, index)).toISOString(),
+        }),
+      )
+    }
+  }
+
+  it('returns the newest events first, in a total order', () => {
+    const store = openTemporaryStore()
+    seedRun(store, 3)
+
+    const history = store.readEventHistory()
+    expect(history.map((event) => event.dedupeKey)).toEqual([
+      'opencode:ses_run:idle-2',
+      'opencode:ses_run:idle-1',
+      'opencode:ses_run:idle-0',
+    ])
+  })
+
+  it('breaks an occurrence-timestamp tie by row key descending, so a page boundary is stable', () => {
+    const store = openTemporaryStore()
+    const at = '2026-09-26T09:00:00.000Z'
+    const first = store.insertEvent(finishedTurn({ sessionId: 'ses_tie', dedupeKey: 'a', occurredAt: at }))
+    const second = store.insertEvent(finishedTurn({ sessionId: 'ses_tie', dedupeKey: 'b', occurredAt: at }))
+
+    const ordered = [first.event.eventId, second.event.eventId].sort().reverse()
+    expect(store.readEventHistory().map((event) => event.eventId)).toEqual(ordered)
+  })
+
+  it('clamps a limit above the ceiling instead of honouring it, and defaults a nonsense one', () => {
+    const store = openTemporaryStore()
+    seedRun(store, 5)
+
+    expect(store.readEventHistory({ limit: 2 })).toHaveLength(2)
+    // A caller cannot widen the bound, and a caller that asks for everything gets
+    // the largest page this product serves rather than an unbounded read.
+    expect(store.readEventHistory({ limit: 1_000_000 })).toHaveLength(5)
+    expect(store.readEventHistory({ limit: 0 })).toHaveLength(5)
+    expect(store.readEventHistory({ limit: -10 })).toHaveLength(5)
+    expect(store.readEventHistory({ limit: Number.NaN })).toHaveLength(5)
+    expect(store.readEventHistory()).toHaveLength(5)
+  })
+
+  it('narrows to one session when asked, and does not answer another session events', () => {
+    const store = openTemporaryStore()
+    seedRun(store, 2)
+    store.insertEvent(finishedTurn({ sessionId: 'ses_elsewhere' }))
+
+    expect(store.readEventHistory({ sessionId: 'ses_run' })).toHaveLength(2)
+    expect(store.readEventHistory({ sessionId: 'ses_elsewhere' })).toHaveLength(1)
+    expect(store.readEventHistory({ sessionId: 'ses_missing' })).toEqual([])
+  })
+
+  it('includes pending blocks, because history is the whole log and not the pending set', () => {
+    const store = openTemporaryStore()
+    store.insertEvent(needsYouBlock({ occurredAt: '2026-09-26T12:00:00.000Z' }))
+    store.insertEvent(finishedTurn({ sessionId: 'ses_finished_01' }))
+
+    expect(store.readEventHistory()[0]?.class).toBe('needs-you')
+    expect(store.readEventHistory()).toHaveLength(2)
   })
 })
 

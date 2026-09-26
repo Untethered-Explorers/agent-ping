@@ -109,6 +109,43 @@ export interface SessionSummary {
   readonly pendingCount: number
 }
 
+/**
+ * One session with the events a client asked to see beside it (HC-FR-02:
+ * `GET /api/sessions/:id`).
+ *
+ * The summary fields are exactly the ones the list route returns, and
+ * `recentEvents` carries the same EventRecord shape as the bounded history, so
+ * the two routes cannot disagree about what an event looks like. Newest first:
+ * the question a detail panel asks is "what just happened", and the history view
+ * reads top-down.
+ */
+export interface SessionDetail extends SessionSummary {
+  readonly recentEvents: readonly EventRecord[]
+}
+
+/**
+ * The bounds on a paged read, in one place, because "bounded" is the property
+ * and not the number.
+ *
+ * `HISTORY_MAX_LIMIT` is the most a caller may ever receive. PRD 16 Open
+ * Questions 8 keeps at least the most recent 500 events per session, and this
+ * is that number expressed as a ceiling rather than a floor: a bound the caller
+ * can raise is not a bound. The default is what a client gets when it asks for
+ * nothing, chosen to cover a full dashboard history panel in one response.
+ */
+export const HISTORY_DEFAULT_LIMIT = 100
+export const HISTORY_MAX_LIMIT = 500
+
+/**
+ * A bounded history query. Both fields are optional and neither can widen the
+ * bound: a limit above the maximum is clamped, not honoured, and an absent
+ * session identifier means every session.
+ */
+export interface EventHistoryQuery {
+  readonly limit?: number
+  readonly sessionId?: string
+}
+
 export type InsertOutcome = 'inserted' | 'duplicate'
 
 export interface InsertResult {
@@ -154,8 +191,28 @@ export interface EventStore {
   markResolved(eventId: string): MutationResult
   markAcknowledged(eventId: string): MutationResult
   readSessionSummaries(): SessionSummary[]
+  /**
+   * One session with its most recent events, or null when there is no such
+   * session. Bounded by RECENT_EVENTS_MAX; the accessor cannot return the whole
+   * history of a session no matter what a caller passes (HC-FR-02).
+   */
+  readSession(sessionId: string): SessionDetail | null
+  /**
+   * Bounded event history, newest first, optionally narrowed to one session
+   * (HC-FR-02). A limit is clamped into [1, HISTORY_MAX_LIMIT], so "unbounded" is
+   * not a value this method can be given.
+   */
+  readEventHistory(query?: EventHistoryQuery): readonly EventRecord[]
   close(): void
 }
+
+/**
+ * The ceiling on one session's recent events. Lower than the history ceiling
+ * because a detail panel renders a handful of rows beside a summary, and a
+ * session with tens of thousands of events must not turn one request into a
+ * full-table read.
+ */
+export const RECENT_EVENTS_MAX = 200
 
 /**
  * The session state and turn work signal implied by an event's class, as data
@@ -299,6 +356,39 @@ export function openEventStore(options: OpenDatabaseOptions = {}): EventStore {
      FROM sessions s
      ORDER BY s.repo_short_name ASC, s.last_seen_at DESC, s.session_id ASC`,
   )
+  // The single-session read is the same projection with a key, prepared separately
+  // rather than built by string concatenation: a session identifier is a value
+  // from a URL, and the only way it can reach a statement is as a bound parameter.
+  const readOneSessionRow = db.prepare<[string], SessionRow>(
+    `SELECT s.session_id, s.harness, s.repo_short_name, s.repo_full_path, s.first_seen_at,
+            s.last_seen_at, s.state, s.work_signal,
+            (SELECT COUNT(*) FROM events e
+              WHERE e.session_id = s.session_id AND ${pendingCondition('e')}) AS pending_count
+     FROM sessions s
+     WHERE s.session_id = ?`,
+  )
+  // Newest first, with the row key as the tiebreak so events that share an
+  // occurrence timestamp - which the out-of-order polling fallback makes routine -
+  // still have one total order and a page boundary that never repeats or skips a
+  // row. The limit is bound, never interpolated, which is what keeps "bounded" a
+  // property of the statement rather than a promise about the caller.
+  const readRecentEventRows = db.prepare<[string, number], EventRow>(
+    `SELECT ${EVENT_COLUMNS} FROM events
+     WHERE session_id = ?
+     ORDER BY occurred_at DESC, event_id DESC
+     LIMIT ?`,
+  )
+  const readHistoryRows = db.prepare<[number], EventRow>(
+    `SELECT ${EVENT_COLUMNS} FROM events
+     ORDER BY occurred_at DESC, event_id DESC
+     LIMIT ?`,
+  )
+  const readHistoryRowsForSession = db.prepare<[string, number], EventRow>(
+    `SELECT ${EVENT_COLUMNS} FROM events
+     WHERE session_id = ?
+     ORDER BY occurred_at DESC, event_id DESC
+     LIMIT ?`,
+  )
   // A resolution is recorded independently of an acknowledgement, so it is
   // written whenever the block is unresolved, whoever cleared it.
   //
@@ -411,6 +501,24 @@ export function openEventStore(options: OpenDatabaseOptions = {}): EventStore {
     rebuiltFromMigrations: opened.rebuiltFromMigrations,
     insertEvent: (event: NewEvent): InsertResult => insertEvent(event),
     readPending: (): PendingItem[] => readPendingRows.all().map(toPendingItem),
+    readSession: (sessionId: string): SessionDetail | null => {
+      const row = readOneSessionRow.get(sessionId)
+      if (row === undefined) return null
+      return {
+        ...toSessionSummary(row),
+        recentEvents: readRecentEventRows
+          .all(sessionId, RECENT_EVENTS_MAX)
+          .map(toEventRecord),
+      }
+    },
+    readEventHistory: (query: EventHistoryQuery = {}): readonly EventRecord[] => {
+      const limit = clampHistoryLimit(query.limit)
+      const rows =
+        query.sessionId === undefined
+          ? readHistoryRows.all(limit)
+          : readHistoryRowsForSession.all(query.sessionId, limit)
+      return rows.map(toEventRecord)
+    },
     markResolved: (eventId: string): MutationResult => markResolvedTransaction(eventId),
     markAcknowledged: (eventId: string): MutationResult => markAcknowledgedTransaction(eventId),
     readSessionSummaries: (): SessionSummary[] => readSessionRows.all().map(toSessionSummary),
@@ -418,6 +526,23 @@ export function openEventStore(options: OpenDatabaseOptions = {}): EventStore {
       opened.close()
     },
   }
+}
+
+/**
+ * Fold a caller's requested page size into the bound.
+ *
+ * A value that is not a positive integer becomes the default, and a value above
+ * the maximum becomes the maximum. Clamping rather than refusing is deliberate:
+ * this is a read, a client asking for too much history deserves the largest page
+ * this product serves rather than an error, and a client asking for a nonsense
+ * size deserves the ordinary default. What a caller cannot do is widen the bound,
+ * which is the property the read route's `limit` parameter also depends on.
+ */
+function clampHistoryLimit(requested: number | undefined): number {
+  if (requested === undefined || !Number.isFinite(requested)) return HISTORY_DEFAULT_LIMIT
+  const whole = Math.floor(requested)
+  if (whole < 1) return HISTORY_DEFAULT_LIMIT
+  return Math.min(whole, HISTORY_MAX_LIMIT)
 }
 
 function toEventRecord(row: EventRow): EventRecord {

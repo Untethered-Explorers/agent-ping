@@ -1,10 +1,10 @@
 # Project Progress
 
 ## Current State
-**Phase**: EVENT-MODEL-AND-DURABLE-LOG-2
+**Phase**: HUB-CORE-AND-DELIVERY-POLICY-1
 **Status**: In Progress
-**Validation Gaps**: 13 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-26T13:40:10.288Z
+**Validation Gaps**: 16 unverified check(s) - see "Validation Gaps"
+**Last Updated**: 2026-09-26T14:01:10.390Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -26,6 +26,8 @@
   - Files: src/domain/envelope.ts, src/domain/classify.ts, tests/domain/classify.test.ts
 - [x] Phase EVENT-MODEL-AND-DURABLE-LOG-2, Task EL-4: Implement the pending lifecycle state machine (@domain-engineer)
   - Files: src/domain/pending.ts, tests/domain/pending.test.ts, src/storage/eventStore.ts, tests/domain/classify.test.ts, tests/storage/eventStore.test.ts
+- [x] Phase HUB-CORE-AND-DELIVERY-POLICY-1, Task HC-1: Stand up the hub process and its read routes (@hub-engineer)
+  - Files: src/main/index.ts, src/hub/server.ts, src/hub/routes/read.ts, src/hub/runtime-file.ts, tests/hub/server.test.ts, src/storage/eventStore.ts, tests/storage/eventStore.test.ts, tests/hub/fixtures/measure-idle-rss.mjs, tests/hub/fixtures/second-instance.mjs, tests/hub/fixtures/ts-resolver.mjs
 
 ## Current Task
 - None currently running
@@ -66,6 +68,9 @@
 - Task EL-1: The macOS and Windows state-directory layouts are asserted through the pure resolveStateDir(env, platform, home) function rather than on those machines, which remains the documented APX-CON-06 manual-gate path.
 - Task EL-3: The classification table is asserted against the event names documented in PRD 5 and in the harness-signal-mapping skill reference, not against a live opencode or Copilot capture; the live proof is OA-5's script, not this task.
 - Task EL-3: The built classifier was exercised directly (idle gate and row count) and confirmed to load no database driver, but no hub or harness integration was run, because that is out of this task's scope.
+- Task HC-1: No Electron process was started: the package is not installed in this checkout and the task's own tests are specified against a real loopback socket, not a window. startElectronMain is exercised only as far as its non-Electron branches allow, and the single-instance guarantee is proven through the runtime-file lock that the Electron path also takes.
+- Task HC-1: The build output of the hub was smoke-tested locally by hand-copying schema.sql; that copy is removed and the packaged start path is not covered by an automated test while the build gap above stands.
+- Task HC-1: The stream route (HC-2), ingest (HC-3), ack (HC-4), delivery and shutdown (HC-5) and counter recording (HC-6) are deliberately absent. The seams they need exist and are documented in place: one registration point, one close() primitive, the delivery field on health, and the onRequestServed hook.
 
 ## Notes
 - Workflow engine run 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
