@@ -3,8 +3,8 @@
 ## Current State
 **Phase**: HUB-CORE-AND-DELIVERY-POLICY-1
 **Status**: In Progress
-**Validation Gaps**: 20 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-26T14:40:07.829Z
+**Validation Gaps**: 23 unverified check(s) - see "Validation Gaps"
+**Last Updated**: 2026-09-26T15:18:23.259Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -30,12 +30,13 @@
   - Files: src/main/index.ts, src/hub/server.ts, src/hub/routes/read.ts, src/hub/runtime-file.ts, tests/hub/server.test.ts, src/storage/eventStore.ts, tests/storage/eventStore.test.ts, tests/hub/fixtures/measure-idle-rss.mjs, tests/hub/fixtures/second-instance.mjs, tests/hub/fixtures/ts-resolver.mjs
 - [x] Phase HUB-CORE-AND-DELIVERY-POLICY-1, Task HC-2: Add the live state stream with heartbeat and cursor replay (@hub-engineer)
   - Files: src/hub/sse.ts, src/hub/routes/stream.ts, tests/hub/stream.test.ts, src/hub/routes/read.ts, src/main/index.ts, tests/hub/server.test.ts, tests/hub/fixtures/measure-stream-rss.mjs
+- [x] Phase HUB-CORE-AND-DELIVERY-POLICY-1, Task HC-3: Build the ingest route and event pipeline (@hub-engineer)
+  - Files: src/hub/routes/ingest.ts, src/hub/ingest-service.ts, tests/hub/ingest.test.ts, src/hub/routes/read.ts, src/hub/server.ts, src/main/index.ts, tests/hub/server.test.ts
 
 ## Current Task
 - None currently running
 
 ## Remaining
-- [ ] Phase HUB-CORE-AND-DELIVERY-POLICY-1: Phase 1: Process, read surface and live stream
 - [ ] Phase HUB-CORE-AND-DELIVERY-POLICY-2: Phase 2: Write surface, security, delivery and metrics
 - [ ] Phase HUB-CORE-AND-DELIVERY-POLICY-3: Phase 3: Read-only and restart-safety gate
 - [ ] Phase NOTIFICATION-AND-TRAY-PRESENCE-1: Phase 1: Notifier and toast policy
@@ -77,6 +78,9 @@
 - Task HC-2: The two client implementations prove the frames are readable by a standard HTTP client and by a WHATWG client; no browser was involved. EventSource-specific behaviour (automatic reconnection using Last-Event-ID) is asserted against the spec's id/last-event-id rules in the test's own parser rather than against a real browser, and qa-engineer's LD-4 journey is where that belongs.
 - Task HC-2: The 250ms budget is measured from the store write the hub accepted to the frame on a real socket. The full accepted-event-to-visible path includes HC-3's ingest validation and classification, which do not exist, so the budget is proven for the stream's share of it only.
 - Task HC-2: Idle RSS is measured in a child process that is only a hub, holding four streams through six hundred paced transitions. A real workload's socket and undici costs are not represented.
+- Task HC-3: No Electron process was started: the package is not installed in this checkout, so the entry point was exercised through startHub rather than through the Electron runtime.
+- Task HC-3: The wire shape is agreed with nothing external: no opencode adapter exists yet, so 'an adapter posts this' is a contract this file publishes, not a behaviour a test observed against a real harness. OA-1/OA-2 and OA-5's live script are where that is proven.
+- Task HC-3: The store bound is asserted as a measured watchdog plus a fast-error path, because a synchronous driver cannot be interrupted mid-call. What is proven is that the caller is released on every path, that a throwing store is refused immediately, that an overrun is reported rather than hidden, and that the p95 of real posts is 4.61 ms; a store blocked inside SQLite is bounded by that driver's own busy timeout (src/storage/db.ts) rather than by this task.
 
 ## Notes
 - Workflow engine run 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8

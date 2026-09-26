@@ -61,6 +61,7 @@ import {
   DASHBOARD_CSP,
   DEFAULT_HUB_PORT,
   MUTATING_ROUTE,
+  MUTATING_ROUTES,
   RouteRegistry,
   isLoopbackAddress,
 } from '@/hub/server'
@@ -877,6 +878,13 @@ describe('the read routes are observably read-only', () => {
     for (const route of hub.registry.routes()) {
       for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const) {
         const pathname = concretePathFor(route.pattern)
+        // The one request this file does not make on a route that serves it: the
+        // mutating route's own method, which is the append HC-3 owns. It is skipped
+        // rather than counted, because counting it would mean expecting an event to
+        // appear; every *other* method on that path, and every method on every other
+        // route, is still compared, which is where a hidden mutation would show up.
+        const resolution = hub.registry.resolve(method, pathname)
+        if (resolution.kind === 'route' && resolution.route.mutation !== 'read-only') continue
         // The stream route answers GET with a response that never ends, because
         // that is what a stream is. It is opened, read until it has said
         // something, and closed, and the counts are still compared around it -
@@ -891,9 +899,12 @@ describe('the read routes are observably read-only', () => {
           after,
           `${method} ${route.pattern} changed stored state`,
         ).toEqual(before)
-        if (method !== 'GET') {
-          // Every method that is not a read is refused, whatever the path. There
-          // is no mutating route registered yet, so nothing may answer 2xx here.
+        if (resolution.kind === 'route') {
+          // A route that serves this method is a read: it was answered, and the log
+          // did not move.
+          expect(response.status, `${method} ${route.pattern}`).toBe(200)
+        } else {
+          // Every method no route serves on this path is refused, whatever the path.
           expect(
             [404, 405],
             `${method} ${route.pattern} answered ${response.status}`,
@@ -905,7 +916,7 @@ describe('the read routes are observably read-only', () => {
     expect(countsOf(hub)).toEqual(before)
   })
 
-  it('registers the whole read surface and nothing that mutates', async () => {
+  it('registers the whole surface, with ingest as the only append and no ack yet', async () => {
     const hub = await startFixtureHub()
 
     // The registry the running hub holds, not a list written here: a hand-written
@@ -919,12 +930,24 @@ describe('the read routes are observably read-only', () => {
       'GET /api/sessions',
       'GET /api/sessions/:sessionId',
       'GET /api/stream',
+      'POST /api/ingest',
     ])
-    // No registered route claims a mutation, and the only signature that may ever
-    // claim one is the ack route, which arrives in HC-4.
-    expect(hub.registry.routes().every((route) => route.mutation === 'read-only')).toBe(true)
+    // Exactly one registered route claims a mutation, and it is the append: it creates
+    // a row and changes nothing that already exists. The ack route - the one control
+    // surface - arrives in HC-4 and is still absent (APX-CON-08, ADR-002).
+    const mutating = hub.registry.routes().filter((route) => route.mutation !== 'read-only')
+    expect(mutating.map((route) => `${route.method} ${route.pattern}`)).toEqual([
+      'POST /api/ingest',
+    ])
+    expect(mutating[0]?.mutation).toBe('ingest-append')
+    expect([...MUTATING_ROUTES].sort()).toEqual(['POST /api/ack/:eventId', 'POST /api/ingest'])
     expect(MUTATING_ROUTE).toBe('POST /api/ack/:eventId')
     expect(hub.registry.signatures()).not.toContain(MUTATING_ROUTE)
+    // Every other route is a read, and a read-only route is a GET - so no mutating
+    // method can be registered as a read.
+    for (const route of hub.registry.routes()) {
+      if (route.mutation === 'read-only') expect(route.method).toBe('GET')
+    }
   })
 
   it('refuses a registration that claims to be the mutating route without being it', () => {
@@ -938,6 +961,26 @@ describe('the read routes are observably read-only', () => {
         handle: () => undefined,
       }),
     ).toThrow(/only mutating route/)
+    // The append is equally closed: exactly one route may put a row in this log.
+    expect(() =>
+      registry.register({
+        method: 'POST',
+        pattern: '/api/events',
+        name: 'read.append',
+        mutation: 'ingest-append',
+        handle: () => undefined,
+      }),
+    ).toThrow(/only appending route/)
+    // And a read cannot be a write in disguise.
+    expect(() =>
+      registry.register({
+        method: 'DELETE',
+        pattern: '/api/events',
+        name: 'read.purge',
+        mutation: 'read-only',
+        handle: () => undefined,
+      }),
+    ).toThrow(/read-only/)
   })
 
   it('exposes no route that could steer, interrupt, prompt or approve anything', () => {

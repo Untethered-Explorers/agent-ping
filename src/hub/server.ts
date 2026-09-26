@@ -118,27 +118,47 @@ export const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'O
 export type HttpMethod = (typeof HTTP_METHODS)[number]
 
 /**
- * The closed set of mutating routes.
+ * The closed set of routes that may change stored state.
  *
- * One member, and it is not registered yet: the ack route arrives with HC-4. The
- * union exists now so a route that wants to declare a mutation has to name itself
- * as the ack route, which means adding a second control surface is a diff in this
- * file that a reviewer reads. A route that mutates while declaring
- * `mutation: 'read-only'` is a different failure, and it is caught by comparing
- * stored counts around every read rather than by reading this declaration.
+ * Two members, and they are two *different* things, which is the distinction
+ * ADR-002 draws and the reason they are two entries rather than one:
+ *
+ *   - `POST /api/ack/:eventId` is the control surface. It changes a record that
+ *     already exists, and it is the only route in the product that can do that
+ *     (APX-CON-08). The write token of HC-4 guards this one and no other.
+ *   - `POST /api/ingest` appends. It creates a new row and changes nothing that
+ *     already exists, which is why it is not a control surface: a caller can add an
+ *     event to the developer's own log and can reach no session, no agent and no
+ *     harness through it.
+ *
+ * The union is the closed set, so a route that wants to declare a mutation has to
+ * name itself as one of these two, which means adding a third control surface is a
+ * diff in this file that a reviewer reads. A route that mutates while declaring
+ * `read-only` is a different failure, and it is caught by comparing stored counts
+ * around every read rather than by reading this declaration.
  */
 export const MUTATING_ROUTE = 'POST /api/ack/:eventId' as const
 
-export type MutatingRoute = typeof MUTATING_ROUTE
+/** The append-only route, which is mutating and is not a control surface. */
+export const INGEST_ROUTE = 'POST /api/ingest' as const
+
+export const MUTATING_ROUTES = [MUTATING_ROUTE, INGEST_ROUTE] as const
+
+export type MutatingRoute = (typeof MUTATING_ROUTES)[number]
 
 /**
- * Whether a route may change stored state.
+ * Whether a route may change stored state, and which way.
  *
- * A closed union, checked against the one allowed value at registration time.
- * Rejecting a registration that claims a mutation without being the ack route is
- * what makes the closed set a property of the code rather than a convention.
+ * A closed union, checked against the two allowed signatures at registration time.
+ * Rejecting a registration that claims a mutation it is not is what makes the closed
+ * set a property of the code rather than a convention: `ack-only` names the single
+ * control surface, `ingest-append` names the single append, and a read declares
+ * `read-only` and is proven to be one.
  */
-export type RouteMutation = 'read-only' | 'ack-only'
+export type RouteMutation = 'read-only' | 'ack-only' | 'ingest-append'
+
+/** A read-only route is a GET. A route that writes declares how. */
+const READ_ONLY_METHOD: HttpMethod = 'GET'
 
 /** What a handler is given: the request, its resolved path parts, and the services. */
 export interface RouteContext<TServices> {
@@ -183,11 +203,33 @@ export class RouteRegistry<TServices> {
   readonly #routes: RouteDefinition<TServices>[] = []
 
   register(route: RouteDefinition<TServices>): void {
-    if (route.mutation === 'ack-only' && `${route.method} ${route.pattern}` !== MUTATING_ROUTE) {
+    const signature = `${route.method} ${route.pattern}`
+    if (route.mutation === 'ack-only' && signature !== MUTATING_ROUTE) {
       throw new Error(
         `route ${route.name} declares itself mutating, and the only mutating route in this product ` +
-          `is ${MUTATING_ROUTE} (APX-CON-08). A route that changes stored state is a control ` +
-          'surface; the one allowed control surface marks a pending item acknowledged and nothing else.',
+          `that changes an existing record is ${MUTATING_ROUTE} (APX-CON-08). A route that changes a ` +
+          'record is a control surface; the one allowed control surface marks a pending item ' +
+          'acknowledged and nothing else.',
+      )
+    }
+    if (route.mutation === 'ingest-append' && signature !== INGEST_ROUTE) {
+      throw new Error(
+        `route ${route.name} declares itself appending, and the only appending route in this product ` +
+          `is ${INGEST_ROUTE} (ADR-002). Appending is not a control surface - it creates a row and ` +
+          'changes nothing that already exists - but exactly one route may do it, so a second way to ' +
+          'put a row in this log is a diff in this file rather than a review finding.',
+      )
+    }
+    // The other half of the closed set: a route that declares itself read-only is a
+    // GET, so no mutating method can hide behind a read-only declaration. This is a
+    // compile-time-adjacent check made at runtime because the declaration is a string
+    // on a route definition, and it catches the failure that comparing counts would
+    // only catch after it had already written something.
+    if (route.mutation === 'read-only' && route.method !== READ_ONLY_METHOD) {
+      throw new Error(
+        `route ${route.name} declares itself read-only but answers ${route.method}. A read-only route ` +
+          `is a GET; a route that writes declares ${MUTATING_ROUTE} or ${INGEST_ROUTE} and says which ` +
+          'one it is, so a mutating method cannot be registered as a read (APX-CON-08).',
       )
     }
     if (this.#routes.some((existing) => existing.name === route.name)) {

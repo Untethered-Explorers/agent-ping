@@ -48,6 +48,7 @@ import {
 } from '../../storage/eventStore.js'
 import type { Counters, CounterReading } from '../../storage/counters.js'
 import type { ChangeFeed } from '../sse.js'
+import type { IngestService } from '../ingest-service.js'
 import { respondJson, type RouteDefinition } from '../server.js'
 
 /**
@@ -73,6 +74,16 @@ export interface HubServices {
   readonly counters: Counters
   /** The live state stream's feed: cursors, the replay window, the clients. */
   readonly stream: ChangeFeed
+  /**
+   * The ingest pipeline (HC-FR-04).
+   *
+   * Declared here rather than in src/hub/routes/ingest.ts for the same reason
+   * `stream` is: `HubServices` is the one description of what a handler is given, and
+   * a handler that reached for a pipeline which was not in it would be a second,
+   * unregistered way to build one. Only the ingest route calls it, and only the
+   * composition root constructs it.
+   */
+  readonly ingest: IngestService
   readonly hub: HubIdentity
 }
 

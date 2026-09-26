@@ -33,14 +33,15 @@
 // Electron to be installed at all.
 //
 // WHAT IS NOT HERE YET
-// Ingest, the ack route, delivery policy, the notifier and the tray arrive in
-// HC-3 through HC-5 and NT-2. The seams they need are already in place:
-// `registerRoutes` is the single registration point, `close` is the single
-// shutdown path the lifecycle work will call, and `desktop.mountTray` is where the
-// tray will be mounted. What is deliberately absent is any route that can spawn,
-// steer, interrupt, prompt or approve anything inside a harness (APX-CON-08): the
-// mutating set in src/hub/server.ts has exactly one member and it is not
-// registered here.
+// The ack route, the delivery policy, the notifier and the tray arrive in HC-4,
+// HC-5 and NT-2. Ingest (HC-3) is wired here now, and the seams the rest need are
+// already in place: `registerRoutes` is the single registration point, `close` is
+// the single shutdown path the lifecycle work will call, and `desktop.mountTray` is
+// where the tray will be mounted. What is deliberately absent is any route that can
+// spawn, steer, interrupt, prompt or approve anything inside a harness
+// (APX-CON-08): the mutating set in src/hub/server.ts is exactly two signatures, the
+// append-only ingest route and the ack route that arrives in HC-4, and the registry
+// refuses to register anything else that claims to write.
 //
 // The live state stream (HC-2) is wired here rather than inside the store, which
 // is what keeps ingest and ack from having to know it exists: they call the
@@ -60,6 +61,12 @@ import { openEventStore, type EventStore } from '../storage/eventStore.js'
 import { databaseFilePath, ensureStateDir, resolveStateDir } from '../storage/paths.js'
 import { READ_ROUTES, type HubIdentity, type HubServices } from '../hub/routes/read.js'
 import { STREAM_ROUTES } from '../hub/routes/stream.js'
+import { INGEST_ROUTES } from '../hub/routes/ingest.js'
+import {
+  createIngestService,
+  type IngestService,
+  type IngestServiceOptions,
+} from '../hub/ingest-service.js'
 import {
   createChangeFeed,
   withChangeFeed,
@@ -132,6 +139,16 @@ export interface StartHubOptions {
    * rather than by faking a clock the hub does not have.
    */
   readonly stream?: Partial<StreamSettings>
+  /**
+   * Overrides for the ingest pipeline (HC-FR-04).
+   *
+   * Production passes nothing, and the omission is meaningful: the defaults are the
+   * documented bounds, and the delivery port is absent, which the service counts as
+   * `not-wired` rather than passing silently (APX-FR-02). HC-5 supplies the real
+   * notifier through this same option, and a test uses it to observe that the answer
+   * is returned before any delivery work begins.
+   */
+  readonly ingest?: Partial<Omit<IngestServiceOptions, 'store'>>
   readonly desktop?: DesktopBridge
   /** ISO 8601 UTC source for `startedAt` and the store's migration records. */
   readonly now?: () => string
@@ -172,6 +189,14 @@ export interface RunningHub {
   readonly counters: Counters
   /** The live state stream's feed. Closed first on shutdown. */
   readonly stream: ChangeFeed
+  /**
+   * The ingest pipeline the `POST /api/ingest` route drives.
+   *
+   * Exposed for `doctor` and for a test that has to observe a dropped event or a
+   * delivery outcome (HC-FR-07, HC-3). It reads and records; it cannot steer, and
+   * the only durable effect it has is an appended event.
+   */
+  readonly ingest: IngestService
   readonly startedAt: string
   /** Stop the listener, close the log, and give the runtime file back. Idempotent. */
   close(): Promise<void>
@@ -205,6 +230,7 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
   let counters: Counters | undefined
   let server: HubServer<HubServices> | undefined
   let stream: ChangeFeed | undefined
+  let ingest: IngestService | undefined
   try {
     // 3. The durable log, and the counters over the same file. Both are opened
     //    against the resolved state directory, never against a second guess at it.
@@ -217,12 +243,20 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
     stream = createChangeFeed(options.stream)
     const watching = withChangeFeed(store, stream)
 
-    // 5. Every route, registered in one place. The list is the product's read
+    // 4b. The ingest pipeline, over the same wrapped store, so an ingested event
+    //     becomes a live change frame without the pipeline knowing the stream exists.
+    //     It is built here and nowhere else: the composition root is the single place
+    //     a route's collaborators are constructed, which is what keeps a second way to
+    //     build one from being a diff nobody reads.
+    ingest = createIngestService({ store: watching, onDiagnostic: diagnostic, ...options.ingest })
+
+    // 5. Every route, registered in one place. The list is the product's whole HTTP
     //    surface; adding a route means adding it here, where the enumeration test
     //    will see it.
     const registry = new RouteRegistry<HubServices>()
     registry.registerAll(READ_ROUTES)
     registry.registerAll(STREAM_ROUTES)
+    registry.registerAll(INGEST_ROUTES)
     const dashboardRoot = resolveDashboardRoot(options.dashboardRoot)
     registry.register(createDashboardRoute<HubServices>({ root: dashboardRoot }))
 
@@ -234,6 +268,7 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
       store: watching,
       counters,
       stream,
+      ingest,
       hub: unpublishedIdentity(claim),
     }
 
@@ -260,6 +295,7 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
       store: watching,
       counters,
       stream,
+      ingest,
       hub: {
         instanceId: claim.instanceId,
         pid: claim.pid,
@@ -295,6 +331,7 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
       store: watching,
       counters,
       stream,
+      ingest,
       startedAt: runtimeFile.startedAt,
       close: async (): Promise<void> => {
         // Idempotent, because a shutdown can be triggered twice: `close` is
@@ -304,24 +341,39 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
         // error, which is exactly the sort of "not silent" that is not a report.
         if (closed) return
         closed = true
-        // The order a shutdown has to have: end the live streams, stop answering,
-        // fold the counters into the file, close the log, then give the runtime
-        // file back. The feed goes first, and both halves of that are deliberate.
-        // Ending the streams is what stops a client waiting on a socket that will
-        // never speak again, and it is also what stops `server.close` from sitting
-        // on a response that is deliberately still open - a streaming response is
-        // not an idle connection, so the listener would wait for every dashboard to
-        // disconnect on its own. The cost of that order is that a transition
-        // reaching a closing feed throws, which is why HC-FR-10's "stop accepting
-        // events" step has to come before this call: an ingest still in flight when
-        // the feed closes is an ordering bug, and losing its frame quietly would
-        // hide it. Publishing a shutdown state is HC-5's work with the signal
+        // The order a shutdown has to have: stop accepting events, end the live
+        // streams, stop answering, fold the counters into the file, close the log,
+        // then give the runtime file back. The ingest drain goes first of all, and
+        // the feed second; both placements are deliberate.
+        //
+        // Draining ingest first is HC-FR-10's "refuse new events" becoming a real
+        // step rather than an intention: the pipeline stops accepting, waits out the
+        // deliveries already in flight - bounded by the delivery timeout, so a wedged
+        // notifier cannot hold a shutdown - and only then does anything else close.
+        // Closing the log underneath a delivery would be the ordering bug the comment
+        // on the feed below describes, seen from the other end.
+        //
+        // The feed goes after that and before the listener, and both halves of that
+        // are deliberate. Ending the streams is what stops a client waiting on a
+        // socket that will never speak again, and it is also what stops
+        // `server.close` from sitting on a response that is deliberately still open -
+        // a streaming response is not an idle connection, so the listener would wait
+        // for every dashboard to disconnect on its own. The cost of that order is
+        // that a transition reaching a closing feed throws, which is why the
+        // "refuse new events" step has to come before this call: an ingest still in
+        // flight when the feed closes is an ordering bug, and losing its frame quietly
+        // would hide it. Publishing a shutdown state is HC-5's work with the signal
         // handler; this is the primitive it calls.
         let firstError: unknown
         try {
-          stream?.close()
+          await ingest?.close()
         } catch (cause) {
           firstError = cause
+        }
+        try {
+          stream?.close()
+        } catch (cause) {
+          firstError ??= cause
         }
         try {
           await server?.close()
@@ -370,6 +422,11 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
     // Every failure path releases what it took, so a failed start never leaves a
     // runtime file that refuses the next attempt, and never leaves a heartbeat
     // timer running in a process that is about to report the failure.
+    try {
+      await ingest?.close()
+    } catch {
+      // The failure being reported is the one that caused this cleanup.
+    }
     stream?.close()
     await quietClose(server, counters, store)
     releaseQuietly(claim)
