@@ -1,10 +1,10 @@
 # Project Progress
 
 ## Current State
-**Phase**: DASHBOARD-DESIGN-PROTOTYPE-2
+**Phase**: EVENT-MODEL-AND-DURABLE-LOG-2
 **Status**: In Progress
-**Validation Gaps**: 11 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-26T13:03:40.638Z
+**Validation Gaps**: 13 unverified check(s) - see "Validation Gaps"
+**Last Updated**: 2026-09-26T13:20:52.069Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -22,6 +22,8 @@
   - Files: src/storage/schema.sql, src/storage/db.ts, src/storage/paths.ts, src/storage/eventStore.ts, tests/storage/schema.test.ts, tests/storage/eventStore.test.ts, package-lock.json, package.json
 - [x] Phase EVENT-MODEL-AND-DURABLE-LOG-1, Task EL-2: Add retention pruning and local counters (@domain-engineer)
   - Files: src/storage/retention.ts, src/storage/counters.ts, tests/storage/retention.test.ts, tests/storage/counters.test.ts, tests/storage/eventStore.test.ts
+- [x] Phase EVENT-MODEL-AND-DURABLE-LOG-2, Task EL-3: Define the envelope and the classification rules (@domain-engineer)
+  - Files: src/domain/envelope.ts, src/domain/classify.ts, tests/domain/classify.test.ts
 
 ## Current Task
 - None currently running
@@ -61,6 +63,8 @@
 - Task DP-3: The design verdicts in DP-4 and LD-5 are human judgements and are not claimed here; no human-review attestation was created.
 - Task EL-1: The descriptor-leak test reads /proc/self/fd and is skipped where that directory does not exist; the owner-only mode tests are skipped on Windows. Both skips are visible in the reporter output rather than silent.
 - Task EL-1: The macOS and Windows state-directory layouts are asserted through the pure resolveStateDir(env, platform, home) function rather than on those machines, which remains the documented APX-CON-06 manual-gate path.
+- Task EL-3: The classification table is asserted against the event names documented in PRD 5 and in the harness-signal-mapping skill reference, not against a live opencode or Copilot capture; the live proof is OA-5's script, not this task.
+- Task EL-3: The built classifier was exercised directly (idle gate and row count) and confirmed to load no database driver, but no hub or harness integration was run, because that is out of this task's scope.
 
 ## Notes
 - Workflow engine run 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
