@@ -680,6 +680,30 @@ export function respondJson(
 }
 
 /**
+ * The one thing the dashboard route reports about a request it served.
+ *
+ * The path and the query, and nothing else: no headers, no body and no socket. The
+ * one consumer of this (HC-6, src/hub/metrics.ts) decides a dashboard open and a
+ * deep-link open from exactly these two things, and a handler that is told less
+ * cannot record more.
+ */
+export interface DashboardDocumentRequest {
+  readonly pathname: string
+  readonly query: URLSearchParams
+}
+
+/**
+ * Called when the dashboard's own file was served, and only then.
+ *
+ * A hook rather than a branch in the listener because the listener serves static
+ * bytes and knows nothing about product vocabulary; the caller decides what serving
+ * a page means. A throw from the handler is caught by the listener and answered as a
+ * contentless 500, exactly as a throw from any other route body would be - so a
+ * diagnostic counter can never take a dashboard down (APX-FR-02).
+ */
+export type DashboardDocumentHandler = (request: DashboardDocumentRequest) => void
+
+/**
  * The dashboard's own files, as a fallback GET route.
  *
  * A route rather than a branch in the listener, so the dashboard is in the
@@ -688,6 +712,7 @@ export function respondJson(
  */
 export function createDashboardRoute<TServices>(
   dashboard: DashboardSource,
+  onDocumentServed?: DashboardDocumentHandler,
 ): RouteDefinition<TServices> {
   return {
     method: 'GET',
@@ -695,24 +720,33 @@ export function createDashboardRoute<TServices>(
     name: 'dashboard.static',
     mutation: 'read-only',
     fallback: true,
-    handle: ({ response, pathname }): void => {
+    handle: ({ response, pathname, query }): void => {
       // A mistyped API path must not be answered by the dashboard's file handler.
       // The fallback exists because hashed asset names are unknowable in advance,
       // not because this server has no idea what its own routes are: a request
-      // under /api that matched nothing is a missing route, and saying so is the
-      // difference between a client that retries a real endpoint and one that
+      // under /api that matched nothing is a missing route, and saying so is
+      // the difference between a client that retries a real endpoint and one that
       // starts hunting for the right filename.
       if (pathname === '/api' || pathname.startsWith('/api/')) {
         respondJson(response, 404, { error: 'not-found', message: `${pathname} is not served.` })
         return
       }
-      serveStaticFile(response, dashboard.root, pathname)
+      // `served`, not `response.statusCode === 200`: Node's default status for a
+      // response nobody touched is already 200, so inferring success from it would
+      // call a 404 a served page.
+      if (serveStaticFile(response, dashboard.root, pathname) && onDocumentServed !== undefined) {
+        onDocumentServed({ pathname, query })
+      }
     },
   }
 }
 
 /**
  * Serve one file from the built dashboard.
+ *
+ * Returns whether a file was actually served. Every refusal answers with its own
+ * status first and returns false, so the caller does not have to read the response
+ * to know whether anything was sent.
  *
  * Three properties, each of which is a refusal rather than a convenience:
  *   - The resolved path must still be inside the root, checked on the resolved
@@ -728,13 +762,13 @@ export function serveStaticFile(
   response: ServerResponse,
   root: string | null,
   pathname: string,
-): void {
+): boolean {
   if (root === null) {
     respondJson(response, 503, {
       error: 'dashboard-unavailable',
       message: 'this hub serves no dashboard; the build output was not found at start.',
     })
-    return
+    return false
   }
   const resolvedRoot = path.resolve(root)
   if (!existsSync(resolvedRoot)) {
@@ -742,17 +776,17 @@ export function serveStaticFile(
       error: 'dashboard-unavailable',
       message: `the built dashboard is not present at ${resolvedRoot}. Build it with npm run build:dashboard.`,
     })
-    return
+    return false
   }
   const requested = pathname === '/' || pathname === '' ? 'index.html' : pathname.replace(/^\/+/, '')
   const target = path.resolve(resolvedRoot, requested)
   if (target !== resolvedRoot && !target.startsWith(resolvedRoot + path.sep)) {
     respondJson(response, 404, { error: 'not-found', message: 'no such dashboard file.' })
-    return
+    return false
   }
   if (!existsSync(target) || !statSync(target).isFile()) {
     respondJson(response, 404, { error: 'not-found', message: 'no such dashboard file.' })
-    return
+    return false
   }
   const contentType = CONTENT_TYPES[path.extname(target).toLowerCase()]
   if (contentType === undefined) {
@@ -760,7 +794,7 @@ export function serveStaticFile(
       error: 'unsupported-media-type',
       message: 'the dashboard build contains a file type this hub does not serve.',
     })
-    return
+    return false
   }
   for (const [name, value] of Object.entries(baseHeaders(contentType))) {
     response.setHeader(name, value)
@@ -773,4 +807,8 @@ export function serveStaticFile(
       else respondJson(response, 500, { error: 'internal-error', message: 'unreadable dashboard file.' })
     })
     .pipe(response)
+  // True once the file has been opened and the response head is on its way. A read
+  // that fails afterwards cannot un-serve it, and the caller has nothing to correct:
+  // the head is already written.
+  return true
 }

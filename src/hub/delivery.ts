@@ -67,11 +67,13 @@
 // counters of PRD 10: nothing here opens the counters table, because the counters are
 // domain-engineer's file and the recording is HC-6's, and a delivery policy that wrote
 // its own durable statistics would be a second place to forget to count. What HC-6 needs
-// is here and is enough: `outcomes()` is the per-event record of every attempt, each with
-// its own outcome, so a `delivered` outcome is the increment for `toast_deliveries` and
-// the ledger is bounded rather than a tail nobody can drain. `DeliveryAttemptRecord` is
-// content-free by construction, so a counter taken from it cannot carry anything the log
-// does not already hold (APX-FR-01).
+// is here and is enough: the `onOutcome` seam is called with every recorded attempt, so
+// a `delivered` outcome is the increment for `toast_deliveries` and the other four
+// outcomes are handed over rather than left to be polled out of `outcomes()`. The seam
+// is one call inside `record` and nothing else; `DeliveryAttemptRecord` is content-free
+// by construction, so a counter taken from it cannot carry anything the log does not
+// already hold (APX-FR-01). A listener that throws is reported and ignored, because a
+// counter must never decide the outcome of the notification it is counting.
 //
 // NOTHING HERE CAN STEER A HARNESS, AND NOTHING LEAVES THE PROCESS
 // The policy's only effects are a read from the store and a call to the notifier port
@@ -365,8 +367,24 @@ export interface DeliveryPolicyOptions {
   readonly origin?: () => string
   /** Milliseconds since the epoch. Injectable so a test can measure a bound. */
   readonly now?: () => number
-  /** Reports a diagnostic line. Never called with content, a path or a token. */
+  /**
+   * Reports a diagnostic line. Never called with content, a path or a token.
+   */
   readonly onDiagnostic?: (message: string) => void
+  /**
+   * Called with every recorded attempt, including the ones that declined to try.
+   *
+   * This is the seam HC-6 asked for and the only thing in this module that leaves
+   * it: a `delivered` outcome is the increment for `toast_deliveries`, and a caller
+   * that wants to know about the other four gets them too rather than having to poll
+   * `outcomes()` and notice what it missed.
+   *
+   * A throw from the hook is swallowed and reported, never propagated. A counter
+   * write that turned a delivered notification into a failed one would be a
+   * diagnostic deciding the outcome of the thing it describes (APX-FR-02), and a
+   * policy that trusted a listener would have a second reason to fail.
+   */
+  readonly onOutcome?: (attempt: DeliveryAttemptRecord) => void
   /** Overrides for the bounds. A test lowers one; production passes none. */
   readonly attemptTimeoutMs?: number
   readonly maxOutcomeRecords?: number
@@ -458,6 +476,25 @@ export function createDeliveryPolicy(options: DeliveryPolicyOptions): DeliveryPo
   let lastFailure: DeliveryFailureSummary | null = null
   let closed = false
 
+  // The outcome seam. Absent means HC-6 was not wired, which is not a fault: the
+  // policy's own ledger, its counts and health carry every attempt either way, and
+  // the counters are a durable summary of them rather than the record itself.
+  const reportOutcome = (entry: DeliveryAttemptRecord): void => {
+    const hook = options.onOutcome
+    if (hook === undefined) return
+    try {
+      hook(entry)
+    } catch {
+      // Reported, never propagated, and never retried: an attempt is not made
+      // twice because somebody counting it was not ready (APX-CON-10).
+      diagnostic(
+        'delivery: an outcome listener threw while a delivery was being recorded. The attempt is ' +
+          'recorded and its outcome is unchanged; a listener that fails cannot cost a notification ' +
+          '(APX-FR-02).',
+      )
+    }
+  }
+
   const record = (input: {
     readonly event: DeliveryRequest['event']
     readonly class: EventClass
@@ -497,6 +534,10 @@ export function createDeliveryPolicy(options: DeliveryPolicyOptions): DeliveryPo
     if (input.outcome !== 'delivered' && input.outcome !== 'suppressed') {
       lastFailure = { at: entry.at, eventId: entry.eventId, reason: entry.reason }
     }
+    // Last, so a listener sees an attempt the policy has already fully recorded:
+    // if it throws, the ledger, the counts and the health verdict are already the
+    // truth and the exception cannot cost any of them.
+    reportOutcome(entry)
     return entry
   }
 

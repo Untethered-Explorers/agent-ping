@@ -3,8 +3,8 @@
 ## Current State
 **Phase**: HUB-CORE-AND-DELIVERY-POLICY-2
 **Status**: In Progress
-**Validation Gaps**: 27 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-26T16:40:44.416Z
+**Validation Gaps**: 32 unverified check(s) - see "Validation Gaps"
+**Last Updated**: 2026-09-26T17:01:48.139Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -36,12 +36,13 @@
   - Files: src/hub/routes/ack.ts, src/hub/security.ts, tests/hub/ack.test.ts, tests/hub/security.test.ts, src/hub/routes/read.ts, src/hub/server.ts, src/main/index.ts, tests/hub/server.test.ts
 - [x] Phase HUB-CORE-AND-DELIVERY-POLICY-2, Task HC-5: Implement delivery policy, restart replay and clean shutdown (@hub-engineer)
   - Files: src/hub/delivery.ts, src/hub/lifecycle.ts, tests/hub/delivery.test.ts, tests/hub/lifecycle.test.ts, src/hub/routes/read.ts, src/main/index.ts, tests/hub/security.test.ts, tests/hub/server.test.ts, tests/hub/fixtures/hub-process.ts, tests/hub/fixtures/signal-hub.mjs
+- [x] Phase HUB-CORE-AND-DELIVERY-POLICY-2, Task HC-6: Expose the local metrics surface (@hub-engineer)
+  - Files: src/hub/metrics.ts, src/hub/routes/metrics.ts, tests/hub/metrics.test.ts, src/hub/delivery.ts, src/hub/routes/read.ts, src/hub/server.ts, src/main/index.ts
 
 ## Current Task
 - None currently running
 
 ## Remaining
-- [ ] Phase HUB-CORE-AND-DELIVERY-POLICY-2: Phase 2: Write surface, security, delivery and metrics
 - [ ] Phase HUB-CORE-AND-DELIVERY-POLICY-3: Phase 3: Read-only and restart-safety gate
 - [ ] Phase NOTIFICATION-AND-TRAY-PRESENCE-1: Phase 1: Notifier and toast policy
 - [ ] Phase NOTIFICATION-AND-TRAY-PRESENCE-2: Phase 2: Tray presence
@@ -89,6 +90,11 @@
 - Task HC-5: The restart evidence is a real SIGKILL of a real child process and a real restart, not a service-manager restart; that remains qa-engineer's IO-4.
 - Task HC-5: Ordering inside the ordered close is asserted from the source rather than observed, because the steps run within one turn of the event loop; every step's own effect is asserted independently (listener released, counters flushed, log closed and openable, runtime file removed, state reported).
 - Task HC-5: The policy was exercised against a notifier that is a test function, not against a platform notifier; notification-engineer's NT-1 is where a real toast boundary is proven, and APX-CON-10's no-retry-storm claim about real notifiers inherits from that.
+- Task HC-6: No Electron process was started and no tray exists: the package is not installed in this checkout and NT-2 is not built. The half of NT-FR-08's counter requirement that belongs to the tray is proven by the recorder's public method and by driving onDashboardDocumentServed directly, not by a tray click.
+- Task HC-6: The restart-replay counter test uses two in-process hubs over one state directory rather than two operating-system processes. The real-process version of restart replay is tests/hub/delivery.test.ts's, and the count above it is the counter, not the kill.
+- Task HC-6: The 'only caller of a counter write' assertion walks src/ as source text with a regular expression. It catches a new call site in any product module, and it would not see a write through a computed property name.
+- Task HC-6: isDashboardDocumentPath treats '//' as a document while the hub answers 404 for it; the hook fires only on a real serve, so this is unobservable in the counters but is a disagreement between two rules rather than a proved-equal pair.
+- Task HC-6: The exact key-set and name-shape assertions on the metrics payload are over one real response body. A field that appeared only on a second hub, a different clock or an error path would need a new assertion; /api/metrics has no other payload shape because it has no error path.
 
 ## Notes
 - Workflow engine run 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8

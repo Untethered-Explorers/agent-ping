@@ -7,8 +7,9 @@
 //   2. the runtime file, which is the lock - so a second instance is refused
 //      before it can open the same log
 //   3. the durable store, then the counters over the same file
-//   4. the state change feed, wrapped around the store, so every transition the
-//      store applies becomes a frame for the dashboards already watching
+//   4. the metrics recorder over those counters (HC-6), then the state change feed
+//      wrapped around the store, so every transition the store applies becomes a
+//      frame for the dashboards already watching and a snapshot for the counters
 //   5. the route registry, with every route registered in one array
 //   6. the loopback server, which chooses the live port
 //   7. the runtime file again, this time with that port in it
@@ -59,6 +60,14 @@
 // listener in the shutdown order below, so a stream is never left pointing at a
 // store that has already been closed.
 //
+// The four local counters (HC-6) are wired the same way and for the same reason. The
+// recorder is the only object in this process that calls a counter's write method,
+// and each of its four increments is fed by the path the fact happens on: the
+// dashboard route's document handler for an open and a deep link, the delivery
+// policy's outcome for a toast, and a wrapper inside the store wrapper for a
+// pending-set change. Nothing polls and nothing samples, so a counter that is
+// wrong is wrong because a path is wrong rather than because a timer fired.
+//
 // agent-ping is a sidecar. It observes agent processes and owns none of them
 // (APX-CON-03, ADR-001), so nothing in this file starts, stops or signals anything
 // outside this process.
@@ -87,6 +96,12 @@ import {
   type ChangeFeed,
   type StreamSettings,
 } from '../hub/sse.js'
+import {
+  createMetricsRecorder,
+  onDashboardDocumentServed,
+  withPendingSnapshot,
+  type MetricsRecorder,
+} from '../hub/metrics.js'
 import {
   DeliveryFailedError,
   createDeliveryPolicy,
@@ -254,6 +269,16 @@ export interface RunningHub {
    */
   readonly store: EventStore
   readonly counters: Counters
+  /**
+   * The metrics recorder (HC-6): the four recording decisions PRD 11 is measured
+   * against, and the only object in this process that calls a counter's write method.
+   *
+   * Exposed for `doctor`, for the tray's deep-link click (NT-FR-08) and for a test
+   * that has to observe a counter moving through a real path. It can only count: no
+   * member of it names a session, an event or a harness, reads a row or returns a
+   * payload, so holding one is not a way to change anything (APX-CON-08).
+   */
+  readonly metrics: MetricsRecorder
   /** The live state stream's feed. Closed first on shutdown. */
   readonly stream: ChangeFeed
   /**
@@ -361,11 +386,41 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
     store = openEventStore({ filePath: databaseFilePath(stateDir), now })
     counters = openCounters({ filePath: store.filePath, now })
 
+    // 3b. The metrics recorder (HC-6), over those counters, built here and nowhere
+    //     else for the same reason every other collaborator is: the composition root
+    //     is the one place this product wires things, so "which path increments which
+    //     counter" is answerable by reading one file rather than by searching for
+    //     every call site.
+    //
+    //     The baseline is the pending count as the log reports it right now, so a hub
+    //     that starts with three blocks outstanding and then stores an `fyi` event is
+    //     not recorded as a change to the pending set (src/hub/metrics.ts). The read
+    //     happens once, here, because the store is open and no request can arrive
+    //     before the socket is bound below.
+    //
+    //     `log` and `localMetrics` are constants rather than the `let` bindings the
+    //     steps above use, because the two closures below capture them and a closure
+    //     over a `let` would be re-read at call time - by which point the try block
+    //     may have failed and released whatever it took.
+    const log: EventStore = store
+    const localMetrics: MetricsRecorder = createMetricsRecorder({
+      counters,
+      initialPendingCount: (): number => log.readPending().length,
+      onDiagnostic: diagnostic,
+    })
+
     // 4. The live state stream's feed, wrapped around the store. The wrapper is
     //    what makes a frame appear for every transition the store applies, so the
     //    routes that write (HC-3, HC-4) never have to publish anything themselves.
+    //
+    //    The metrics wrapper is inside the stream wrapper, and that order is a
+    //    decision rather than a habit: an applied transition records its
+    //    pending-set snapshot first, so a client that learns about the change from
+    //    the frame it produces finds the counter already moved. Both wrappers read
+    //    the same bounded pending set, so the cost is one extra small read on the
+    //    ingest path that already reads it twice.
     stream = createChangeFeed(options.stream)
-    const watching = withChangeFeed(store, stream)
+    const watching = withChangeFeed(withPendingSnapshot(store, localMetrics), stream)
 
     // 4b. The delivery policy (HC-FR-07), over the same wrapped store and before the
     //     ingest pipeline, because the pipeline's port *is* this policy. Built here
@@ -381,6 +436,12 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
       // a port nobody is listening on (HC-FR-01, NT-FR-07).
       origin: (): string => server?.origin ?? '',
       onDiagnostic: diagnostic,
+      // The one place a delivery outcome leaves the policy (HC-6). A `delivered`
+      // outcome is the increment for `toast_deliveries`; the other four are handed
+      // over and deliberately not counted, because counting a gap as a delivery is
+      // the one thing PRD 11's notification-restraint row cannot be measured against
+      // (APX-FR-02, ADR-010).
+      onOutcome: (attempt): void => localMetrics.recordDeliveryOutcome(attempt),
       ...options.delivery,
     })
 
@@ -434,7 +495,14 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
     registry.registerAll(INGEST_ROUTES)
     registry.registerAll(ACK_ROUTES)
     const dashboardRoot = resolveDashboardRoot(options.dashboardRoot)
-    registry.register(createDashboardRoute<HubServices>({ root: dashboardRoot }))
+    registry.register(
+      // The second argument is the dashboard document handler (HC-6): the hub
+      // recording that a client was served the page, and that a request carrying a
+      // deep-link target opened it that way. The route tells it only when a file was
+      // actually served, so a 404, an unsupported type and a hub with no build record
+      // nothing - which is right, because no dashboard was opened in any of them.
+      createDashboardRoute<HubServices>({ root: dashboardRoot }, onDashboardDocumentServed(localMetrics)),
+    )
 
     // The services are read per request rather than captured, because the port they
     // report is the one the bind below produces. `let` with a thunk is the honest
@@ -518,6 +586,7 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
       server,
       store: watching,
       counters,
+      metrics: localMetrics,
       stream,
       ingest,
       /**

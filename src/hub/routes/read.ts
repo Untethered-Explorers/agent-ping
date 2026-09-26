@@ -6,11 +6,15 @@
 // event, not a counter, not a file. That is not a promise in a comment - it is
 // asserted by tests/hub/server.test.ts, which counts pending items and events
 // through a second connection before and after every request on the enumerated
-// route list. The three counters that do get recorded from real request paths
-// (dashboard opens, deep links, toast deliveries, and a pending snapshot) live in
-// their own table and are recorded by the paths that own them: HC-6. A read route
-// that starts writing state breaks the promise the count comparison enforces, so
-// this file has no writer in it and is not allowed to grow one.
+// route list. The four counters that do get recorded from real request paths
+// (dashboard opens, deep-link opens, toast deliveries and a pending-count
+// snapshot) live in their own table and are recorded by the paths that own them:
+// the dashboard route's document handler, the delivery policy's outcome and a
+// wrapper around the store (HC-6, ../metrics.ts). A read route that starts writing
+// state breaks the promise the count comparison enforces, so this file has no
+// writer in it and is not allowed to grow one - which is why `/api/metrics`, whose
+// recording side is the busiest of the four, is served from its own module and
+// still cannot write.
 //
 // WHAT CROSSES THE WIRE
 // The exact read shapes of the store, and nothing else. The store's shapes are
@@ -52,7 +56,8 @@ import {
   type SessionDetail,
   type SessionSummary,
 } from '../../storage/eventStore.js'
-import type { Counters, CounterReading } from '../../storage/counters.js'
+import type { Counters } from '../../storage/counters.js'
+import { METRICS_ROUTES } from './metrics.js'
 import type { ChangeFeed } from '../sse.js'
 import type { IngestService } from '../ingest-service.js'
 import type { DeliveryStatus } from '../delivery.js'
@@ -253,10 +258,6 @@ export interface EventHistoryPayload {
   readonly sessionId: string | null
 }
 
-export interface MetricsPayload {
-  readonly counters: readonly CounterReading[]
-}
-
 /**
  * Every read route, in one array.
  *
@@ -325,19 +326,12 @@ export const READ_ROUTES: readonly RouteDefinition<HubServices>[] = [
       } satisfies EventHistoryPayload)
     },
   },
-  {
-    method: 'GET',
-    pattern: '/api/metrics',
-    name: 'read.metrics',
-    mutation: 'read-only',
-    // Registered here because HC-FR-02 lists the counters among the read routes.
-    // HC-6 owns the recording side, in src/hub/metrics.ts, and extends this
-    // payload; the route itself stays where the read surface is declared so there
-    // is still one list of routes.
-    handle: ({ services, response }): void => {
-      respond(response, 200, { counters: services.counters.read() } satisfies MetricsPayload)
-    },
-  },
+  // HC-FR-02 lists the counters among the read routes, so the metrics route is
+  // registered from this list like every other one. Its own module
+  // (./metrics.ts) is where the payload and its bounds live, and where the
+  // recording side is visibly absent: the route is a read, and a read route that
+  // could increment a counter would be a read route that mutates.
+  ...METRICS_ROUTES,
   {
     method: 'GET',
     pattern: '/api/health',
@@ -347,7 +341,7 @@ export const READ_ROUTES: readonly RouteDefinition<HubServices>[] = [
       respond(response, 200, readHealth(services))
     },
   },
-]
+ ]
 
 /**
  * The health read, separated from the route so a test can drive it with an
