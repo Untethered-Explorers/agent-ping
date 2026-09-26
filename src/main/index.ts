@@ -33,16 +33,25 @@
 // Electron to be installed at all.
 //
 // WHAT IS NOT HERE YET
-// The delivery policy, the notifier and the tray arrive in HC-5 and NT-2. Ingest
-// (HC-3), the live stream (HC-2) and the ack route with its security boundary
-// (HC-4) are wired here now, and the seams the rest need are already in place:
-// `registerRoutes` is the single registration point, `close` is the single
-// shutdown path the lifecycle work will call, and `desktop.mountTray` is where the
-// tray will be mounted. What is deliberately absent is any route that can spawn,
-// steer, interrupt, prompt or approve anything inside a harness (APX-CON-08): the
-// mutating set in src/hub/server.ts is exactly two signatures, the append-only
-// ingest route and the ack route, and the registry refuses to register anything
-// else that claims to write.
+// The platform notifier and the tray arrive in NT-1 and NT-2. The delivery policy
+// (HC-5) is wired here now: it is the one thing in this process that may call a
+// notifier, the notifier itself is constructed at the bottom of this file and
+// injected into it, and the restart replay and the shutdown path are both driven
+// from here. What remains deliberately absent is any route that can spawn, steer,
+// interrupt, prompt or approve anything inside a harness (APX-CON-08): the mutating
+// set in src/hub/server.ts is exactly two signatures, the append-only ingest route
+// and the ack route, and the registry refuses to register anything else that
+// claims to write. The delivery policy is not a route and is reachable from no
+// request at all.
+//
+// THE ORDER THE SHUTDOWN AND THE START SHARE
+// A hub that is starting replays its pending blocks (HC-FR-07) and a hub that is
+// stopping drains them (HC-FR-10), and both go through the two objects built here:
+// `delivery` owns the attempt and the bound, `lifecycle` owns the signal and the
+// exit. `close` remains the single ordered shutdown - refuse new work, drain, end
+// the streams, stop answering, flush the counters, close the log, release the
+// runtime file - and the lifecycle calls it rather than restating it, so a test that
+// closes a hub directly and a service manager that stops one take the same path.
 //
 // The live state stream (HC-2) is wired here rather than inside the store, which
 // is what keeps ingest and ack from having to know it exists: they call the
@@ -68,6 +77,7 @@ import { ACK_ROUTES } from '../hub/routes/ack.js'
 import { createHubSecurity, type CreateHubSecurityOptions, type HubSecurity } from '../hub/security.js'
 import {
   createIngestService,
+  type DeliveryPort,
   type IngestService,
   type IngestServiceOptions,
 } from '../hub/ingest-service.js'
@@ -77,6 +87,13 @@ import {
   type ChangeFeed,
   type StreamSettings,
 } from '../hub/sse.js'
+import {
+  DeliveryFailedError,
+  createDeliveryPolicy,
+  type DeliveryPolicy,
+  type DeliveryPolicyOptions,
+} from '../hub/delivery.js'
+import { createHubLifecycle, type HubLifecycle, type HubState } from '../hub/lifecycle.js'
 import {
   createDashboardRoute,
   startServer,
@@ -154,6 +171,42 @@ export interface StartHubOptions {
    */
   readonly ingest?: Partial<Omit<IngestServiceOptions, 'store'>>
   /**
+   * Overrides for the delivery policy (HC-FR-07).
+   *
+   * Production passes nothing until NT-1 constructs the platform notifier, and the
+   * absence is meaningful rather than a gap: with no notifier the policy reports
+   * `not-wired` on health and the ingest pipeline counts `not-wired` deliveries, so
+   * "nobody was told" is visible from both ends (APX-FR-02). A test passes a `notifier`
+   * to watch one classified event become one attempt.
+   *
+   * `origin` is not a caller option: it is this file's own live origin, read per
+   * request, because a deep link cannot be built from a port that was only a
+   * preference (HC-FR-01, NT-FR-07).
+   */
+  readonly delivery?: Partial<Omit<DeliveryPolicyOptions, 'store' | 'origin'>>
+  /**
+   * Overrides for the shutdown path (HC-FR-10).
+   *
+   * `installSignals: false` is for a caller that owns the process's signals itself -
+   * a test, or a host application that has its own quit handling. A hub that installs
+   * the handlers removes them again in `close`, so a test that always closes cannot
+   * leave a handler behind on the test runner.
+   */
+  readonly lifecycle?: {
+    readonly installSignals?: boolean
+    readonly graceMs?: number
+    readonly signals?: readonly string[]
+    /**
+     * How the process ends after a shutdown. Defaults to `process.exit`.
+     *
+     * The Electron entry point passes `app.quit` instead, so a quit from the tray
+     * takes the same ordered path as a signal and then lets Electron tear the
+     * application down in its own way rather than being killed mid-teardown. A test
+     * passes a spy so the exit code can be asserted without ending the test runner.
+     */
+    readonly exit?: (code: number) => void
+  }
+  /**
    * Overrides for the security boundary (HC-FR-06).
    *
    * Production passes nothing, which means the token is a fresh 32 bytes in the
@@ -218,6 +271,21 @@ export interface RunningHub {
    */
   readonly pending: PendingLifecycle
   /**
+   * The delivery policy (HC-FR-07): the one object here that may call a notifier, and
+   * the only place a delivery is attempted.
+   *
+   * Exposed for `doctor` and for a test that has to see a per-event outcome or a
+   * replay report. It has no route, so no client can reach it; what a *request* can
+   * reach is the ingest port adapter below, which is why this is a plain field on a
+   * running hub and not a service in `HubServices` (APX-CON-08).
+   */
+  readonly delivery: DeliveryPolicy
+  /**
+   * The shutdown path (HC-FR-10): PRD 10's lifecycle state, and the one ordered
+   * shutdown a signal, an Electron quit and a test all take.
+   */
+  readonly lifecycle: HubLifecycle
+  /**
    * The security boundary: this install's write token, the header it travels in, and
    * where the token file is. In-process only - the token is on no read route, in no
    * response body and in no served asset (HC-FR-06).
@@ -257,6 +325,36 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
   let server: HubServer<HubServices> | undefined
   let stream: ChangeFeed | undefined
   let ingest: IngestService | undefined
+  let delivery: DeliveryPolicy | undefined
+
+  // The lifecycle exists before anything is opened, because a termination signal can
+  // arrive at any point in this function. What it calls before the hub exists is the
+  // honest answer to "stop" at that moment: give the claim back and close whatever had
+  // been opened, rather than leaving a half-started process holding a runtime file
+  // (HC-FR-10). `closeHub` is filled in below, once there is a hub to close.
+  let closeHub: (() => Promise<void>) | undefined
+  const lifecycle = createHubLifecycle({
+    close: async (): Promise<void> => {
+      if (closeHub !== undefined) {
+        await closeHub()
+        return
+      }
+      await quietClose(server, counters, store)
+      releaseQuietly(claim)
+    },
+    stateDir,
+    instanceId: claim.instanceId,
+    pid: claim.pid,
+    ...(options.lifecycle?.graceMs === undefined ? {} : { graceMs: options.lifecycle.graceMs }),
+    ...(options.lifecycle?.signals === undefined ? {} : { signals: options.lifecycle.signals }),
+    ...(options.lifecycle?.exit === undefined ? {} : { exit: options.lifecycle.exit }),
+    onDiagnostic: diagnostic,
+  })
+  // Installed here rather than at the end, so a signal during a slow start is a clean
+  // stop rather than a default termination. `close` removes them again on every path,
+  // including the failure path below, so a refused or failed start leaves the process
+  // exactly as it found it.
+  if (options.lifecycle?.installSignals !== false) lifecycle.install()
   try {
     // 3. The durable log, and the counters over the same file. Both are opened
     //    against the resolved state directory, never against a second guess at it.
@@ -269,12 +367,45 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
     stream = createChangeFeed(options.stream)
     const watching = withChangeFeed(store, stream)
 
-    // 4b. The ingest pipeline, over the same wrapped store, so an ingested event
+    // 4b. The delivery policy (HC-FR-07), over the same wrapped store and before the
+    //     ingest pipeline, because the pipeline's port *is* this policy. Built here
+    //     and nowhere else: the composition root is the single place a collaborator is
+    //     constructed, which is what keeps a second delivery path from being a diff
+    //     nobody reads. The notifier is the platform's (NT-1) and arrives through the
+    //     `delivery` option; until then the policy reports `not-wired` rather than
+    //     pretending anything was delivered (APX-FR-02).
+    delivery = createDeliveryPolicy({
+      store: watching,
+      // The live origin, read per request rather than captured: the bind below is what
+      // chooses the port, and a deep link built from the preferred one would point at
+      // a port nobody is listening on (HC-FR-01, NT-FR-07).
+      origin: (): string => server?.origin ?? '',
+      onDiagnostic: diagnostic,
+      ...options.delivery,
+    })
+
+    // 4c. The ingest pipeline, over the same wrapped store, so an ingested event
     //     becomes a live change frame without the pipeline knowing the stream exists.
     //     It is built here and nowhere else: the composition root is the single place
     //     a route's collaborators are constructed, which is what keeps a second way to
     //     build one from being a diff nobody reads.
-    ingest = createIngestService({ store: watching, onDiagnostic: diagnostic, ...options.ingest })
+    //
+    //     The delivery port is the policy, and the adapter's whole job is to turn an
+    //     outcome the policy already recorded back into a rejection the pipeline
+    //     records as a dropped delivery (HC-FR-09). The policy never throws, so this
+    //     is the only place the two layers meet.
+    //
+    //     `deliveryWired` is the policy's own `wired`: a hub with no notifier behind
+    //     the port has told nobody, and the pipeline's `not-wired` count is the
+    //     honest answer for it. Reporting those attempts as `delivered` would be the
+    //     one thing this product must never do (APX-FR-02).
+    ingest = createIngestService({
+      store: watching,
+      delivery: deliveryPort(delivery),
+      deliveryWired: delivery.wired,
+      onDiagnostic: diagnostic,
+      ...options.ingest,
+    })
 
     // 4c. The pending lifecycle the ack route drives, and the security boundary that
     //     guards it. Both over the same wrapped store, so an acknowledgement also
@@ -315,8 +446,9 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
       stream,
       ingest,
       pending,
+      delivery,
       security,
-      hub: unpublishedIdentity(claim),
+      hub: unpublishedIdentity(claim, lifecycle),
     }
 
     // 6. The listener. The port is chosen here and nowhere else.
@@ -344,6 +476,7 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
       stream,
       ingest,
       pending,
+      delivery,
       security,
       hub: {
         instanceId: claim.instanceId,
@@ -356,6 +489,12 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
         rebuiltFromMigrations: store.rebuiltFromMigrations,
         dashboardRoot,
         servedRequests: (): number => server?.servedRequests() ?? 0,
+        // Read at request time, not captured: the listener and the lifecycle state
+        // both change while a health payload is being built, and a doctor run that
+        // reads `listening: true` from a hub that has already closed is worse than no
+        // field (HC-FR-07, HC-FR-10).
+        listening: (): boolean => server?.nodeServer.listening ?? false,
+        state: (): HubState => lifecycle.state().state,
       },
     }
 
@@ -388,6 +527,14 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
        */
       pending,
       /**
+       * The delivery policy and the shutdown path. Neither is a route, so neither is
+       * reachable from a request; both are here because `doctor` and the notification
+       * engineer need to read them from a running hub, and because a signal has to
+       * reach the shutdown from inside the process (HC-FR-07, HC-FR-10).
+       */
+      delivery,
+      lifecycle,
+      /**
        * The security boundary: this install's write token, the header it travels in
        * and where the token file is. In-process only - the token is on no read route,
        * in no response and in no served asset (HC-FR-06).
@@ -402,34 +549,49 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
         // error, which is exactly the sort of "not silent" that is not a report.
         if (closed) return
         closed = true
-        // The order a shutdown has to have: stop accepting events, end the live
-        // streams, stop answering, fold the counters into the file, close the log,
-        // then give the runtime file back. The ingest drain goes first of all, and
-        // the feed second; both placements are deliberate.
+        // First, and before anything is closed: the hub is stopping. This is the
+        // signal path's own first step (src/hub/lifecycle.ts) and it is repeated here
+        // because `close` is reachable without a signal - from a test, from Electron's
+        // before-quit, from the CLI - and a health payload that said `running` while
+        // the log was being closed would be a lie in all three of those cases.
+        // Beginning the shutdown also removes the signal handlers, so a second Ctrl-C
+        // is the operating system's answer rather than a second ordered close.
+        lifecycle.begin('close')
+        // The order a shutdown has to have: refuse new deliveries, stop accepting
+        // events, end the live streams, stop answering, fold the counters into the
+        // file, close the log, then give the runtime file back. The delivery drain
+        // goes first of all, and the feed third; every placement is deliberate.
         //
-        // Draining ingest first is HC-FR-10's "refuse new events" becoming a real
-        // step rather than an intention: the pipeline stops accepting, waits out the
-        // deliveries already in flight - bounded by the delivery timeout, so a wedged
-        // notifier cannot hold a shutdown - and only then does anything else close.
-        // Closing the log underneath a delivery would be the ordering bug the comment
-        // on the feed below describes, seen from the other end.
+        // Draining delivery is HC-FR-10's "stop accepting events" reaching the
+        // notification path first: the policy refuses new attempts and waits out the
+        // ones already in flight - bounded by DELIVERY_ATTEMPT_TIMEOUT_MS, so a wedged
+        // notifier cannot decide whether the hub stops (APX-CON-10). Closing the log
+        // underneath a delivery would be the ordering bug the comment on the feed
+        // describes, seen from the other end.
         //
-        // The feed goes after that and before the listener, and both halves of that
-        // are deliberate. Ending the streams is what stops a client waiting on a
-        // socket that will never speak again, and it is also what stops
-        // `server.close` from sitting on a response that is deliberately still open -
-        // a streaming response is not an idle connection, so the listener would wait
-        // for every dashboard to disconnect on its own. The cost of that order is
-        // that a transition reaching a closing feed throws, which is why the
-        // "refuse new events" step has to come before this call: an ingest still in
-        // flight when the feed closes is an ordering bug, and losing its frame quietly
-        // would hide it. Publishing a shutdown state is HC-5's work with the signal
-        // handler; this is the primitive it calls.
+        // The ingest drain follows, and is the step that refuses new *events*: the
+        // pipeline stops accepting, and a post that arrives now is answered 503 and
+        // recorded as dropped rather than stored by a half-closed hub. Its own tracked
+        // promises include the port calls above, so this is where a live delivery that
+        // the ingest started is waited for as well.
+        //
+        // The feed goes before the listener, and both halves of that are deliberate.
+        // Ending the streams is what stops a client waiting on a socket that will never
+        // speak again, and it is also what stops `server.close` from sitting on a
+        // response that is deliberately still open - a streaming response is not an
+        // idle connection, so the listener would wait for every dashboard to disconnect
+        // on its own. The cost of that order is that a transition reaching a closing
+        // feed throws, which is why the refusal steps have to come before this call.
         let firstError: unknown
+        try {
+          await delivery?.close()
+        } catch (cause) {
+          firstError = cause
+        }
         try {
           await ingest?.close()
         } catch (cause) {
-          firstError = cause
+          firstError ??= cause
         }
         try {
           stream?.close()
@@ -442,6 +604,13 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
           firstError ??= cause
         }
         try {
+          // The flush is PRD 10's "counters flushed", and it is a step rather than a
+          // detail: it folds the write-ahead log back into the single database file,
+          // so a copy of that file taken after a shutdown is complete rather than
+          // needing a restart to become so (src/storage/counters.ts). It has to happen
+          // while the counters' own connection is still open, which is why it sits
+          // between the listener closing and the database closing.
+          counters?.flush()
           counters?.close()
         } catch (cause) {
           firstError ??= cause
@@ -452,11 +621,32 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
           firstError ??= cause
         }
         releaseQuietly(claim)
+        lifecycle.finish()
         if (firstError !== undefined && firstError !== null) throw firstError
       },
     }
+    closeHub = hub.close
 
-    // 8. The desktop shell, last, so nothing is mounted over a hub that is not
+    // 8. The restart replay (HC-FR-07), with the socket bound and the port published,
+    //    because a replayed delivery's deep link needs the live origin and a replayed
+    //    block must reach the same notifier a fresh one does. Awaited rather than
+    //    fired: every attempt inside it is bounded, so the bound on the start is one
+    //    delivery attempt rather than a pending count, and "the hub is running with its
+    //    outstanding blocks already re-announced" is a fact its caller can rely on
+    //    rather than a race. PRD 10 puts the replay in `starting`, before `running`,
+    //    and the state reported on health is `starting` for exactly this window.
+    const replay = await delivery.replayPending()
+    if (replay.candidates > 0) {
+      diagnostic(
+        `agent-ping replayed ${replay.candidates} unacknowledged pending item(s) from a previous ` +
+          `run: ${replay.delivered} delivered, ${replay.failed} failed or timed out, ` +
+          `${replay.suppressed} already delivered in this run, ${replay.notWired} with no notifier ` +
+          '(HC-FR-07)',
+      )
+    }
+    lifecycle.markRunning()
+
+    // 9. The desktop shell, last, so nothing is mounted over a hub that is not
     //    yet serving.
     const desktop = options.desktop
     if (desktop !== undefined) {
@@ -482,11 +672,20 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
   } catch (cause) {
     // Every failure path releases what it took, so a failed start never leaves a
     // runtime file that refuses the next attempt, and never leaves a heartbeat
-    // timer running in a process that is about to report the failure.
+    // timer or a signal handler running in a process that is about to report the
+    // failure. The lifecycle's handlers go first: a failed start is not a hub, and a
+    // process that has just reported a failure must not be listening for a signal that
+    // would run a shutdown against a hub that was never built.
+    lifecycle.dispose()
+    try {
+      await delivery?.close()
+    } catch {
+      // The failure being reported is the one that caused this cleanup.
+    }
     try {
       await ingest?.close()
     } catch {
-      // The failure being reported is the one that caused this cleanup.
+      // As above.
     }
     stream?.close()
     await quietClose(server, counters, store)
@@ -530,7 +729,7 @@ function projectRoot(): string {
  * that claimed a port the hub had not taken would be a lie with a plausible number
  * in it.
  */
-function unpublishedIdentity(claim: HubInstanceClaim): HubIdentity {
+function unpublishedIdentity(claim: HubInstanceClaim, lifecycle: HubLifecycle): HubIdentity {
   return {
     instanceId: claim.instanceId,
     pid: claim.pid,
@@ -542,6 +741,30 @@ function unpublishedIdentity(claim: HubInstanceClaim): HubIdentity {
     rebuiltFromMigrations: false,
     dashboardRoot: null,
     servedRequests: () => 0,
+    listening: () => false,
+    state: (): HubState => lifecycle.state().state,
+  }
+}
+
+/**
+ * The bridge from the ingest pipeline's delivery port to the delivery policy.
+ *
+ * Three lines, and the only place the two layers meet. The policy resolves with an
+ * outcome and never throws, which is what lets it keep its own record and its own
+ * bound; the ingest pipeline is built to record a throwing port as a dropped delivery
+ * with a reason (HC-FR-09). So the adapter turns any outcome that is not `delivered`
+ * into a rejection carrying the policy's own record - a `DeliveryFailedError`, whose
+ * message names the outcome and the reason and quotes nothing from the event.
+ *
+ * The consequence is that one failed notification is visible from all three places a
+ * caller could look: the policy's ledger, the pipeline's drop ledger, and health
+ * (APX-FR-02, ADR-010). And a hub with no notifier behind the port never gets here at
+ * all, because the pipeline's `deliveryWired` is the policy's own `wired`.
+ */
+function deliveryPort(delivery: DeliveryPolicy): DeliveryPort {
+  return async (request: Parameters<DeliveryPort>[0]): Promise<void> => {
+    const attempt = await delivery.deliver(request, 'event')
+    if (attempt.outcome !== 'delivered') throw new DeliveryFailedError(attempt)
   }
 }
 
@@ -640,16 +863,20 @@ export async function startElectronMain(): Promise<RunningHub | null> {
   }
 
   await app.whenReady()
-  const hub = await startHub({ desktop: { isPrimaryInstance: true } })
+  // `app.quit` rather than `process.exit` as the lifecycle's exit, so the ordered
+  // shutdown ends with Electron tearing the application down in its own order. The
+  // lifecycle still owns the *sequence* - refuse, drain, flush, close, release - and a
+  // second `before-quit` is a no-op because `shutdown` is idempotent, which matters
+  // because a quit can be requested twice (a tray click and a session logout, say).
+  const hub = await startHub({
+    desktop: { isPrimaryInstance: true },
+    lifecycle: { exit: (): void => app.quit() },
+  })
 
-  // The hub owns the shutdown order (close listener, flush, close, release), and
-  // this only decides when to start it. A second `before-quit` is a no-op because
-  // `close` is idempotent, which matters because a quit can be requested twice.
+  // The same path a signal takes, so a quit from the tray and a `systemctl stop` are
+  // not two shutdown implementations.
   app.on('before-quit', () => {
-    void hub.close().catch(() => {
-      // A shutdown that cannot finish still has to end the process; the error is
-      // already reported through health while the hub was up.
-    })
+    void hub.lifecycle.shutdown('electron-quit')
   })
   return hub
 }

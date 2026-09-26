@@ -34,6 +34,12 @@
 // and the stream arrive in HC-3, HC-4 and HC-2, each registered into the same
 // registry from the composition root, so the enumeration test sees all of them
 // without this file knowing they exist.
+//
+// `/api/health` is the one route whose *payload* is assembled by the tasks around it:
+// HC-1 gave it the database section, HC-5 filled in the server and delivery sections
+// and wired the delivery policy into `HubServices`. It stays a read-only GET, it
+// still carries nothing that could be content, and the whole route is still in this
+// file - the one list a reviewer reads to see what a client can ask for.
 
 import type { ServerResponse } from 'node:http'
 import {
@@ -49,6 +55,8 @@ import {
 import type { Counters, CounterReading } from '../../storage/counters.js'
 import type { ChangeFeed } from '../sse.js'
 import type { IngestService } from '../ingest-service.js'
+import type { DeliveryStatus } from '../delivery.js'
+import type { HubState } from '../lifecycle.js'
 import type { HubSecurity } from '../security.js'
 import type { PendingLifecycle } from '../../domain/pending.js'
 import { respondJson, type RouteDefinition } from '../server.js'
@@ -99,6 +107,16 @@ export interface HubServices {
    */
   readonly pending: PendingLifecycle
   /**
+   * The delivery policy (HC-FR-07).
+   *
+   * The health route's only collaborator here, and declared in `HubServices` for the
+   * reason `ingest` is: the one description of what a handler is given. A route that
+   * reached for a policy which was not in it would be a second, unregistered way to
+   * build one - and the policy is the only thing in this product that can call a
+   * notifier, so a second one would be a second way to interrupt a developer.
+   */
+  readonly delivery: DeliveryStatusReader
+  /**
    * The security boundary (HC-FR-06): the per-install write token, the header it
    * travels in, and the one function that judges a write. The ack route is its only
    * caller, and a route that needs the boundary has to be handed it here - there is
@@ -109,11 +127,27 @@ export interface HubServices {
 }
 
 /**
+ * The slice of the delivery policy a read route may hold.
+ *
+ * `status()` only, and deliberately: the health route reports counts, and the
+ * policy's per-event ledger and its `deliver` method are not a read route's business.
+ * Narrowing the type here rather than importing the whole policy is what makes it a
+ * compile error for a future read route to call `deliver` - a route that could
+ * interrupt the developer would be the loudest possible regression (APX-CON-08,
+ * ADR-002).
+ */
+export interface DeliveryStatusReader {
+  status(): DeliveryStatus
+}
+
+/**
  * The hub's own reported state. Counts and timestamps only.
  *
- * `servedRequests` is a function rather than a number because it is read when the
- * request is answered: a snapshot taken at construction would be permanently
- * stale, and a stale number in a health payload is worse than no number.
+ * `servedRequests`, `listening` and `state` are functions rather than values because
+ * they are read when the request is answered: a snapshot taken at construction would
+ * be permanently stale, and a stale number in a health payload is worse than no
+ * number. The same is true of `state`, which changes at most twice in a run but can
+ * change while a doctor request is being built.
  */
 export interface HubIdentity {
   readonly instanceId: string
@@ -127,20 +161,31 @@ export interface HubIdentity {
   readonly rebuiltFromMigrations: boolean
   readonly dashboardRoot: string | null
   servedRequests(): number
+  /** Whether the loopback listener is still accepting connections (HC-FR-07). */
+  listening(): boolean
+  /** PRD 10's lifecycle state, read from the shutdown path (HC-FR-10). */
+  state(): HubState
 }
 
 /**
- * The health payload.
+ * The health payload: what `doctor` reads, in the three sections HC-FR-07 names -
+ * database, server and delivery.
  *
  * `status` is `ok` or `degraded`, and a degraded hub still answers 200. That is
- * deliberate: the question a doctor run asks is whether the hub is alive, and a
- * 503 from a hub that is alive and holding an unreadable log would collapse two
- * different faults into one. The `database.readable` field is how the two are
- * told apart.
+ * deliberate: the question a doctor run asks is whether the hub is alive, and a 503
+ * from a hub that is alive and holding an unreadable log would collapse two different
+ * faults into one. The `database.readable` field is how the two are told apart.
  *
- * `delivery` is the seam HC-5 fills with the real delivery status. It says
- * `not-wired` until then rather than being absent, so a doctor run against this
- * build can tell "delivery is not implemented yet" from "the field was forgotten".
+ * The top-level `status` follows PRD 10's own definition of `degraded` - the database
+ * is unavailable - rather than widening it to cover a failed notification. A delivery
+ * failure is reported in `delivery.status` instead, because the two are different
+ * facts with different remedies: one needs the log reopened, the other needs
+ * `notify-send`. A doctor run reads both, and a hub whose notifier failed once is not
+ * the same thing as a hub that cannot read its own log.
+ *
+ * Every field is a count, a timestamp, a path the local user already knows, a row key
+ * or a closed token. None of them can carry conversation content (APX-FR-01,
+ * APX-CON-12).
  */
 export interface HealthPayload {
   readonly status: 'ok' | 'degraded'
@@ -160,13 +205,29 @@ export interface HealthPayload {
     readonly sessionCount: number | null
     readonly pendingCount: number | null
   }
+  readonly server: {
+    readonly host: string
+    readonly port: number
+    readonly origin: string
+    readonly listening: boolean
+    /** PRD 10's state: starting, running, stopping or stopped. */
+    readonly state: HubState
+    readonly servedRequests: number
+  }
   readonly dashboard: {
     readonly available: boolean
     readonly root: string | null
   }
-  readonly delivery: {
-    readonly status: 'not-wired'
-  }
+  /**
+   * The delivery policy's own status, verbatim (HC-FR-07, NT-FR-09).
+   *
+   * The policy's shape rather than a restatement of it, so a field the policy starts
+   * reporting is reported here and a field it stops reporting disappears, with no
+   * second list in a route to keep in step. `lastFailure` names a row key and a closed
+   * reason token: enough for `doctor` to say which block nobody was told about, and
+   * nothing that could carry a message (APX-FR-01).
+   */
+  readonly delivery: DeliveryStatus
 }
 
 export interface SessionsPayload {
@@ -295,6 +356,12 @@ export const READ_ROUTES: readonly RouteDefinition<HubServices>[] = [
  * A store that cannot be read is reported as `degraded` with null counts rather
  * than as a 500: the counts are unknown, and saying so is more useful to `doctor`
  * than an error body (APX-FR-02, HC-FR-07).
+ *
+ * Every other read route keeps failing loudly on a closed log rather than degrading
+ * quietly to an empty answer, and that asymmetry is deliberate: health is the
+ * diagnostic route, and its job is to say what is wrong, while a client that gets a
+ * 500 from `/api/pending` knows its request failed and a client that got an empty 200
+ * would not.
  */
 export function readHealth(services: HubServices, now: Date = new Date()): HealthPayload {
   const { hub } = services
@@ -329,11 +396,19 @@ export function readHealth(services: HubServices, now: Date = new Date()): Healt
       sessionCount,
       pendingCount,
     },
+    server: {
+      host: hub.host,
+      port: hub.port,
+      origin: hub.origin,
+      listening: hub.listening(),
+      state: hub.state(),
+      servedRequests: hub.servedRequests(),
+    },
     dashboard: {
       available: hub.dashboardRoot !== null,
       root: hub.dashboardRoot,
     },
-    delivery: { status: 'not-wired' },
+    delivery: services.delivery.status(),
   }
 }
 

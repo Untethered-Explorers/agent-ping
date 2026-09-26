@@ -71,6 +71,7 @@ import { ACK_ROUTES } from '@/hub/routes/ack'
 import { RUNTIME_FILE_NAME } from '@/hub/runtime-file'
 import { INGEST_ROUTES } from '@/hub/routes/ingest'
 import { READ_ROUTES } from '@/hub/routes/read'
+import { createDeliveryPolicy } from '@/hub/delivery'
 import {
   createRequestListener,
   MUTATING_ROUTE,
@@ -320,6 +321,10 @@ describe('the loopback predicate (APX-CON-01)', () => {
       stream: feed,
       ingest,
       pending: createPendingLifecycle(store),
+      // A real policy over the same store, with no notifier behind it: the health
+      // route reads its status, and this fixture is about the address boundary rather
+      // than about delivery, so nothing here may interrupt the developer either.
+      delivery: createDeliveryPolicy({ store }),
       security,
       hub: {
         instanceId: 'synthetic',
@@ -332,6 +337,8 @@ describe('the loopback predicate (APX-CON-01)', () => {
         rebuiltFromMigrations: false,
         dashboardRoot: null,
         servedRequests: () => 0,
+        listening: () => false,
+        state: () => 'starting',
       },
     }
     const listener = createRequestListener<HubServices>({

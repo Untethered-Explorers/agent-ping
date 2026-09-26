@@ -3,8 +3,8 @@
 ## Current State
 **Phase**: HUB-CORE-AND-DELIVERY-POLICY-2
 **Status**: In Progress
-**Validation Gaps**: 23 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-26T15:41:12.918Z
+**Validation Gaps**: 27 unverified check(s) - see "Validation Gaps"
+**Last Updated**: 2026-09-26T16:40:44.416Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -34,6 +34,8 @@
   - Files: src/hub/routes/ingest.ts, src/hub/ingest-service.ts, tests/hub/ingest.test.ts, src/hub/routes/read.ts, src/hub/server.ts, src/main/index.ts, tests/hub/server.test.ts
 - [x] Phase HUB-CORE-AND-DELIVERY-POLICY-2, Task HC-4: Add the ack-only write surface and its security boundary (@hub-engineer)
   - Files: src/hub/routes/ack.ts, src/hub/security.ts, tests/hub/ack.test.ts, tests/hub/security.test.ts, src/hub/routes/read.ts, src/hub/server.ts, src/main/index.ts, tests/hub/server.test.ts
+- [x] Phase HUB-CORE-AND-DELIVERY-POLICY-2, Task HC-5: Implement delivery policy, restart replay and clean shutdown (@hub-engineer)
+  - Files: src/hub/delivery.ts, src/hub/lifecycle.ts, tests/hub/delivery.test.ts, tests/hub/lifecycle.test.ts, src/hub/routes/read.ts, src/main/index.ts, tests/hub/security.test.ts, tests/hub/server.test.ts, tests/hub/fixtures/hub-process.ts, tests/hub/fixtures/signal-hub.mjs
 
 ## Current Task
 - None currently running
@@ -83,6 +85,10 @@
 - Task HC-3: No Electron process was started: the package is not installed in this checkout, so the entry point was exercised through startHub rather than through the Electron runtime.
 - Task HC-3: The wire shape is agreed with nothing external: no opencode adapter exists yet, so 'an adapter posts this' is a contract this file publishes, not a behaviour a test observed against a real harness. OA-1/OA-2 and OA-5's live script are where that is proven.
 - Task HC-3: The store bound is asserted as a measured watchdog plus a fast-error path, because a synchronous driver cannot be interrupted mid-call. What is proven is that the caller is released on every path, that a throwing store is refused immediately, that an overrun is reported rather than hidden, and that the p95 of real posts is 4.61 ms; a store blocked inside SQLite is bounded by that driver's own busy timeout (src/storage/db.ts) rather than by this task.
+- Task HC-5: The observed ingest p95 (6.04 ms) comes from the ingest suite, which measures the response path only: a delivery is fire-and-forget after the 202, so a slow notifier is bounded by DELIVERY_ATTEMPT_TIMEOUT_MS rather than by that number.
+- Task HC-5: The restart evidence is a real SIGKILL of a real child process and a real restart, not a service-manager restart; that remains qa-engineer's IO-4.
+- Task HC-5: Ordering inside the ordered close is asserted from the source rather than observed, because the steps run within one turn of the event loop; every step's own effect is asserted independently (listener released, counters flushed, log closed and openable, runtime file removed, state reported).
+- Task HC-5: The policy was exercised against a notifier that is a test function, not against a platform notifier; notification-engineer's NT-1 is where a real toast boundary is proven, and APX-CON-10's no-retry-storm claim about real notifiers inherits from that.
 
 ## Notes
 - Workflow engine run 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8

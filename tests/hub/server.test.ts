@@ -618,9 +618,17 @@ describe('the hub entry point (HC-FR-01)', () => {
     // No runtime file: an adapter that found one would post to a hub that is gone.
     expect(existsSync(hub.runtimeFilePath)).toBe(false)
     expect(readRuntimeFile(hub.stateDir)).toBeNull()
-    // No listener: the port answers nothing now.
+    // No listener: the port answers nothing now. Read as "nothing from this hub
+    // answers any more" rather than as a bare connection refusal, because a loopback
+    // port is released the moment the listener closes and another hub in this suite -
+    // running in parallel, in another worker - can take it in the same millisecond. A
+    // refusal is the usual answer; a health payload carrying a different instance id is
+    // the other one, and both mean the same thing about this hub.
     expect(hub.server.nodeServer.listening).toBe(false)
-    await expect(call(hub.origin, '/api/health')).rejects.toThrow()
+    const afterClose = await call(hub.origin, '/api/health').catch(() => null)
+    if (afterClose !== null) {
+      expect(afterClose.json<{ instanceId: string }>().instanceId).not.toBe(hub.instanceId)
+    }
     // The log is still openable by anything else, and still holds the block: a
     // sidecar that was stopped lost nothing (APX-CON-03).
     const store = openEventStore({ filePath: path.join(hub.stateDir, DATABASE_FILE_NAME) })
@@ -781,6 +789,7 @@ describe('the read routes (HC-FR-02)', () => {
       'pid',
       'port',
       'requests',
+      'server',
       'startedAt',
       'status',
       'uptimeSeconds',
@@ -793,9 +802,34 @@ describe('the read routes (HC-FR-02)', () => {
       sessionCount: 1,
       pendingCount: 1,
     })
-    // The delivery seam exists and says it is not wired yet, rather than being
-    // absent: HC-5 fills it, and `doctor` can tell the two apart today.
-    expect(health['delivery']).toEqual({ status: 'not-wired' })
+    // The second of HC-FR-07's three sections: where the hub is listening, whether it
+    // still is, and which of PRD 10's states it is in. Read at request time rather
+    // than captured, so `listening` can go false without the payload being rebuilt.
+    expect(health['server']).toEqual({
+      host: '127.0.0.1',
+      port: hub.port,
+      origin: hub.origin,
+      listening: true,
+      state: 'running',
+      servedRequests: expect.any(Number) as unknown as number,
+    })
+    // And the third. A hub with no notifier behind the port says so, which is the
+    // honest answer for this build: NT-1 has not constructed the platform notifier
+    // yet, and `doctor` must be able to tell that apart from a delivered run.
+    expect(health['delivery']).toEqual({
+      status: 'not-wired',
+      wired: false,
+      attempted: 0,
+      delivered: 0,
+      failed: 0,
+      timedOut: 0,
+      suppressed: 0,
+      notWired: 0,
+      replayed: 0,
+      inFlight: 0,
+      lastAttemptAt: null,
+      lastFailure: null,
+    })
     expect(health['dashboard']).toMatchObject({ available: true })
   })
 
