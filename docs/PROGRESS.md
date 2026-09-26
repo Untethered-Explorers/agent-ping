@@ -1,10 +1,10 @@
 # Project Progress
 
 ## Current State
-**Phase**: NOTIFICATION-AND-TRAY-PRESENCE-1
+**Phase**: OPENCODE-PLUGIN-ADAPTER-1
 **Status**: In Progress
-**Validation Gaps**: 36 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-26T18:39:23.375Z
+**Validation Gaps**: 39 unverified check(s) - see "Validation Gaps"
+**Last Updated**: 2026-09-26T19:08:03.294Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -42,6 +42,8 @@
   - Files: docs/reviews/hub-core.json
 - [x] Phase NOTIFICATION-AND-TRAY-PRESENCE-1, Task NT-1: Define the notifier interface and the Linux notifier (@notification-engineer)
   - Files: src/notify/types.ts, src/notify/policy.ts, src/notify/linux.ts, src/notify/registry.ts, src/main/index.ts, tests/notify/policy.test.ts, tests/notify/linux.test.ts, tests/notify/registry-selection.test.ts, tests/hub/delivery.test.ts, tests/hub/ingest.test.ts, tests/hub/metrics.test.ts, tests/hub/server.test.ts
+- [x] Phase OPENCODE-PLUGIN-ADAPTER-1, Task OA-1: Translate opencode events into the normalized envelope (@connector-engineer)
+  - Files: src/plugin/opencode/index.ts, src/plugin/opencode/translate.ts, src/plugin/opencode/work-signal.ts, tests/plugin/opencode-translate.test.ts, tests/plugin/opencode-work-signal.test.ts, docs/engine-config.json
 
 ## Current Task
 - None currently running
@@ -102,6 +104,9 @@
 - Task NT-1: The two tests that run against the installed notify-send branch on whether the binary exists: without it they assert the honest 'command-not-found' outcome rather than the parsing claim, so on a machine without libnotify the parsing assertions are not exercised (both branches are real, only one proves the parser).
 - Task NT-1: The delivery timeouts and the health route are asserted over real sockets in process; the restart replay test uses two hubs in one process rather than two OS processes, because the process-level restart evidence is HC-5's and tests/hub/delivery.test.ts.
 - Task NT-1: The unavailable-platform answers for macOS and Windows are verified as values only (no notifier, correct reason, probe reports it); no macOS or Windows behaviour of any kind is exercised.
+- Task OA-1: No live opencode session was run. The payload shapes are the 1.18.32 type declarations, not a capture from a running harness; proving the harness delivers them is OA-5's script and OA-6's gate, not this task.
+- Task OA-1: The one-envelope and block-lifecycle tests use the real ingest pipeline and the real SQLite log but drive it from fixtures rather than from a harness's event stream.
+- Task OA-1: The plugin was not loaded by opencode itself. Its structural plugin and client types mirror the 1.18.32 declarations rather than importing @opencode-ai/plugin, which is deliberate (the adapter must load with no dependency), so a signature change upstream would not be caught by a compile error here - the OA-3 install and OA-5 live run are where that surfaces.
 
 ## Notes
 - Workflow engine run 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
