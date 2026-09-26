@@ -1,3 +1,47 @@
+# Dependencies
 node_modules/
+.pnp
+.pnp.js
+
+# Build output (tsc for main/plugin, Vite for the dashboard)
+dist/
+out/
+*.tsbuildinfo
+
+# Native modules (better-sqlite3)
+build/
+prebuilds/
+*.node
+
+# Test and coverage output
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+
+# Local runtime state (the state directory lives outside the repo; these guard
+# against a test or a manual run leaving a database or log inside it)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+logs/
+*.log
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Forge pipeline
 docs/engine-run.log
 docs/artifacts/
+
+# Operating system cruft
+.DS_Store
+Thumbs.db
+desktop.ini
