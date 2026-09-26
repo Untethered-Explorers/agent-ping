@@ -7,10 +7,12 @@
 //   2. the runtime file, which is the lock - so a second instance is refused
 //      before it can open the same log
 //   3. the durable store, then the counters over the same file
-//   4. the route registry, with every route registered in one array
-//   5. the loopback server, which chooses the live port
-//   6. the runtime file again, this time with that port in it
-//   7. the desktop shell: window, tray, quit
+//   4. the state change feed, wrapped around the store, so every transition the
+//      store applies becomes a frame for the dashboards already watching
+//   5. the route registry, with every route registered in one array
+//   6. the loopback server, which chooses the live port
+//   7. the runtime file again, this time with that port in it
+//   8. the desktop shell: window, tray, quit
 //
 // Each step exists so a later step cannot run in a half-started hub. If the store
 // will not open, nothing is listening and no file claims a port. If the port
@@ -31,14 +33,20 @@
 // Electron to be installed at all.
 //
 // WHAT IS NOT HERE YET
-// Ingest, the ack route, the stream, delivery policy, the notifier and the tray
-// arrive in HC-2 through HC-5 and NT-2. The seams they need are already in place:
+// Ingest, the ack route, delivery policy, the notifier and the tray arrive in
+// HC-3 through HC-5 and NT-2. The seams they need are already in place:
 // `registerRoutes` is the single registration point, `close` is the single
 // shutdown path the lifecycle work will call, and `desktop.mountTray` is where the
 // tray will be mounted. What is deliberately absent is any route that can spawn,
 // steer, interrupt, prompt or approve anything inside a harness (APX-CON-08): the
 // mutating set in src/hub/server.ts has exactly one member and it is not
 // registered here.
+//
+// The live state stream (HC-2) is wired here rather than inside the store, which
+// is what keeps ingest and ack from having to know it exists: they call the
+// store's accessors, and the frames follow. The feed is closed before the
+// listener in the shutdown order below, so a stream is never left pointing at a
+// store that has already been closed.
 //
 // agent-ping is a sidecar. It observes agent processes and owns none of them
 // (APX-CON-03, ADR-001), so nothing in this file starts, stops or signals anything
@@ -51,6 +59,13 @@ import { openCounters, type Counters } from '../storage/counters.js'
 import { openEventStore, type EventStore } from '../storage/eventStore.js'
 import { databaseFilePath, ensureStateDir, resolveStateDir } from '../storage/paths.js'
 import { READ_ROUTES, type HubIdentity, type HubServices } from '../hub/routes/read.js'
+import { STREAM_ROUTES } from '../hub/routes/stream.js'
+import {
+  createChangeFeed,
+  withChangeFeed,
+  type ChangeFeed,
+  type StreamSettings,
+} from '../hub/sse.js'
 import {
   createDashboardRoute,
   startServer,
@@ -108,6 +123,15 @@ export interface StartHubOptions {
    * without occupying twenty ports.
    */
   readonly portFallbackAttempts?: number
+  /**
+   * Overrides for the live state stream's own bounds (HC-FR-03).
+   *
+   * Absent in production, which is the point: the defaults are the documented
+   * five-minute replay window and twenty-five-second heartbeat. A test lowers
+   * them so it can watch a heartbeat arrive and a window expire in real time
+   * rather than by faking a clock the hub does not have.
+   */
+  readonly stream?: Partial<StreamSettings>
   readonly desktop?: DesktopBridge
   /** ISO 8601 UTC source for `startedAt` and the store's migration records. */
   readonly now?: () => string
@@ -137,8 +161,17 @@ export interface RunningHub {
   readonly reclaimedFromPid: number | null
   readonly registry: RouteRegistry<HubServices>
   readonly server: HubServer<HubServices>
+  /**
+   * The store, wrapped so every transition it applies is published to the live
+   * stream. Reads pass straight through and writes report an outcome; nothing
+   * about the store's own contract changes, which is why ingest (HC-3) and the
+   * ack route (HC-4) get live dashboards without either of them knowing this
+   * exists.
+   */
   readonly store: EventStore
   readonly counters: Counters
+  /** The live state stream's feed. Closed first on shutdown. */
+  readonly stream: ChangeFeed
   readonly startedAt: string
   /** Stop the listener, close the log, and give the runtime file back. Idempotent. */
   close(): Promise<void>
@@ -171,17 +204,25 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
   let store: EventStore | undefined
   let counters: Counters | undefined
   let server: HubServer<HubServices> | undefined
+  let stream: ChangeFeed | undefined
   try {
     // 3. The durable log, and the counters over the same file. Both are opened
     //    against the resolved state directory, never against a second guess at it.
     store = openEventStore({ filePath: databaseFilePath(stateDir), now })
     counters = openCounters({ filePath: store.filePath, now })
 
-    // 4. Every route, registered in one place. The list is the product's read
+    // 4. The live state stream's feed, wrapped around the store. The wrapper is
+    //    what makes a frame appear for every transition the store applies, so the
+    //    routes that write (HC-3, HC-4) never have to publish anything themselves.
+    stream = createChangeFeed(options.stream)
+    const watching = withChangeFeed(store, stream)
+
+    // 5. Every route, registered in one place. The list is the product's read
     //    surface; adding a route means adding it here, where the enumeration test
     //    will see it.
     const registry = new RouteRegistry<HubServices>()
     registry.registerAll(READ_ROUTES)
+    registry.registerAll(STREAM_ROUTES)
     const dashboardRoot = resolveDashboardRoot(options.dashboardRoot)
     registry.register(createDashboardRoute<HubServices>({ root: dashboardRoot }))
 
@@ -190,12 +231,13 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
     // shape for that: a request cannot arrive before `listen` resolves, and a
     // request that did arrive always reads the finished object.
     let services: HubServices = {
-      store,
+      store: watching,
       counters,
+      stream,
       hub: unpublishedIdentity(claim),
     }
 
-    // 5. The listener. The port is chosen here and nowhere else.
+    // 6. The listener. The port is chosen here and nowhere else.
     server = await startServer<HubServices>({
       registry,
       services: () => services,
@@ -207,7 +249,7 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
       },
     })
 
-    // 6. Publish the live port. Until this line the file is a lock with no pointer
+    // 7. Publish the live port. Until this line the file is a lock with no pointer
     //    in it, which is exactly what an adapter must see as "not up yet".
     const runtimeFile = claim.publishPort({
       port: server.port,
@@ -215,8 +257,9 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
       schemaVersion: store.schemaVersion,
     })
     services = {
-      store,
+      store: watching,
       counters,
+      stream,
       hub: {
         instanceId: claim.instanceId,
         pid: claim.pid,
@@ -249,8 +292,9 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
       reclaimedFromPid: claim.reclaimedFromPid,
       registry,
       server,
-      store,
+      store: watching,
       counters,
+      stream,
       startedAt: runtimeFile.startedAt,
       close: async (): Promise<void> => {
         // Idempotent, because a shutdown can be triggered twice: `close` is
@@ -260,18 +304,27 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
         // error, which is exactly the sort of "not silent" that is not a report.
         if (closed) return
         closed = true
-        // The order a shutdown has to have: stop answering, fold the counters into
-        // the file, close the log, then give the runtime file back. Publishing a
-        // shutdown state is HC-5's work with the signal handler; this is the
-        // primitive it calls.
+        // The order a shutdown has to have: end the live streams, stop answering,
+        // fold the counters into the file, close the log, then give the runtime
+        // file back. The feed goes first, and both halves of that are deliberate.
+        // Ending the streams is what stops a client waiting on a socket that will
+        // never speak again, and it is also what stops `server.close` from sitting
+        // on a response that is deliberately still open - a streaming response is
+        // not an idle connection, so the listener would wait for every dashboard to
+        // disconnect on its own. The cost of that order is that a transition
+        // reaching a closing feed throws, which is why HC-FR-10's "stop accepting
+        // events" step has to come before this call: an ingest still in flight when
+        // the feed closes is an ordering bug, and losing its frame quietly would
+        // hide it. Publishing a shutdown state is HC-5's work with the signal
+        // handler; this is the primitive it calls.
         let firstError: unknown
         try {
-          await server?.close()
+          stream?.close()
         } catch (cause) {
           firstError = cause
         }
         try {
-          counters?.flush()
+          await server?.close()
         } catch (cause) {
           firstError ??= cause
         }
@@ -290,7 +343,7 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
       },
     }
 
-    // 7. The desktop shell, last, so nothing is mounted over a hub that is not
+    // 8. The desktop shell, last, so nothing is mounted over a hub that is not
     //    yet serving.
     const desktop = options.desktop
     if (desktop !== undefined) {
@@ -315,7 +368,9 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
     return hub
   } catch (cause) {
     // Every failure path releases what it took, so a failed start never leaves a
-    // runtime file that refuses the next attempt.
+    // runtime file that refuses the next attempt, and never leaves a heartbeat
+    // timer running in a process that is about to report the failure.
+    stream?.close()
     await quietClose(server, counters, store)
     releaseQuietly(claim)
     throw cause

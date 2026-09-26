@@ -3,8 +3,8 @@
 ## Current State
 **Phase**: HUB-CORE-AND-DELIVERY-POLICY-1
 **Status**: In Progress
-**Validation Gaps**: 16 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-26T14:01:10.390Z
+**Validation Gaps**: 20 unverified check(s) - see "Validation Gaps"
+**Last Updated**: 2026-09-26T14:40:07.829Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -28,6 +28,8 @@
   - Files: src/domain/pending.ts, tests/domain/pending.test.ts, src/storage/eventStore.ts, tests/domain/classify.test.ts, tests/storage/eventStore.test.ts
 - [x] Phase HUB-CORE-AND-DELIVERY-POLICY-1, Task HC-1: Stand up the hub process and its read routes (@hub-engineer)
   - Files: src/main/index.ts, src/hub/server.ts, src/hub/routes/read.ts, src/hub/runtime-file.ts, tests/hub/server.test.ts, src/storage/eventStore.ts, tests/storage/eventStore.test.ts, tests/hub/fixtures/measure-idle-rss.mjs, tests/hub/fixtures/second-instance.mjs, tests/hub/fixtures/ts-resolver.mjs
+- [x] Phase HUB-CORE-AND-DELIVERY-POLICY-1, Task HC-2: Add the live state stream with heartbeat and cursor replay (@hub-engineer)
+  - Files: src/hub/sse.ts, src/hub/routes/stream.ts, tests/hub/stream.test.ts, src/hub/routes/read.ts, src/main/index.ts, tests/hub/server.test.ts, tests/hub/fixtures/measure-stream-rss.mjs
 
 ## Current Task
 - None currently running
@@ -71,6 +73,10 @@
 - Task HC-1: No Electron process was started: the package is not installed in this checkout and the task's own tests are specified against a real loopback socket, not a window. startElectronMain is exercised only as far as its non-Electron branches allow, and the single-instance guarantee is proven through the runtime-file lock that the Electron path also takes.
 - Task HC-1: The build output of the hub was smoke-tested locally by hand-copying schema.sql; that copy is removed and the packaged start path is not covered by an automated test while the build gap above stands.
 - Task HC-1: The stream route (HC-2), ingest (HC-3), ack (HC-4), delivery and shutdown (HC-5) and counter recording (HC-6) are deliberately absent. The seams they need exist and are documented in place: one registration point, one close() primitive, the delivery field on health, and the onRequestServed hook.
+- Task HC-2: The subscribe-before-write ordering in serveStream is a correctness argument about a synchronous handler, not a test: no publish can interleave between reading the current cursor and subscribing, so a mutation that inverts the order is unobservable and was not counted as one of the eleven that were caught.
+- Task HC-2: The two client implementations prove the frames are readable by a standard HTTP client and by a WHATWG client; no browser was involved. EventSource-specific behaviour (automatic reconnection using Last-Event-ID) is asserted against the spec's id/last-event-id rules in the test's own parser rather than against a real browser, and qa-engineer's LD-4 journey is where that belongs.
+- Task HC-2: The 250ms budget is measured from the store write the hub accepted to the frame on a real socket. The full accepted-event-to-visible path includes HC-3's ingest validation and classification, which do not exist, so the budget is proven for the stream's share of it only.
+- Task HC-2: Idle RSS is measured in a child process that is only a hub, holding four streams through six hundred paced transitions. A real workload's socket and undici costs are not represented.
 
 ## Notes
 - Workflow engine run 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8

@@ -65,6 +65,7 @@ import {
   isLoopbackAddress,
 } from '@/hub/server'
 import { READ_ROUTES, parseLimit, type HubServices } from '@/hub/routes/read'
+import { STREAM_ROUTES } from '@/hub/routes/stream'
 import {
   HubAlreadyRunningError,
   HubRuntimeFileError,
@@ -269,6 +270,51 @@ function call(origin: string, pathname: string, init: CallInit = {}): Promise<Fe
             text,
             json: <T,>(): T => JSON.parse(text) as T,
           })
+        })
+      },
+    )
+    outgoing.on('error', reject)
+    outgoing.end()
+  })
+}
+
+/**
+ * Open the stream, wait for it to say something, and close it.
+ *
+ * A stream response does not end, so the one request helper in this file cannot be
+ * used for it: it waits for `end`. This reads the first chunk instead, which is
+ * enough to know the route answered and to be sure the connection is live, and
+ * then destroys it - so the hub sees a client that went away, which is half of
+ * what the read-only comparison is there to check.
+ */
+function openStreamAndReadFirstFrame(hub: RunningHub): Promise<{
+  status: number
+  headers: Record<string, string | string[] | undefined>
+  firstChunk: string
+}> {
+  const { hostname, port } = new URL(hub.origin)
+  return new Promise((resolve, reject) => {
+    let settled = false
+    const finish = (result: {
+      status: number
+      headers: Record<string, string | string[] | undefined>
+      firstChunk: string
+    }): void => {
+      if (settled) return
+      settled = true
+      resolve(result)
+    }
+    const outgoing = request(
+      { host: hostname, port, path: '/api/stream', method: 'GET', agent: false },
+      (response) => {
+        response.setEncoding('utf8')
+        response.once('data', (chunk: string) => {
+          finish({
+            status: response.statusCode ?? 0,
+            headers: response.headers as Record<string, string | string[] | undefined>,
+            firstChunk: chunk,
+          })
+          outgoing.destroy()
         })
       },
     )
@@ -830,7 +876,16 @@ describe('the read routes are observably read-only', () => {
 
     for (const route of hub.registry.routes()) {
       for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const) {
-        const response = await call(hub.origin, concretePathFor(route.pattern), { method })
+        const pathname = concretePathFor(route.pattern)
+        // The stream route answers GET with a response that never ends, because
+        // that is what a stream is. It is opened, read until it has said
+        // something, and closed, and the counts are still compared around it -
+        // so the promise covers the one route whose whole purpose is to stay
+        // open, which is exactly the one a read-only assertion could have
+        // quietly skipped.
+        const response = route.pattern === '/api/stream' && method === 'GET'
+          ? await openStreamAndReadFirstFrame(hub)
+          : await call(hub.origin, pathname, { method })
         const after = countsOf(hub)
         expect(
           after,
@@ -863,6 +918,7 @@ describe('the read routes are observably read-only', () => {
       'GET /api/pending',
       'GET /api/sessions',
       'GET /api/sessions/:sessionId',
+      'GET /api/stream',
     ])
     // No registered route claims a mutation, and the only signature that may ever
     // claim one is the ack route, which arrives in HC-4.
@@ -888,11 +944,11 @@ describe('the read routes are observably read-only', () => {
     // A promise about intent rather than about state, so it is asserted over the
     // enumerated registry instead of over a comment (APX-CON-08, HC-US-03).
     const forbidden = /spawn|steer|interrupt|prompt|approve|resume|kill|send|control|execute|run\b|input|keypress/i
-    for (const route of READ_ROUTES) {
+    for (const route of [...READ_ROUTES, ...STREAM_ROUTES]) {
       expect(`${route.method} ${route.pattern} ${route.name}`).not.toMatch(forbidden)
     }
     // And the read surface as a whole has no write-shaped path at all.
-    for (const route of READ_ROUTES) {
+    for (const route of [...READ_ROUTES, ...STREAM_ROUTES]) {
       expect(route.method).toBe('GET')
     }
   })
@@ -1002,6 +1058,18 @@ describe('the loopback boundary (APX-CON-01)', () => {
       expect(response.headers.get('access-control-allow-origin'), pathname).toBeNull()
       expect(response.headers.get('access-control-allow-credentials'), pathname).toBeNull()
       expect(response.headers.get('access-control-expose-headers'), pathname).toBeNull()
+    }
+    // The stream is the response that stays open the longest, so it is the one
+    // where a permissive header would do the most damage: opened from any page the
+    // developer visits, it would hand that page their whole session feed.
+    const stream = await openStreamAndReadFirstFrame(hub)
+    expect(stream.status).toBe(200)
+    for (const header of [
+      'access-control-allow-origin',
+      'access-control-allow-credentials',
+      'access-control-expose-headers',
+    ]) {
+      expect(stream.headers[header], header).toBeUndefined()
     }
   })
 })

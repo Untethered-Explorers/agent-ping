@@ -47,15 +47,22 @@ import {
   type SessionSummary,
 } from '../../storage/eventStore.js'
 import type { Counters, CounterReading } from '../../storage/counters.js'
+import type { ChangeFeed } from '../sse.js'
 import { respondJson, type RouteDefinition } from '../server.js'
 
 /**
  * What a read route is given beyond the request itself.
  *
- * The store and the counters are the only collaborators, and both are the typed
- * accessors from src/storage. A route cannot reach a database handle, so no read
- * route can grow a statement of its own - which is also why a new query is a
- * change to the store's closed API rather than something a route invents.
+ * The store, the counters and the state change feed are the only collaborators,
+ * and all three are typed accessors rather than handles. A route cannot reach a
+ * database handle, so no read route can grow a statement of its own - which is
+ * also why a new query is a change to the store's closed API rather than
+ * something a route invents.
+ *
+ * `stream` is the live feed the stream route (HC-FR-03) subscribes to. It is
+ * declared here rather than in src/hub/routes/stream.ts because `HubServices` is
+ * the one description of what a handler is given, and a handler that reached for
+ * a feed that was not in it would be a second, unregistered way to get one.
  *
  * `hub` is the identity the server published: the loopback origin the adapters
  * read out of the runtime file, plus enough of the hub's own state for `doctor` to
@@ -64,6 +71,8 @@ import { respondJson, type RouteDefinition } from '../server.js'
 export interface HubServices {
   readonly store: EventStore
   readonly counters: Counters
+  /** The live state stream's feed: cursors, the replay window, the clients. */
+  readonly stream: ChangeFeed
   readonly hub: HubIdentity
 }
 
