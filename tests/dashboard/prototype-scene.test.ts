@@ -709,6 +709,23 @@ describe('DP-2 prototype: no hub, no plugin, no network', () => {
     ]
     expect(files.sort()).toEqual(['index.html', 'main.ts', 'mock-data.ts', 'scene.ts'])
 
+    // DP-3 added the mirror, the keyboard model and the motion policy to the
+    // prototype's dependency graph, so "static" now covers those directories too.
+    // A transport or a hub URL appearing in any of them would make the page that
+    // was supposed to make no request make one.
+    const dashboardDir = path.resolve(prototypeDir, '..')
+    const scanned = [
+      ...files.map((name) => ({ label: `prototype/${name}`, file: path.join(prototypeDir, name) })),
+      ...['a11y', 'theme'].flatMap((directory) =>
+        readdirSync(path.join(dashboardDir, directory))
+          .filter((name) => name.endsWith('.ts'))
+          .map((name) => ({
+            label: `${directory}/${name}`,
+            file: path.join(dashboardDir, directory, name),
+          })),
+      ),
+    ]
+
     const forbiddenUrls = [
       'http://',
       'https://',
@@ -732,10 +749,10 @@ describe('DP-2 prototype: no hub, no plugin, no network', () => {
       'readFile',
     ]
 
-    for (const name of files) {
-      const source = readFileSync(path.join(prototypeDir, name), 'utf8')
+    for (const { label, file } of scanned) {
+      const source = readFileSync(file, 'utf8')
       for (const needle of [...forbiddenUrls, ...forbiddenCalls]) {
-        expect(source.includes(needle), `${name} must not contain ${needle}`).toBe(false)
+        expect(source.includes(needle), `${label} must not contain ${needle}`).toBe(false)
       }
     }
   })

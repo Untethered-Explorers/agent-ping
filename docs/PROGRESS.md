@@ -1,10 +1,10 @@
 # Project Progress
 
 ## Current State
-**Phase**: EVENT-MODEL-AND-DURABLE-LOG-1
+**Phase**: DASHBOARD-DESIGN-PROTOTYPE-1
 **Status**: In Progress
-**Validation Gaps**: 8 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-26T11:48:40.555Z
+**Validation Gaps**: 11 unverified check(s) - see "Validation Gaps"
+**Last Updated**: 2026-09-26T12:15:36.628Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -14,6 +14,8 @@
   - Files: package.json, tsconfig.json, vitest.config.ts, eslint.config.js, tests/tooling/runner-convention.test.ts, .gitignore, package-lock.json, scripts/build.mjs, scripts/run-tests.mjs, tsconfig.build.json
 - [x] Phase DASHBOARD-DESIGN-PROTOTYPE-1, Task DP-2: Render the static mock dashboard page (@dashboard-engineer)
   - Files: vite.config.ts, src/dashboard/prototype/index.html, src/dashboard/prototype/main.ts, src/dashboard/prototype/scene.ts, src/dashboard/prototype/mock-data.ts, tests/dashboard/prototype-scene.test.ts, package-lock.json, package.json, tsconfig.json
+- [x] Phase DASHBOARD-DESIGN-PROTOTYPE-1, Task DP-3: Add non-colour urgency encoding, keyboard order and the DOM mirror (@dashboard-engineer)
+  - Files: src/dashboard/prototype/main.ts, src/dashboard/a11y/dom-mirror.ts, src/dashboard/a11y/keyboard-nav.ts, src/dashboard/theme/motion.ts, tests/dashboard/dom-mirror.test.ts, tests/dashboard/keyboard-nav.test.ts, tests/dashboard/prototype-scene.test.ts, tests/dashboard/prototype-harness.ts
 - [x] Phase EVENT-MODEL-AND-DURABLE-LOG-1, Task EL-1: Create the content-free schema and store API (@domain-engineer)
   - Files: src/storage/schema.sql, src/storage/db.ts, src/storage/paths.ts, src/storage/eventStore.ts, tests/storage/schema.test.ts, tests/storage/eventStore.test.ts, package-lock.json, package.json
 
@@ -21,7 +23,6 @@
 - None currently running
 
 ## Remaining
-- [ ] Phase DASHBOARD-DESIGN-PROTOTYPE-1: Phase 1: Toolchain and static prototype
 - [ ] Phase DASHBOARD-DESIGN-PROTOTYPE-2: Phase 2: Design review gate
 - [ ] Phase EVENT-MODEL-AND-DURABLE-LOG-1: Phase 1: Durable store
 - [ ] Phase EVENT-MODEL-AND-DURABLE-LOG-2: Phase 2: Event model and pending lifecycle
@@ -53,6 +54,9 @@
 - Task DP-2: The APX-CON-11 first-paint budget of 1 s from warm cache is not measured here. The built entry chunk is 283 kB raw and 85 kB gzipped with six lazy chunks, but no timing harness exists yet; measuring it belongs to the LD-4 browser suite.
 - Task DP-2: Mouse hover was driven through CDP Input.dispatchMouseEvent rather than a real device, and the browser run was headless with software WebGL. The design verdicts in DP-4 and LD-5 remain unperformed and are not claimed here.
 - Task DP-2: docs/EXECUTION-AUDIT.jsonl and docs/WORKFLOW-STATE.json show as modified in git status; those are the engine's own files and I did not touch them.
+- Task DP-3: jsdom applies no layout, so the visual hiding is asserted as stylesheet text and the browser run above is what proves the computed style; jsdom would report a focus on an element hidden with display: none.
+- Task DP-3: The prototype's row model is fixed, so an update that changes a row cannot be produced through the prototype's entry point; the changed-row, departed-row and emptied-list cases are driven through the same mirror and keyboard modules with the mount's own two-line wiring, while the mount's own repaint paths are asserted through the entry point.
+- Task DP-3: The design verdicts in DP-4 and LD-5 are human judgements and are not claimed here; no human-review attestation was created.
 - Task EL-1: The descriptor-leak test reads /proc/self/fd and is skipped where that directory does not exist; the owner-only mode tests are skipped on Windows. Both skips are visible in the reporter output rather than silent.
 - Task EL-1: The macOS and Windows state-directory layouts are asserted through the pure resolveStateDir(env, platform, home) function rather than on those machines, which remains the documented APX-CON-06 manual-gate path.
 
