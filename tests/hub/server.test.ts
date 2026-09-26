@@ -58,13 +58,12 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { startHub, type RunningHub } from '@/main/index'
 import {
   createRequestListener,
-  DASHBOARD_CSP,
   DEFAULT_HUB_PORT,
   MUTATING_ROUTE,
   MUTATING_ROUTES,
   RouteRegistry,
-  isLoopbackAddress,
 } from '@/hub/server'
+import { DASHBOARD_CSP, isLoopbackAddress, WRITE_TOKEN_FILE_NAME } from '@/hub/security'
 import { READ_ROUTES, parseLimit, type HubServices } from '@/hub/routes/read'
 import { STREAM_ROUTES } from '@/hub/routes/stream'
 import {
@@ -652,16 +651,17 @@ describe('the hub entry point (HC-FR-01)', () => {
     expect(path.basename(hub.runtimeFilePath)).toBe(RUNTIME_FILE_NAME)
   })
 
-  it('writes only the database and the runtime file into the state directory', async () => {
+  it('writes only the database, the runtime file and the write token into the state directory', async () => {
     const hub = await startFixtureHub()
     seedOneBlock(hub)
     const files = [...readdirSync(hub.stateDir)].sort()
     // The write-ahead log sidecars are SQLite's, and they are named after the
-    // database; nothing else appears, and in particular no token file and no log
-    // file, because neither exists yet (HC-4, EL-2).
-    expect(files.filter((name) => !name.startsWith(DATABASE_FILE_NAME))).toEqual([
-      RUNTIME_FILE_NAME,
-    ])
+    // database. The other three are the product's own: the lock-and-pointer, the
+    // durable log, and the per-install write token HC-FR-06 puts beside them. No log
+    // file, and nothing else - a state directory is a place a stranger can list.
+    expect(files.filter((name) => !name.startsWith(DATABASE_FILE_NAME))).toEqual(
+      [RUNTIME_FILE_NAME, WRITE_TOKEN_FILE_NAME].sort(),
+    )
   })
 })
 
@@ -916,7 +916,7 @@ describe('the read routes are observably read-only', () => {
     expect(countsOf(hub)).toEqual(before)
   })
 
-  it('registers the whole surface, with ingest as the only append and no ack yet', async () => {
+  it('registers the whole surface: one append and exactly one control route', async () => {
     const hub = await startFixtureHub()
 
     // The registry the running hub holds, not a list written here: a hand-written
@@ -930,19 +930,24 @@ describe('the read routes are observably read-only', () => {
       'GET /api/sessions',
       'GET /api/sessions/:sessionId',
       'GET /api/stream',
+      'POST /api/ack/:eventId',
       'POST /api/ingest',
     ])
-    // Exactly one registered route claims a mutation, and it is the append: it creates
-    // a row and changes nothing that already exists. The ack route - the one control
-    // surface - arrives in HC-4 and is still absent (APX-CON-08, ADR-002).
+    // Two registered routes declare a mutation, and they are two different things
+    // (ADR-002): the append creates a row and changes nothing that already exists,
+    // and the ack is the single control surface - the only route in the product that
+    // can change an existing record (APX-CON-08).
     const mutating = hub.registry.routes().filter((route) => route.mutation !== 'read-only')
     expect(mutating.map((route) => `${route.method} ${route.pattern}`)).toEqual([
       'POST /api/ingest',
+      'POST /api/ack/:eventId',
     ])
-    expect(mutating[0]?.mutation).toBe('ingest-append')
+    expect(mutating.map((route) => route.mutation)).toEqual(['ingest-append', 'ack-only'])
+    // The control surface is exactly one signature, and it is the one the registry
+    // checks every `ack-only` registration against.
     expect([...MUTATING_ROUTES].sort()).toEqual(['POST /api/ack/:eventId', 'POST /api/ingest'])
     expect(MUTATING_ROUTE).toBe('POST /api/ack/:eventId')
-    expect(hub.registry.signatures()).not.toContain(MUTATING_ROUTE)
+    expect(hub.registry.signatures()).toContain(MUTATING_ROUTE)
     // Every other route is a read, and a read-only route is a GET - so no mutating
     // method can be registered as a read.
     for (const route of hub.registry.routes()) {

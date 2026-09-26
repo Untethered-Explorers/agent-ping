@@ -7,11 +7,13 @@
 //     loopback. Both, because binding alone is not enough: a proxy, a container
 //     port mapping or a forwarded socket can deliver a request that reached
 //     loopback from somewhere else, and the check that matters reads the socket.
+//     The predicate lives in ./security.js with the rest of the boundary; this
+//     module is where it is applied and where the socket is created.
 //   - It routes to a registry that is written down, in one place, and every entry
 //     declares whether it mutates. The mutating set is a closed union with
 //     exactly one member - the ack route - so a second control surface is a
 //     compile error rather than a review finding (APX-CON-08).
-//   - It serves a strict content-security-policy with the dashboard and sends no
+//   - It sends a strict content-security-policy with the dashboard and sends no
 //     cross-origin header at all, because a read-only daemon still hands a
 //     cross-origin page a channel to it.
 //
@@ -35,6 +37,7 @@ import { createReadStream, existsSync, statSync } from 'node:fs'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import path from 'node:path'
+import { DASHBOARD_CSP, isLoopbackAddress } from './security.js'
 
 /**
  * The one address this product binds.
@@ -63,33 +66,6 @@ export const DEFAULT_HUB_PORT = 43117
  * guessed one is the failure mode this whole design exists to avoid.
  */
 export const PORT_FALLBACK_ATTEMPTS = 20
-
-/**
- * The content-security-policy sent with the dashboard.
- *
- * One named constant so the server and the test that asserts it cannot disagree
- * about what is sent. No `unsafe-inline` and no `unsafe-eval`: when the PixiJS
- * bundle conflicts with one of these directives the fix is to narrow the policy or
- * change the mechanism, never to weaken it (feature document Open Questions 4,
- * and the rule that a weakened policy looks exactly like a working one in review).
- */
-export const DASHBOARD_CSP = [
-  "default-src 'self'",
-  "script-src 'self'",
-  "style-src 'self'",
-  // PixiJS draws into a canvas and may hand an image back as a data URI.
-  "img-src 'self' data: blob:",
-  // The live state stream arrives as an EventSource from this same origin.
-  "connect-src 'self'",
-  "font-src 'self'",
-  "worker-src 'self' blob:",
-  "object-src 'none'",
-  "base-uri 'none'",
-  // A framed dashboard is a confused deputy: the hub is a local daemon and no
-  // page on the machine has business framing it.
-  "frame-ancestors 'none'",
-  "form-action 'none'",
-].join('; ')
 
 /** Content types for the dashboard's own build output, by extension. */
 const CONTENT_TYPES: Readonly<Record<string, string>> = {
@@ -293,38 +269,11 @@ export type RouteResolution<TServices> =
   | { readonly kind: 'method-not-allowed'; readonly allowed: readonly HttpMethod[] }
   | { readonly kind: 'not-found'; readonly allowed: readonly HttpMethod[] }
 
-/**
- * Is this remote address on the loopback interface?
- *
- * A pure predicate, and the reason the boundary survives a proxy. The address is
- * compared as a value rather than as a string, because one loopback address has
- * several string forms: Node reports an IPv4 client on a dual-stack socket as
- * `::ffff:127.0.0.1`, and refusing that would break the product on a default
- * macOS or Linux configuration.
- *
- * The empty address is not loopback. It appears when a socket has no peer, and a
- * request with no peer is not a request from this machine's user.
- *
- * `::` and `0.0.0.0` are not loopback either: they are the unspecified address, so
- * accepting them would be accepting a claim rather than an address.
- */
-export function isLoopbackAddress(remoteAddress: string | undefined | null): boolean {
-  if (typeof remoteAddress !== 'string' || remoteAddress.trim() === '') return false
-  const address = remoteAddress.trim().toLowerCase()
-  if (address === '::1' || address === '0:0:0:0:0:0:0:1') return true
-  // An IPv4-mapped IPv6 address is the same host as the address it maps.
-  const mapped = address.startsWith('::ffff:') ? address.slice('::ffff:'.length) : address
-  if (mapped.includes(':')) return false
-  return /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(mapped) && isDottedQuad(mapped)
-}
-
-function isDottedQuad(value: string): boolean {
-  return value
-    .split('.')
-    .every(
-      (part) => /^\d{1,3}$/.test(part) && Number(part) >= 0 && Number(part) <= 255,
-    )
-}
+// `isLoopbackAddress` is not defined here any more. The predicate itself lives in
+// ./security.js, next to the token check and the response-header policy, because the
+// three of them are one boundary and a reader looking for "how does this daemon decide
+// who may talk to it" should find all of it in one file. This module applies it - before
+// routing, so a refused peer reaches no handler - and it is what binds the socket.
 
 function splitPath(pathname: string): string[] {
   return pathname.split('/').filter((segment) => segment !== '')

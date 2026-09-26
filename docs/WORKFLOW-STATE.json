@@ -1,12 +1,12 @@
 {
   "runId": "7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8",
   "startedAt": "2026-09-26T10:43:05.421Z",
-  "lastUpdatedAt": "2026-09-26T15:18:23.255Z",
+  "lastUpdatedAt": "2026-09-26T15:41:12.916Z",
   "manifestPath": "/home/mcfuzzysquirrel/Projects/agent-ping/docs/EXECUTION-MANIFEST.json",
   "manifestVersion": "1.0",
   "harness": "opencode",
   "status": "running",
-  "currentPhase": "HUB-CORE-AND-DELIVERY-POLICY-1",
+  "currentPhase": "HUB-CORE-AND-DELIVERY-POLICY-2",
   "tasks": {
     "DP-1": {
       "taskId": "DP-1",
@@ -372,10 +372,35 @@
     },
     "HC-4": {
       "taskId": "HC-4",
-      "status": "pending",
+      "status": "complete",
       "ownerAgent": "hub-engineer",
-      "attempt": 0,
-      "outputFiles": []
+      "attempt": 1,
+      "outputFiles": [
+        "src/hub/routes/ack.ts",
+        "src/hub/security.ts",
+        "tests/hub/ack.test.ts",
+        "tests/hub/security.test.ts",
+        "src/hub/routes/read.ts",
+        "src/hub/server.ts",
+        "src/main/index.ts",
+        "tests/hub/server.test.ts"
+      ],
+      "startedAt": "2026-09-26T15:18:23.313Z",
+      "attemptHistory": [
+        {
+          "attempt": 1,
+          "outcome": "passed",
+          "resultPath": "docs/artifacts/HC-4.2026-09-26T15-41-12-911Z.attempt-1.result.json"
+        }
+      ],
+      "completedAt": "2026-09-26T15:41:12.916Z",
+      "agentOutput": "I'll start by reading the execution file.\nNow let me write the security module.\nNow the ack route:\nNow wire it into the composition root and the services type:\nNow the composition root:\nNow the `startHub` body:\nNow add the `security` option and the `pending`/`security` fields to the `RunningHub`/`StartHubOptions` interfaces:\nNow let me measure the performance budgets I touched:\nHC-4 is implemented and verified. Report:\n\n```forge-result\n{\"summary\":\"Added the ack-only write surface and its security boundary. src/hub/security.ts owns the four layers of the boundary as pure, separately testable decisions (loopback predicate, per-install 32-byte write token in an owner-only 0600 file in the state directory, constant-time comparison, strict CSP plus the cross-origin-absence check); src/hub/routes/ack.ts is the single control surface, marking one pending item acknowledged through the pending lifecycle with 200 applied/unchanged, 401 unauthorised, 404 not-found, 409 conflict and a contentless 500, reading no body and echoing only the store's own row key. Wired into the real composition root (ACK_ROUTES registered alongside the others, the pending lifecycle and the boundary built once there and exposed on RunningHub). 41 tests in tests/hub/ack.test.ts and tests/hub/security.test.ts over real loopback sockets prove all four acceptance criteria: the registry walk records what every registered route did and asserts the ack route is the only one that changes an existing record (the whole log diffed field by field around every route and method), an unknown identifier and an already resolved item answer 404 and 409 with the log untouched, a write without or with the wrong token and a non-loopback caller (driven through the real listener with a synthetic socket, with the correct token supplied) are both refused, and the dashboard response carries exactly DASHBOARD_CSP with no permissive cross-origin header on any route. npm test -- tests/hub/ack.test.ts tests/hub/security.test.ts exit 0 (41 tests), npm run typecheck, npm run lint, npm run build exit 0, whole suite exit 0 (448 tests). Observed ack write p50 1.51 ms / p95 3.90 ms over 60 real writes, refused write p95 1.99 ms; observed hub idle RSS 115.3 MB after 125 reads and 115.4 MB after 123 ack writes against the 150 MB budget; ingest p95 4.84 ms (unchanged path, measured by the ingest suite) against the 50 ms budget. 24 mutations applied one at a time and reverted: 22 caught by a named test.\",\"unresolved\":[]}\n```\n\n### Files created\n- `src/hub/security.ts` — the boundary as pure decisions: `isLoopbackAddress`, `DASHBOARD_CSP`, `CROSS_ORIGIN_HEADERS`/`crossOriginHeadersPresent`, `ensureWriteToken`/`readWriteToken`/`writeTokenFilePath`, `presentedWriteToken`/`tokensMatch`/`authoriseWriteToken`, `createHubSecurity` → `HubSecurity`.\n- `src/hub/routes/ack.ts` — `ACK_ROUTES` (`mutation: 'ack-only'`), `ACK_STATUS`, `ACK_ERROR_CODES`, `ACK_REFUSAL_MESSAGE`, `AckAcceptedBody`/`AckErrorBody`.\n- `tests/hub/ack.test.ts` — 19 tests.\n- `tests/hub/security.test.ts` — 22 tests.\n\n### Files changed\n- `src/main/index.ts` — registers `ACK_ROUTES`, builds the pending lifecycle and the boundary once (step 4c), adds `security` to `StartHubOptions`, `pending`/`security` to `RunningHub` and `HubServices`.\n- `src/hub/routes/read.ts` — `HubServices` gains `pending: PendingLifecycle` and `security: HubSecurity`.\n- `src/hub/server.ts` — `isLoopbackAddress` and `DASHBOARD_CSP` moved to `security.js` (one home for the boundary); the listener still applies both.\n- `tests/hub/server.test.ts` — imports moved, the registered-surface expectation now includes `POST /api/ack/:eventId`, the state-directory file list includes the token file.\n\n### Decisions\n- The token check lives **inside** the ack route, not in the listener or shared middleware: there is exactly one route that can change a record and it guards itself, so there is no layer that has to be correct about which routes to guard.\n- Token = 32 `randomBytes`, hex, in `hub-write-token` at `0o600` inside the `0o700` state dir, read-or-create and never rotated silently; a damaged file is a refusal to start. Not a runtime-file field (every adapter reads that file) and never a query parameter.\n- Ingest deliberately needs no token: an append is not a control surface (ADR-002), and adapters must not need the write capability to report what they observed.\n- The three token refusal codes collapse to one 401 with one fixed sentence naming the header, so a guess learns nothing.\n- An acknowledgement also moves the session row's *derived* `pendingCount` (a subquery); the tests name that field explicitly rather than glossing it.\n- `POST /api/ack/` (empty segment) reaches the same handler and answers 404 — asserted and remarked, like ingest's trailing slash.\n\n### Warnings\n- The constant-time comparison is asserted at the source (timing is not observable from a test); that is the one source read in this task's tests.\n- The token file's mode is held twice (create mode plus a post-write `chmod`); removing either changes no observable outcome — recorded as deliberate defence in depth, and the reason two mutations of it were not caught.\n- `x-agent-ping-token` is a literal in the refusal sentence; a renamed header fails the test asserting the sentence names `WRITE_TOKEN_HEADER`.\n- The token is deliberately not in the served bundle, so a browser page cannot ack by itself; how the dashboard obtains it is LD-1/LD-2's decision, not implemented here.\n- A refused write produces a 401 and nothing else — no counter, no ledger entry. HC-6 can count it from the existing `onRequestServed` hook.\n- Unchanged: HC-1's build gap (`schema.sql` not copied into `dist/main`) and HC-2's `servedRequests()` defect; both out of scope here.\n\n### Validation limitations\n- No Electron process started (the package is not installed in this checkout); the entry point was exercised through `startHub`, as HC-1/2/3 recorded.\n- The non-loopback refusal cannot be driven from a real socket on a loopback-only machine: the refusal half is proven through the **real** listener with a synthetic socket and a real log, and the real-socket half by the bound address and the published port being unreachable on every non-loopback local address. Each test says which half it is.\n- No external client has yet presented the token: no adapter and no browser exist, so \"a client can send this header\" is a published contract (asserted over real sockets), not an observed integration.\n",
+      "artifactId": "work-hc-4-001",
+      "inputArtifactIds": [
+        "work-hc-3-001",
+        "work-hc-1-001",
+        "work-hc-2-001"
+      ]
     },
     "HC-5": {
       "taskId": "HC-5",

@@ -1,10 +1,10 @@
 # Project Progress
 
 ## Current State
-**Phase**: HUB-CORE-AND-DELIVERY-POLICY-1
+**Phase**: HUB-CORE-AND-DELIVERY-POLICY-2
 **Status**: In Progress
 **Validation Gaps**: 23 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-26T15:18:23.259Z
+**Last Updated**: 2026-09-26T15:41:12.918Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -32,6 +32,8 @@
   - Files: src/hub/sse.ts, src/hub/routes/stream.ts, tests/hub/stream.test.ts, src/hub/routes/read.ts, src/main/index.ts, tests/hub/server.test.ts, tests/hub/fixtures/measure-stream-rss.mjs
 - [x] Phase HUB-CORE-AND-DELIVERY-POLICY-1, Task HC-3: Build the ingest route and event pipeline (@hub-engineer)
   - Files: src/hub/routes/ingest.ts, src/hub/ingest-service.ts, tests/hub/ingest.test.ts, src/hub/routes/read.ts, src/hub/server.ts, src/main/index.ts, tests/hub/server.test.ts
+- [x] Phase HUB-CORE-AND-DELIVERY-POLICY-2, Task HC-4: Add the ack-only write surface and its security boundary (@hub-engineer)
+  - Files: src/hub/routes/ack.ts, src/hub/security.ts, tests/hub/ack.test.ts, tests/hub/security.test.ts, src/hub/routes/read.ts, src/hub/server.ts, src/main/index.ts, tests/hub/server.test.ts
 
 ## Current Task
 - None currently running

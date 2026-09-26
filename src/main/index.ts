@@ -33,15 +33,16 @@
 // Electron to be installed at all.
 //
 // WHAT IS NOT HERE YET
-// The ack route, the delivery policy, the notifier and the tray arrive in HC-4,
-// HC-5 and NT-2. Ingest (HC-3) is wired here now, and the seams the rest need are
-// already in place: `registerRoutes` is the single registration point, `close` is
-// the single shutdown path the lifecycle work will call, and `desktop.mountTray` is
-// where the tray will be mounted. What is deliberately absent is any route that can
-// spawn, steer, interrupt, prompt or approve anything inside a harness
-// (APX-CON-08): the mutating set in src/hub/server.ts is exactly two signatures, the
-// append-only ingest route and the ack route that arrives in HC-4, and the registry
-// refuses to register anything else that claims to write.
+// The delivery policy, the notifier and the tray arrive in HC-5 and NT-2. Ingest
+// (HC-3), the live stream (HC-2) and the ack route with its security boundary
+// (HC-4) are wired here now, and the seams the rest need are already in place:
+// `registerRoutes` is the single registration point, `close` is the single
+// shutdown path the lifecycle work will call, and `desktop.mountTray` is where the
+// tray will be mounted. What is deliberately absent is any route that can spawn,
+// steer, interrupt, prompt or approve anything inside a harness (APX-CON-08): the
+// mutating set in src/hub/server.ts is exactly two signatures, the append-only
+// ingest route and the ack route, and the registry refuses to register anything
+// else that claims to write.
 //
 // The live state stream (HC-2) is wired here rather than inside the store, which
 // is what keeps ingest and ack from having to know it exists: they call the
@@ -59,9 +60,12 @@ import { fileURLToPath } from 'node:url'
 import { openCounters, type Counters } from '../storage/counters.js'
 import { openEventStore, type EventStore } from '../storage/eventStore.js'
 import { databaseFilePath, ensureStateDir, resolveStateDir } from '../storage/paths.js'
+import { createPendingLifecycle, type PendingLifecycle } from '../domain/pending.js'
 import { READ_ROUTES, type HubIdentity, type HubServices } from '../hub/routes/read.js'
 import { STREAM_ROUTES } from '../hub/routes/stream.js'
 import { INGEST_ROUTES } from '../hub/routes/ingest.js'
+import { ACK_ROUTES } from '../hub/routes/ack.js'
+import { createHubSecurity, type CreateHubSecurityOptions, type HubSecurity } from '../hub/security.js'
 import {
   createIngestService,
   type IngestService,
@@ -149,6 +153,16 @@ export interface StartHubOptions {
    * is returned before any delivery work begins.
    */
   readonly ingest?: Partial<Omit<IngestServiceOptions, 'store'>>
+  /**
+   * Overrides for the security boundary (HC-FR-06).
+   *
+   * Production passes nothing, which means the token is a fresh 32 bytes in the
+   * state directory on the first start and the existing file thereafter. The one
+   * override that matters is `random`, and it exists so a test can assert a
+   * *refused* write against a token whose value it chose - proving the comparison
+   * rejects something plausible rather than something absent.
+   */
+  readonly security?: Partial<CreateHubSecurityOptions>
   readonly desktop?: DesktopBridge
   /** ISO 8601 UTC source for `startedAt` and the store's migration records. */
   readonly now?: () => string
@@ -197,6 +211,18 @@ export interface RunningHub {
    * the only durable effect it has is an appended event.
    */
   readonly ingest: IngestService
+  /**
+   * The pending lifecycle the `POST /api/ack/:eventId` route drives, and the only
+   * mutation a client request can reach (APX-CON-08). Exposed so `doctor` and a test
+   * can read the pending set through the same accessor the tray badge uses.
+   */
+  readonly pending: PendingLifecycle
+  /**
+   * The security boundary: this install's write token, the header it travels in, and
+   * where the token file is. In-process only - the token is on no read route, in no
+   * response body and in no served asset (HC-FR-06).
+   */
+  readonly security: HubSecurity
   readonly startedAt: string
   /** Stop the listener, close the log, and give the runtime file back. Idempotent. */
   close(): Promise<void>
@@ -250,6 +276,24 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
     //     build one from being a diff nobody reads.
     ingest = createIngestService({ store: watching, onDiagnostic: diagnostic, ...options.ingest })
 
+    // 4c. The pending lifecycle the ack route drives, and the security boundary that
+    //     guards it. Both over the same wrapped store, so an acknowledgement also
+    //     becomes a live change frame; both built here and nowhere else, because a
+    //     second way to obtain either is a second way to change a record.
+    //
+    //     The lifecycle is the second one in this process: the ingest pipeline holds
+    //     its own. They are interchangeable - it is stateless, and every read it does
+    //     goes to the store - so this is duplication of a *reference*, not of state,
+    //     and it is what lets the ack route be a route rather than a method on the
+    //     ingest pipeline (src/domain/pending.ts).
+    //
+    //     The token file is created or read here, at start, rather than on the first
+    //     write: a hub that is serving is a hub whose write route can be reached, and a
+    //     state directory that cannot hold the token is a start-up failure rather than
+    //     a click that does nothing (HC-FR-06).
+    const pending = createPendingLifecycle(watching)
+    const security = createHubSecurity({ stateDir, ...options.security })
+
     // 5. Every route, registered in one place. The list is the product's whole HTTP
     //    surface; adding a route means adding it here, where the enumeration test
     //    will see it.
@@ -257,6 +301,7 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
     registry.registerAll(READ_ROUTES)
     registry.registerAll(STREAM_ROUTES)
     registry.registerAll(INGEST_ROUTES)
+    registry.registerAll(ACK_ROUTES)
     const dashboardRoot = resolveDashboardRoot(options.dashboardRoot)
     registry.register(createDashboardRoute<HubServices>({ root: dashboardRoot }))
 
@@ -269,6 +314,8 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
       counters,
       stream,
       ingest,
+      pending,
+      security,
       hub: unpublishedIdentity(claim),
     }
 
@@ -296,6 +343,8 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
       counters,
       stream,
       ingest,
+      pending,
+      security,
       hub: {
         instanceId: claim.instanceId,
         pid: claim.pid,
@@ -332,6 +381,18 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
       counters,
       stream,
       ingest,
+      /**
+       * The pending lifecycle the ack route drives, and the only mutation a client
+       * request can reach (APX-CON-08). Exposed for the same reason `ingest` is: a
+       * test and `doctor` have to be able to observe what the control surface did.
+       */
+      pending,
+      /**
+       * The security boundary: this install's write token, the header it travels in
+       * and where the token file is. In-process only - the token is on no read route,
+       * in no response and in no served asset (HC-FR-06).
+       */
+      security,
       startedAt: runtimeFile.startedAt,
       close: async (): Promise<void> => {
         // Idempotent, because a shutdown can be triggered twice: `close` is

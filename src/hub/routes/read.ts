@@ -49,6 +49,8 @@ import {
 import type { Counters, CounterReading } from '../../storage/counters.js'
 import type { ChangeFeed } from '../sse.js'
 import type { IngestService } from '../ingest-service.js'
+import type { HubSecurity } from '../security.js'
+import type { PendingLifecycle } from '../../domain/pending.js'
 import { respondJson, type RouteDefinition } from '../server.js'
 
 /**
@@ -84,6 +86,25 @@ export interface HubServices {
    * composition root constructs it.
    */
   readonly ingest: IngestService
+  /**
+   * The pending lifecycle (HC-FR-05).
+   *
+   * The ack route's only collaborator, and declared here for the reason `ingest` is:
+   * the one description of what a handler is given. It is built by the composition
+   * root over the same change-feed-wrapped store the read routes use, so an
+   * acknowledgement becomes a live stream frame without either route knowing the
+   * stream exists. The ingest pipeline holds a second lifecycle of its own, which is
+   * interchangeable with this one: it is stateless, and every read it does goes to
+   * the store (src/domain/pending.ts).
+   */
+  readonly pending: PendingLifecycle
+  /**
+   * The security boundary (HC-FR-06): the per-install write token, the header it
+   * travels in, and the one function that judges a write. The ack route is its only
+   * caller, and a route that needs the boundary has to be handed it here - there is
+   * no ambient way to reach it.
+   */
+  readonly security: HubSecurity
   readonly hub: HubIdentity
 }
 
