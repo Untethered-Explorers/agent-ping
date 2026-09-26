@@ -814,11 +814,17 @@ describe('the generated single file', () => {
 
   it('inlines the modules the adapter and the transport reach, and nothing else', () => {
     const rendered = render()
+    // The closure, in dependency order. OA-4's polling fallback is in it because the entry
+    // point reaches it: a fallback that were merely present rather than started would not
+    // be, and an installed file that did not carry it could not start it. Everything else
+    // is the same set as before, and the store, the notifier and the dashboard are still
+    // absent, which is what this test is for.
     expect(rendered.modules).toEqual([
       'domain/envelope.ts',
       'domain/classify.ts',
       'plugin/opencode/work-signal.ts',
       'plugin/opencode/translate.ts',
+      'plugin/opencode/poll-fallback.ts',
       'plugin/opencode/index.ts',
       'storage/paths.ts',
       'hub/runtime-file.ts',

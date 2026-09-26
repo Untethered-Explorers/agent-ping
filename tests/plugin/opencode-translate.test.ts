@@ -1332,8 +1332,11 @@ describe('the plugin never touches the session (APX-CON-03, OA-FR-09)', () => {
 describe('the adapter is a plugin and nothing more (ADR-005, ADR-006, APX-CON-12)', () => {
   const pluginDir = fileURLToPath(new URL('../../src/plugin/opencode/', import.meta.url))
   const modules = ['index.ts', 'translate.ts', 'work-signal.ts'] as const
-  const sourceOf = (name: (typeof modules)[number]): string =>
-    readFileSync(`${pluginDir}${name}`, 'utf8')
+  // The polling fallback is a fourth file in this directory, and the tests below read its
+  // source for the claims it has to satisfy too. It is not in `modules` because the
+  // "no socket, no spawn, no console" assertions above are about the translation path,
+  // and this module is the one exception to the first of them.
+  const sourceOf = (name: string): string => readFileSync(`${pluginDir}${name}`, 'utf8')
   const specifiersOf = (source: string): readonly string[] =>
     [
       ...[...source.matchAll(/\bfrom\s+'([^']+)'/g)].map((match) => match[1] ?? ''),
@@ -1355,15 +1358,20 @@ describe('the adapter is a plugin and nothing more (ADR-005, ADR-006, APX-CON-12
     }
   })
 
-  it('imports only the domain vocabulary and its own two modules', () => {
+  it('imports only the domain vocabulary and its own modules', () => {
     expect(specifiersOf(sourceOf('work-signal.ts'))).toEqual(['../../domain/classify.js'])
     expect([...new Set(specifiersOf(sourceOf('translate.ts')))].sort()).toEqual([
       '../../domain/classify.js',
       '../../domain/envelope.js',
       './work-signal.js',
     ])
+    // Three and not two, because OA-4's polling fallback is reached from the entry point:
+    // a fallback that were merely present rather than started would not be, and these
+    // three modules plus the fallback are still the adapter's whole surface. Nothing here
+    // reaches the hub, the transport or the store - those are separate roots (ADR-005).
     expect([...new Set(specifiersOf(sourceOf('index.ts')))].sort()).toEqual([
       '../../domain/classify.js',
+      './poll-fallback.js',
       './translate.js',
     ])
   })
@@ -1390,6 +1398,39 @@ describe('the adapter is a plugin and nothing more (ADR-005, ADR-006, APX-CON-12
     }
   })
 
+  it('the polling fallback is the one module that opens a socket, and it bounds every one', () => {
+    // The claim above is about the translation modules and stays true of them. The
+    // fallback does open a socket - to opencode's own server on loopback, because the
+    // event stream is the only other way in - so what has to be true of it is that every
+    // socket is bounded and nothing else is open: no filesystem, no child process, no
+    // interval, and no unbounded fetch (APX-CON-03, APX-CON-10).
+    const code = withoutComments(sourceOf('poll-fallback.ts'))
+    expect(code.includes('node:http')).toBe(true)
+    for (const forbidden of [
+      'node:net',
+      'node:https',
+      'node:child_process',
+      'node:worker_threads',
+      'node:dgram',
+      'node:fs',
+      'node:os',
+      'fetch(',
+      'XMLHttpRequest',
+      'WebSocket',
+      'setInterval',
+    ]) {
+      expect(code.includes(forbidden), `poll-fallback.ts uses ${forbidden}`).toBe(false)
+    }
+    // Every request carries the bound its caller chose, and the socket is destroyed when
+    // it elapses.
+    expect(code).toContain('timeoutMs')
+    expect(code).toContain('request.destroy()')
+    expect(code).toContain('timer.unref?.()')
+    // And it only ever dials a loopback address: a session id and a repository path must
+    // never leave this machine because an address was misconfigured (APX-CON-12).
+    expect(code).toContain('isLoopbackHost')
+  })
+
   it('never writes to the console, in code rather than in a comment', () => {
     for (const name of modules) {
       const code = withoutComments(sourceOf(name))
@@ -1399,17 +1440,34 @@ describe('the adapter is a plugin and nothing more (ADR-005, ADR-006, APX-CON-12
   })
 
   it('derives no dedupe key of its own, because the classifier owns the derivation', () => {
-    for (const name of modules) {
+    // Two claims, and they are different. *Building* a key is forbidden in every module:
+    // a key built here is a key that differs from the hub's, and that is a second event for
+    // one state. *Reading* the classifier's key is required in the modules that have to
+    // suppress a duplicate - OA-1's entry point records what it pushed and OA-4's fallback
+    // claims what it is about to push - so the check is on the derivation, not the word.
+    for (const name of [...modules, 'poll-fallback.ts' as const]) {
       const code = withoutComments(sourceOf(name))
-      expect(code.includes('dedupeKey'), `${name} builds a dedupe key`).toBe(false)
+      expect(code.includes('deriveDedupeKey'), `${name} derives a dedupe key`).toBe(false)
+      expect(code.includes('dedupeKey:'), `${name} builds a dedupe key`).toBe(false)
+      expect(code.includes('dedupe_key'), `${name} builds a dedupe key`).toBe(false)
     }
     // The one key the tests read is the classifier's, reached from the envelope.
     expect(sourceOf('translate.ts')).toContain('import { classify }')
+    // And the two places that name `dedupeKey` name it on the classification the
+    // classifier produced, never on anything they assembled.
+    for (const name of ['index.ts', 'poll-fallback.ts'] as const) {
+      const occurrences = withoutComments(sourceOf(name)).match(/classification\.event\.dedupeKey|dedupeKey/g) ?? []
+      expect(occurrences.length, `${name} names dedupeKey`).toBeGreaterThan(0)
+      for (const occurrence of occurrences) {
+        expect(occurrence, `${name} reaches for dedupeKey`).toBe('classification.event.dedupeKey')
+      }
+    }
   })
 
   it('exposes only the surface a plugin, its transport and its tests need', () => {
     expect(Object.keys(translateModule).sort()).toEqual([
       'AGENT_PING_SERVICE',
+      'HARNESS_NAME',
       'MAX_OPEN_TOOL_CALLS',
       'OPENCODE_EVENT_TABLE',
       'OPENCODE_UNMAPPED_EVENTS',

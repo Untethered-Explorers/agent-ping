@@ -21,6 +21,10 @@
 //     directory and the events, so an interactive session, a `opencode run` and a
 //     session attached to a running server all take the same path and none of them
 //     can be invisible because a repository was never set up (OA-FR-09, ADR-006).
+//     The one input that is not the event stream is the opencode server's address, and
+//     only the polling fallback needs it - the HTTP API is not reachable through an
+//     event, so OA-4's fallback takes a default plus an override from the plugin
+//     options record and names the address it dialled in every breadcrumb it writes.
 //   - It does not own the session. It reads events, translates them and hands them
 //     to a delivery port; it never writes to a session, never answers a permission,
 //     never calls a tool and never blocks. A developer's session must behave exactly
@@ -53,10 +57,13 @@
 //     installed artefact is ONE plugin file, so the installer emits a single
 //     directly-loadable file and is responsible for making the classifier reachable
 //     from it rather than copying the classification rules into it (ADR-005, ADR-006).
-//   - OA-4 owns the polling fallback, and it starts from the same entry point below
-//     when no delivery port is wired. It must take its transition identities from
-//     `translator.currentTransitionId` rather than minting keys of its own, or a
-//     session that both pushes and is polled produces two of everything (OA-FR-07).
+//   - OA-4 owns the polling fallback, and it starts from this entry point, below. It
+//     takes its transition identities from `translator.currentTransitionId` rather
+//     than minting keys of its own - which it gets for free by feeding its discoveries
+//     through `translator.observe` exactly as the hooks do - so a session that both
+//     pushes and is polled produces one event rather than two (OA-FR-07). The two
+//     paths share one dedupe ledger: `publish` records every key it pushes, and the
+//     fallback claims a key before it delivers one.
 
 import type {
   HarnessLog,
@@ -65,12 +72,16 @@ import type {
   OpencodeToolBoundary,
   TranslatedSignal,
 } from './translate.js'
-import { AGENT_PING_SERVICE, createHarnessLog, createTranslator } from './translate.js'
+import {
+  AGENT_PING_SERVICE,
+  HARNESS_NAME,
+  createHarnessLog,
+  createTranslator,
+} from './translate.js'
+import type { DedupeLedger, PollFallback, PollFallbackTuning } from './poll-fallback.js'
+import { createDedupeLedger, createPollFallback } from './poll-fallback.js'
 import type { HarnessSignal } from '../../domain/classify.js'
 import { ClassificationError } from '../../domain/classify.js'
-
-/** The harness this adapter speaks for, named where a breadcrumb reports it. */
-const HARNESS_NAME = 'opencode'
 
 // ---------------------------------------------------------------------------
 // The harness's plugin surface
@@ -105,13 +116,22 @@ export type DeliverPort = (signal: HarnessSignal) => void | Promise<void>
 /**
  * The plugin options the installer may configure.
  *
- * opencode passes plugin options as a free-form record, so the one key that means
- * something to this adapter is read by name and validated by shape; anything else in
- * the record is ignored rather than interpreted.
+ * opencode passes plugin options as a free-form record, so the keys that mean something
+ * to this adapter are read by name and validated by shape; anything else in the record is
+ * ignored rather than interpreted. Neither key is per-repository configuration: both are
+ * process-wide wiring decisions made once by whoever installed the plugin (ADR-006).
  */
 export interface AgentPingPluginOptions {
   /** The delivery port. Absent means "not wired", which is reported once. */
   readonly deliver?: DeliverPort
+  /**
+   * The polling fallback (OA-FR-07).
+   *
+   * `false` switches it off, an object tunes it, and absent means on. On is the default
+   * because the fallback's whole purpose is to be there when push delivery is not, and a
+   * fallback nobody switched on is a fallback that is merely present.
+   */
+  readonly poll?: false | PollFallbackTuning
 }
 
 /** The hooks this plugin returns. Nothing else is a hook opencode may call. */
@@ -158,6 +178,22 @@ export const AGENT_PING_PLUGIN: OpencodePlugin = async (input, options) => {
   const state = { unwiredReported: false, unattributedReported: false }
 
   /**
+   * The dedupe keys both paths have seen, in one place.
+   *
+   * `publish` records a key the push path delivered and the fallback claims a key before
+   * it delivers one, so a session that both pushes and is polled produces one delivery of
+   * each state. The keys are the classifier's own - nothing here derives one, and nothing
+   * here looks inside one (EL-FR-06, OA-FR-07).
+   */
+  const ledger: DedupeLedger = createDedupeLedger()
+
+  // Assigned before any hook can run, because `observe` names every session it sees to
+  // the fallback and `publish` shares the ledger with it. A `let` rather than a
+  // constructor argument: the four inputs the fallback needs are all derived here, and
+  // threading them through two closures to reach a `const` would hide that.
+  let fallback: PollFallback | null = null
+
+  /**
    * Hand one signal to the delivery port, and never await it.
    *
    * The three failure modes are all handled here rather than by the caller: a port
@@ -190,6 +226,13 @@ export const AGENT_PING_PLUGIN: OpencodePlugin = async (input, options) => {
           : {}),
       },
     })
+    // Recorded before the delivery attempt, from the classifier's own key: this is the
+    // half of the shared ledger that stops the polling fallback from reporting the same
+    // state a moment later (OA-FR-07). An attempt and not an acceptance, because this port
+    // cannot report one - the cost of that is stated in src/plugin/opencode/poll-fallback.ts.
+    if (translated.classification.outcome === 'event') {
+      ledger.record(translated.classification.event.dedupeKey)
+    }
     if (deliver === undefined) {
       if (!state.unwiredReported) {
         state.unwiredReported = true
@@ -217,9 +260,20 @@ export const AGENT_PING_PLUGIN: OpencodePlugin = async (input, options) => {
     }
   }
 
-  /** Translate one event, whatever the event is, and never throw out of here. */
+  /**
+   * Translate one event, whatever the event is, and never throw out of here.
+   *
+   * The first thing it does is tell the polling fallback which session the event
+   * belonged to, whatever the event turned out to be worth. A session the fallback has
+   * never been told about is one whose repository this build cannot establish, so it is
+   * counted and left alone rather than reported under a label that would be a guess
+   * (APX-CON-09, ADR-008). Doing it here rather than in `publish` is deliberate: a
+   * `tool.execute.before` produces no signal at all, and that is exactly the event that
+   * proves the session is real and has work in its turn.
+   */
   const observe = (event: OpencodeEvent): Promise<void> => {
     try {
+      fallback?.noteSession(translator.sessionIdOf(event) ?? '')
       publish(translator.observe(event))
     } catch (cause) {
       // The signal was never built, so the session is asked of the event itself
@@ -237,6 +291,53 @@ export const AGENT_PING_PLUGIN: OpencodePlugin = async (input, options) => {
     return Promise.resolve()
   }
 
+  /**
+   * Start the polling fallback, so it is running rather than merely present (OA-FR-07).
+   *
+   * It is started on the same terms whether or not a delivery port is wired, and the two
+   * cases are not the same thing:
+   *
+   *   - a port IS wired: the fallback is the net under the push path. It reports only what
+   *     the event stream did not deliver, because the shared ledger holds every key the
+   *     push path has taken, so the ordinary case costs three small loopback requests every
+   *     few seconds and reports nothing at all.
+   *   - no port is wired: push delivery is unavailable, and the fallback is the only path
+   *     left. It still runs, and every state it discovers is reported as a breadcrumb
+   *     naming the session, because there is nowhere to send it and a discovered state that
+   *     vanishes is a silent failure wearing a working poller's clothes (APX-FR-02).
+   *
+   * `start()` returns having armed a timer: no socket is opened here, nothing is awaited,
+   * and no hook is touched. A fallback that cannot even be constructed leaves the adapter
+   * exactly as it was - `fallback` stays null, so `observe` keeps naming sessions to
+   * nothing - which is the sidecar property in the four lines OA-3's installed entry point
+   * uses for the same reason (APX-CON-03, APX-CON-10).
+   */
+  function startPollFallback(): void {
+    const tuning = pollTuningOf(options)
+    if (tuning === null) return
+    try {
+      fallback = createPollFallback({
+        log,
+        translator,
+        directory,
+        ledger,
+        // Spread before `deliver` on purpose: the tuning type does not carry a delivery
+        // port, and a caller who put one in the record anyway must not be able to give the
+        // fallback a second delivery path. The event stream's port is the only one.
+        ...tuning,
+        ...(deliver === undefined ? {} : { deliver }),
+      })
+      fallback.start()
+    } catch (cause) {
+      // A misconfigured endpoint, a port that is not a number, anything the options record
+      // got wrong. Reported once, through the harness's own log, and the event stream is
+      // untouched - the hooks are installed and keep working (APX-FR-02).
+      breadcrumbFor(log, { eventName: 'poll-fallback' }, cause, 'poll-failed')
+    }
+  }
+
+  startPollFallback()
+
   return {
     event: (input) => observe(input.event),
     // The same event, spelled as the event the table knows: one row, one reader, and
@@ -245,6 +346,24 @@ export const AGENT_PING_PLUGIN: OpencodePlugin = async (input, options) => {
       observe({ type: 'tool.execute.before', properties: boundary }),
     'tool.execute.after': (boundary) => observe({ type: 'tool.execute.after', properties: boundary }),
   }
+}
+
+/**
+ * The fallback's tuning, from the options record, or null when it is switched off.
+ *
+ * Only `false` switches it off. Anything that is not a tuning record is read as "on with
+ * the defaults", because the alternative - treating a typo as `off` - would silently
+ * disable the one path that covers a missing push, and a silently disabled fallback is
+ * indistinguishable from a fallback that has nothing to report. A tuning record is checked
+ * by shape and its fields are validated where they are used, so a wrong value in it
+ * becomes a reported failure rather than a fault on the first cycle inside somebody else's
+ * session.
+ */
+function pollTuningOf(options: Readonly<Record<string, unknown>> | undefined): PollFallbackTuning | null {
+  const candidate = options?.['poll']
+  if (candidate === false) return null
+  if (typeof candidate !== 'object' || candidate === null || Array.isArray(candidate)) return {}
+  return candidate as PollFallbackTuning
 }
 
 /** What a failure breadcrumb may name: three closed tokens and a session id. */
@@ -273,7 +392,7 @@ function breadcrumbFor(
   log: HarnessLog,
   ref: FailureRef,
   cause: unknown,
-  stage: 'translate-failed' | 'delivery-failed' | 'delivery-rejected',
+  stage: 'translate-failed' | 'delivery-failed' | 'delivery-rejected' | 'poll-failed',
 ): void {
   if (cause instanceof ClassificationError) {
     log.warn({

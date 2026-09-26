@@ -1,10 +1,10 @@
 # Project Progress
 
 ## Current State
-**Phase**: NOTIFICATION-AND-TRAY-PRESENCE-3
+**Phase**: OPENCODE-PLUGIN-ADAPTER-2
 **Status**: In Progress
-**Validation Gaps**: 58 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-26T22:43:17.971Z
+**Validation Gaps**: 61 unverified check(s) - see "Validation Gaps"
+**Last Updated**: 2026-09-26T23:36:29.943Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -54,6 +54,8 @@
   - Files: src/plugin/transport/http.ts, src/plugin/transport/breadcrumb.ts, tests/plugin/transport.test.ts
 - [x] Phase OPENCODE-PLUGIN-ADAPTER-1, Task OA-3: Install and remove the global plugin idempotently (@connector-engineer)
   - Files: src/plugin/install/global-plugin.ts, tests/plugin/install.test.ts, assets/images/agent-ping-logo.png
+- [x] Phase OPENCODE-PLUGIN-ADAPTER-2, Task OA-4: Add the polling fallback for non-pushing sessions (@connector-engineer)
+  - Files: src/plugin/opencode/poll-fallback.ts, src/plugin/opencode/index.ts, tests/plugin/poll-fallback.test.ts, src/plugin/opencode/translate.ts, tests/plugin/install.test.ts, tests/plugin/opencode-translate.test.ts
 
 ## Current Task
 - None currently running
@@ -133,6 +135,9 @@
 - Task OA-3: The verification child process uses `node --experimental-strip-types`, which is not how opencode itself loads the file; the live probe is the evidence for that, and it is a single observed run rather than a repeated one.
 - Task OA-3: The scanner-based inliner is proven against this repository's eleven inlined modules and its own negative cases, not against arbitrary TypeScript; a future module using an export form it refuses will fail the install loudly with a named module rather than emit a wrong file.
 - Task OA-3: I did not re-verify the claim in the module header that a sibling package.json does not disturb plugin discovery; my own live probe had no package.json beside the plugin, so that specific claim rests on the inherited evidence.
+- Task OA-4: No live opencode session was run and no real opencode server was polled. The three route shapes come from the SDK's type declarations, and the tests answer them from a real loopback server built to those declarations - so what is proven is that the fallback reads and enforces that contract, not that a running opencode answers it.
+- Task OA-4: The end-to-end dedupe test starts a real hub from the real entry point on an ephemeral port and a real opencode-shaped server, but both run in this test process; the process boundary a real harness would add is unproven here.
+- Task OA-4: The poll-fallback module is not yet exercised through OA-3's installed single-file artefact in a real opencode session. That the installer inlines it is asserted (the generated closure includes plugin/opencode/poll-fallback.ts and the file loads in a child Node process), but OA-3's live probe predates this module.
 
 ## Notes
 - Workflow engine run 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8

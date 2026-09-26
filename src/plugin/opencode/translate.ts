@@ -804,8 +804,16 @@ export interface Translator {
   readonly stats: TranslatorStats
 }
 
-/** The harness name every row belongs to, from the closed set. */
-const HARNESS: Harness = 'opencode'
+/**
+ * The harness name every row belongs to, from the closed set.
+ *
+ * Exported rather than private, because two other modules in the closure report it: the
+ * entry point's breadcrumbs and the polling fallback's. One string with one owner is the
+ * same reason `AGENT_PING_SERVICE` is exported - a second copy of it in a second module is
+ * a value that can drift, and the installed plugin file is generated from these modules by
+ * a step that refuses two modules declaring one top-level name (src/plugin/install).
+ */
+export const HARNESS_NAME: Harness = 'opencode'
 
 /**
  * How many tool calls are timed at once.
@@ -871,7 +879,7 @@ export function createTranslator(options: TranslatorOptions): Translator {
       row.measurements.length === 0 ? undefined : readMeasurements(row, payload, durationMs)
     const variant = variantFor(row, statusType)
     const signal: HarnessSignal = {
-      harness: HARNESS,
+      harness: HARNESS_NAME,
       eventName: row.signalEventName,
       ...(variant === undefined ? {} : { variant }),
       sessionId,
