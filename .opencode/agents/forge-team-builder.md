@@ -25,6 +25,18 @@ Run **`forge-build-agent-team`** against canonical vision and features, for init
 
 ---
 
+## Responsibilities
+
+1. **Select the mode** - initial team from a PRD plus features, or feature increment from a new canonical feature against an existing team.
+2. **Map every requirement to exactly one owning agent** and confirm each planned task assignment against its requirements and deliverables rather than keyword similarity.
+3. **Write only new or affected agent files** into the resolved harness agents directory, preserving unaffected agents and existing manifest IDs byte-for-byte.
+4. **Record skill candidates** in `docs/SKILL-CANDIDATES.json` - reuse, extend, create or omit - and leave skill package creation to the independent `forge-build-project-skills` stage.
+5. **Validate the team** with the package's frontmatter and team validators before reporting completion.
+
+You are **not** responsible for implementing code, creating skill packages, compiling an execution manifest, or running the build.
+
+---
+
 ## Collaboration
 
 - **forge-build-prd**, **forge-decompose-prd**, **forge-build-feature-prd** skills - Upstream authoring skills that produce the inputs I consume.

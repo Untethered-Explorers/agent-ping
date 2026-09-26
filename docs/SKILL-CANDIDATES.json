@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "candidates": [
+    {
+      "name": "pixijs",
+      "description": "Route PixiJS 8 work to the right specialised guidance package for application init, scene graph, text, events, ticker, accessibility and performance.",
+      "consumers": [
+        "dashboard-engineer"
+      ],
+      "action": "reuse",
+      "reason": "PixiJS 8.21.0 is the dashboard renderer for both the static prototype and the live page (DP-2, DP-3, LD-1, LD-2), and the installed pixijs router plus its per-topic packages already cover the version-specific mechanics this project depends on: asynchronous Application.init, Graphics/Text layout, ticker lifecycle, renderer teardown and Vite bundling. No project package is needed; a new one would duplicate maintained upstream guidance and drift from the pinned version."
+    },
+    {
+      "name": "canvas-dom-mirror",
+      "description": "Build and test a canvas surface paired with a visually hidden but focusable DOM mirror in canvas order, with non-colour state encoding, keyboard traversal, focus retention across live updates, reduced motion and AA contrast.",
+      "consumers": [
+        "dashboard-engineer"
+      ],
+      "action": "create",
+      "reason": "The same pattern is specified three times with project-specific rules (APX-CON-07, DP-FR-04, DP-FR-05, LD-FR-02, LD-FR-09) and is fragile in a way no general package covers: one focusable entry per visible row in canvas order, icon-plus-text so no state is colour-only, focus retention by row identity when a live update re-renders underneath, and reduced motion for feed-triggered transitions. PixiJS's built-in AccessibilitySystem does not satisfy it, so this is a create rather than a reuse or an extend."
+    },
+    {
+      "name": "harness-signal-mapping",
+      "description": "Translate one harness's event names, ACP notifications and hook payloads into the shared normalized envelope, with a table-driven class, subtype and dedupe-key mapping plus a documented missing-signal degradation.",
+      "consumers": [
+        "connector-engineer",
+        "domain-engineer"
+      ],
+      "action": "create",
+      "reason": "The mapping is written at least three times against one interface - the domain classifier in EL-3, the opencode translation in OA-1, and the authorised Copilot translation in CP-4 - and the connector interface is explicitly specified in Agent Client Protocol terms so a third harness is additive (APX-CON-13). The work-signal accumulator, the shared dedupe key across pushed and polled state, and the requirement that a missing signal degrades visibly rather than silently are project-specific and easy to get subtly wrong per harness."
+    },
+    {
+      "name": "content-free-schema-guard",
+      "description": "Prove and preserve that nothing in agent-ping can hold conversation content, covering the schema column set, the envelope fields, ingest and metrics payloads, the history panel and the local log.",
+      "consumers": [
+        "domain-engineer",
+        "hub-engineer"
+      ],
+      "action": "create",
+      "reason": "The privacy boundary is the product's central promise (APX-FR-01) and is enforced in at least six separate places: the exact column-set assertion in EL-FR-03, the envelope field assertion in EL-FR-01, the ingest payload test in HC-3, the metrics payload test in HC-6, the history panel test in LD-3 and the local log in IO-FR-09. Each is a place where a well-meaning new column or field silently breaks a promise, so one shared guard procedure keeps them from drifting apart."
+    },
+    {
+      "name": "loopback-api-security",
+      "description": "Apply and test the loopback-only boundary: bind 127.0.0.1, reject non-loopback remote addresses, require the per-install token on the single write route, send a strict CSP with no permissive cross-origin header, and enumerate routes to prove ack is the only mutation.",
+      "consumers": [
+        "hub-engineer"
+      ],
+      "action": "create",
+      "reason": "This is the fragility that turns an apparently local daemon into a remote control, and it is spread across HC-1, HC-4 and the strict-CSP interaction with the PixiJS bundle, constrained by APX-CON-01 and APX-CON-08. The route-enumeration test that proves the mutating set is exactly {ack}, and the rule that a CSP conflict is resolved by narrowing the policy rather than adding unsafe-inline, are project decisions that general Node or Electron guidance will not produce."
+    },
+    {
+      "name": "live-verification-script",
+      "description": "Write a repository script that drives a real binary, browser or service manager, prints a machine-readable summary of what was observed, exits non-zero on any failed assertion, has no path that reports success when nothing ran, and keeps its decision logic unit-testable against injected results.",
+      "consumers": [
+        "qa-engineer"
+      ],
+      "action": "create",
+      "reason": "Four separate tasks require this exact shape - the live opencode session (OA-5), the live autostart and restart run (IO-4), the browser-driven dashboard journey (LD-4) and the Copilot probes - and the discipline is unusually strict in this project: a missing browser, harness or service manager is a non-zero exit rather than a skip, because a green result that exercised nothing is treated as worse than a failure. The pattern is reusable and would otherwise be reinvented, slightly differently, four times."
+    },
+    {
+      "name": "create-project-documentation",
+      "description": "Extend the existing project documentation package to cover the three evidence artefact shapes this project repeats: platform runbooks that state what is not live-verified, human-gate review files, and research probe reports.",
+      "consumers": [
+        "notification-engineer",
+        "connector-engineer",
+        "packaging-engineer",
+        "qa-engineer"
+      ],
+      "action": "extend",
+      "reason": "The existing package covers ADRs, user and administrator guides, changelog and release notes, but not the artefacts this project actually repeats: docs/runbooks/notify-platforms.md and docs/runbooks/copilot-support.md must state explicitly which behaviour is not live-verified on the authoring machine, eight human gates write docs/reviews/*.json verdicts against a fixed acceptance shape, and docs/research/copilot-acp-probe.md must distinguish an absent signal from an untriggered one and from an unclear one. The honesty rules are project-specific and additive, so the existing package is extended rather than replaced or duplicated."
+    },
+    {
+      "name": "human-review-gate",
+      "description": "A repeatable procedure for running and recording the project's eight human review gates across design, hub safety, notification behaviour, adapter reality, dashboard journey, operations and the Copilot authorisation decision.",
+      "consumers": [
+        "qa-engineer"
+      ],
+      "action": "omit",
+      "reason": "Considered and rejected. Each gate is entirely human judgement against a running system, and every gate already carries explicit acceptance criteria and a named review file in its feature document, so there is no agent-executable process to package. More importantly, a reusable procedure for producing these artefacts invites an agent to author or close a verdict it has no standing to give, which is the failure mode the no-fabricated-human-review constraint exists to prevent. The responsibility stays with human reviewers, and qa-engineer is recorded here only to make that boundary explicit."
+    }
+  ]
+}

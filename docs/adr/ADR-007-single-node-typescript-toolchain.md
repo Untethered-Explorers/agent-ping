@@ -1,0 +1,143 @@
+# ADR-007: Single toolchain — Node 22 + TypeScript, Electron main, PixiJS dashboard
+
+- **Status:** Accepted
+- **Date:** 2026-09-26
+- **Decision owners:** Project author (decided with the user; versions recorded
+  in the PRD)
+- **Implementation state:** Not started. There is no `package.json`, no
+  `tsconfig.json`, and no lockfile. Every version below is a research finding
+  in the PRD, not an installed dependency.
+
+## Context
+
+The product needs a resident daemon (Electron main process), a rendered
+interactive surface (the dashboard), a native durable store, a per-platform
+notification path including a tray or menu-bar icon, and a plugin that must be
+loadable by a Node process the user already runs.
+
+The user-facing dashboard is a canvas surface by choice — the project targets a
+PixiJS-rendered notification dashboard. That choice is what forces the
+toolchain question, because a canvas surface also forces the accessibility
+question: a canvas has no semantics, so it must be paired with a DOM mirror
+(ADR-009, and APX-CON-07).
+
+The ecosystem options for a resident process with a tray icon and native
+notifications are thin, which pushes toward Electron. Electron is a large
+dependency for what is conceptually a notification daemon, and that cost is
+real: it is recorded as a named risk in the PRD.
+
+A second constraint is decisive: **one toolchain only**. A second implementation
+language, or a runtime dependency the supported Node line does not satisfy, is
+excluded. This keeps the whole product buildable and testable with one
+`npm` toolchain and one type checker.
+
+## Decision
+
+**One npm package, one toolchain, three build entry points.**
+
+Runtime floor: **Node.js 22 LTS or newer**, with **TypeScript** and **npm**.
+No second implementation language, and no runtime dependency the supported Node
+line does not satisfy.
+
+The stack as recorded in the PRD technology table:
+
+| Role | Choice | Version recorded | Verified against |
+|------|--------|------------------|------------------|
+| Runtime | Node.js | 22.23.3 LTS line | npm registry |
+| Language | TypeScript | 7.0.2 | npm registry |
+| Shell and tray host | Electron | 44.4.5 (needs Node >= 22.12.0) | npm registry |
+| Dashboard renderer | PixiJS | 8.21.0 | npm registry |
+| Renderer build | Vite | 8.3.1 | npm registry |
+| Unit and integration tests | Vitest | 5.0.2 | npm registry |
+| DOM test environment | jsdom | 30.1.1 | npm registry |
+| End-to-end tests | Playwright | `@playwright/test` 1.63.0 | npm registry |
+| Durable store | better-sqlite3 | 13.0.3 (needs Node >= 22) | npm registry |
+| Payload validation | zod | 4.6.5 | npm registry |
+| opencode plugin types | `@opencode-ai/plugin` | 1.18.32 | npm registry |
+| opencode client | `@opencode-ai/sdk` | 1.18.32 | npm registry |
+| ACP client | `@agentclientprotocol/sdk` | 1.5.0 (protocol version 1) | npm registry |
+| Linux notifications | `notify-send` via libnotify | system package | local system |
+
+The three build entry points, and why each exists separately:
+
+- **Electron main via `tsc`** — the hub, store, ingest, SSE, delivery, tray
+  wiring, and CLI. Typed compilation, no bundler.
+- **Dashboard via Vite** — the PixiJS renderer, because bundling and asset
+  handling are what a bundler is for.
+- **Plugin as directly loadable TypeScript** — the global opencode plugin is
+  loaded by opencode itself, so it must be loadable without a separate build
+  step in the consumer's path.
+
+Source layout, per the PRD, is organised by concern: `src/domain/`,
+`src/storage/`, `src/hub/`, `src/notify/`, `src/dashboard/`, `src/plugin/`,
+`src/cli/`, with `scripts/` for live verification and `tests/` mirroring
+`src/`.
+
+## Alternatives Considered
+
+- **A native daemon (Rust or Go) plus a web dashboard.** Rejected. It is a
+  second implementation language, violating the single-toolchain constraint,
+  and it roughly doubles the build and test surface for a single-user tool.
+- **A plain Node daemon with no Electron, serving the dashboard to a browser.**
+  Rejected for v1 because it loses the tray or menu-bar icon, and the tray badge
+  is load-bearing: it is the **durable** signal that does not depend on the user
+  catching a toast moment. Losing it would push the product back toward
+  "easy to miss", which is the failure mode ADR-004 is designed to avoid.
+- **Tauri instead of Electron.** Rejected. It is a credible footprint
+  improvement, but it adds a Rust build dependency to a project whose defining
+  constraint is a single Node/TypeScript toolchain.
+- **React or another DOM framework for the dashboard, with no canvas.** Rejected.
+  The canvas surface is a deliberate product choice, not an accident.
+- **Multiple packages in a workspace.** Rejected. A single-user daemon with one
+  binary does not benefit from workspace versioning, and several package
+  versions would create exactly the version-drift ambiguity this repository's
+  documentation has to avoid.
+
+## Consequences
+
+- **Benefit:** One `npm` toolchain builds and tests everything. One type
+  checker. No polyglot repository.
+- **Benefit:** The tray badge is available on all three target platforms from one
+  host, which supports the durable-signal requirement in ADR-004.
+- **Cost:** Electron is a heavy dependency for a notification daemon. The PRD
+  records this as a named risk and mitigates it with a single package, no
+  bundled Chromium download beyond the default, and user-level (non-root)
+  autostart. The footprint is accepted, not solved.
+- **Cost:** Three build entry points means three ways for a build to break, and
+  the Electron main `tsc` path and the Vite path can drift in how they resolve
+  modules.
+- **Risk:** **TypeScript 7.0.2 compatibility is an open question**, not a
+  verified fact. The PRD's recorded default is to pin 7.0.2 and fall back to the
+  5.9.x line only if a concrete incompatibility with Vitest 5 or the build path
+  appears, recording the fallback when it does. This is untested.
+- **Risk:** **Playwright browser download may fail** in a locked environment.
+  The mitigation is that the dashboard is also served over loopback, so the
+  journey can be driven in an existing browser; script failure is explicit and
+  never silently skipped.
+- **Operational implication:** Node 22 is a **floor**, not a suggestion — it is
+  required by Electron 44, Vitest 5, and better-sqlite3. Install and support
+  documentation must state the floor rather than a tested version.
+- **Constraint carried forward:** better-sqlite3 is a native module. This is why
+  the repository ignores `build/`, `prebuilds/`, and `*.node`. It also means the
+  install has a native build step, which is a real installation consideration.
+
+## Implementation References
+
+- Requirements: [APX-CON-05](../PRD.md#7-non-functional-requirements) — one
+  toolchain. [APX-CON-06](../PRD.md#61-technology-stack) — platform support.
+  [APX-CON-07](../PRD.md#9-accessibility) — canvas plus DOM mirror.
+  [APX-CON-11](../PRD.md#7-non-functional-requirements) — performance budgets.
+- Technology table: [PRD §6.1](../PRD.md#61-technology-stack) — including the
+  explicit statement that no dependency in the table is deprecated or
+  end-of-life, and that unverifiable versions are recorded in Open Questions
+  rather than guessed.
+- Project structure: [PRD §6.2](../PRD.md#62-project-structure).
+- Risks and mitigations: [PRD §12.2](../PRD.md#122-risks) — Electron footprint,
+  Playwright download, TypeScript 7 line.
+- Open questions 6 and 7 in [PRD §16](../PRD.md#16-open-questions).
+- Feature documents: [Dashboard Design Prototype](../features/dashboard-design-prototype.md)
+  (which also establishes the toolchain and the test-runner convention),
+  [Live Dashboard](../features/live-dashboard.md),
+  [Install, Autostart and Operations](../features/install-autostart-and-operations.md).
+- Planned paths (**do not exist yet**): `package.json`, `tsconfig.json`,
+  `src/`, `tests/`, `scripts/`.
