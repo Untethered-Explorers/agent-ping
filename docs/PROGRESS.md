@@ -1,10 +1,10 @@
 # Project Progress
 
 ## Current State
-**Phase**: HUB-CORE-AND-DELIVERY-POLICY-3
+**Phase**: NOTIFICATION-AND-TRAY-PRESENCE-1
 **Status**: In Progress
-**Validation Gaps**: 32 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-26T18:12:55.271Z
+**Validation Gaps**: 36 unverified check(s) - see "Validation Gaps"
+**Last Updated**: 2026-09-26T18:39:23.375Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -40,6 +40,8 @@
   - Files: src/hub/metrics.ts, src/hub/routes/metrics.ts, tests/hub/metrics.test.ts, src/hub/delivery.ts, src/hub/routes/read.ts, src/hub/server.ts, src/main/index.ts
 - [x] Phase HUB-CORE-AND-DELIVERY-POLICY-3, Task HC-7: Review the hub read-only promise and restart safety
   - Files: docs/reviews/hub-core.json
+- [x] Phase NOTIFICATION-AND-TRAY-PRESENCE-1, Task NT-1: Define the notifier interface and the Linux notifier (@notification-engineer)
+  - Files: src/notify/types.ts, src/notify/policy.ts, src/notify/linux.ts, src/notify/registry.ts, src/main/index.ts, tests/notify/policy.test.ts, tests/notify/linux.test.ts, tests/notify/registry-selection.test.ts, tests/hub/delivery.test.ts, tests/hub/ingest.test.ts, tests/hub/metrics.test.ts, tests/hub/server.test.ts
 
 ## Current Task
 - None currently running
@@ -96,6 +98,10 @@
 - Task HC-6: The 'only caller of a counter write' assertion walks src/ as source text with a regular expression. It catches a new call site in any product module, and it would not see a write through a computed property name.
 - Task HC-6: isDashboardDocumentPath treats '//' as a document while the hub answers 404 for it; the hook fires only on a real serve, so this is unobservable in the counters but is a disagreement between two rules rather than a proved-equal pair.
 - Task HC-6: The exact key-set and name-shape assertions on the metrics payload are over one real response body. A field that appeared only on a second hub, a different clock or an error path would need a new assertion; /api/metrics has no other payload shape because it has no error path.
+- Task NT-1: The real-binary checks cover what the installed notify-send accepts and how it fails, not what a notification server does with a resident notification: the option set is exercised with --version so no toast is sent, and the real argv delivery uses a stub so the assertion is deterministic. Nothing here proves on-screen persistence.
+- Task NT-1: The two tests that run against the installed notify-send branch on whether the binary exists: without it they assert the honest 'command-not-found' outcome rather than the parsing claim, so on a machine without libnotify the parsing assertions are not exercised (both branches are real, only one proves the parser).
+- Task NT-1: The delivery timeouts and the health route are asserted over real sockets in process; the restart replay test uses two hubs in one process rather than two OS processes, because the process-level restart evidence is HC-5's and tests/hub/delivery.test.ts.
+- Task NT-1: The unavailable-platform answers for macOS and Windows are verified as values only (no notifier, correct reason, probe reports it); no macOS or Windows behaviour of any kind is exercised.
 
 ## Notes
 - Workflow engine run 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8

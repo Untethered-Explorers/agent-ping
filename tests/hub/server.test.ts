@@ -774,7 +774,9 @@ describe('the read routes (HC-FR-02)', () => {
   })
 
   it('reports health as the doctor command needs it', async () => {
-    const hub = await startFixtureHub()
+    // Unwired on purpose: the delivery section is the thing under test here, and the
+    // unwired shape is the one a caller has to be able to read.
+    const hub = await startFixtureHub({ delivery: { notifier: undefined } })
     seedOneBlock(hub)
 
     const health = (await call(hub.origin, '/api/health')).json<Record<string, unknown>>()
@@ -814,8 +816,10 @@ describe('the read routes (HC-FR-02)', () => {
       servedRequests: expect.any(Number) as unknown as number,
     })
     // And the third. A hub with no notifier behind the port says so, which is the
-    // honest answer for this build: NT-1 has not constructed the platform notifier
-    // yet, and `doctor` must be able to tell that apart from a delivered run.
+    // honest answer for a build or a platform without one, and `doctor` must be able to
+    // tell that apart from a delivered run. Since NT-1 the composition root constructs
+    // the platform notifier, so this hub asks for the unwired state explicitly rather
+    // than relying on a default that no longer exists.
     expect(health['delivery']).toEqual({
       status: 'not-wired',
       wired: false,

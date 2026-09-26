@@ -552,8 +552,10 @@ describe('a toast delivery is recorded from the outcome the delivery policy repo
     // The block is not lost by the failure being uncounted: it is the badge's job.
     expect(observeLog(hub).readPending()).toHaveLength(1)
 
-    // A hub with no notifier at all: nobody was told, and the counter says so.
-    const unwired = await startFixtureHub()
+    // A hub with no notifier at all: nobody was told, and the counter says so. Asked for
+    // explicitly, because the composition root wires the platform notifier by default
+    // since NT-1.
+    const unwired = await startFixtureHub({ delivery: { notifier: undefined } })
     await ingestAndSettle(unwired, blockBody())
     expect(counterOf(await metricsOf(unwired), 'toast_deliveries')).toBe(0)
     // The pending set still changed, and that is still recorded: the two counters
@@ -567,7 +569,10 @@ describe('a toast delivery is recorded from the outcome the delivery policy repo
     // notifier (HC-FR-07). The counter answers in the second run, which is the whole
     // point of a durable local count.
     const stateDir = temporaryDirectory()
-    const first = await startFixtureHub({ stateDir })
+    // The first run stores the block with nothing behind the port, so the number it
+    // leaves behind is zero for the reason the test is about rather than by accident -
+    // the composition root wires the platform notifier by default since NT-1.
+    const first = await startFixtureHub({ stateDir, delivery: { notifier: undefined } })
     await ingestAndSettle(first, blockBody())
     expect(counterOf(await metricsOf(first), 'toast_deliveries')).toBe(0)
     await first.close()

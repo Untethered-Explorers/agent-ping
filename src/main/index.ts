@@ -33,17 +33,20 @@
 // Node - for a test, for the CLI, for a verification script - does not require
 // Electron to be installed at all.
 //
-// WHAT IS NOT HERE YET
-// The platform notifier and the tray arrive in NT-1 and NT-2. The delivery policy
-// (HC-5) is wired here now: it is the one thing in this process that may call a
-// notifier, the notifier itself is constructed at the bottom of this file and
-// injected into it, and the restart replay and the shutdown path are both driven
-// from here. What remains deliberately absent is any route that can spawn, steer,
-// interrupt, prompt or approve anything inside a harness (APX-CON-08): the mutating
-// set in src/hub/server.ts is exactly two signatures, the append-only ingest route
-// and the ack route, and the registry refuses to register anything else that
-// claims to write. The delivery policy is not a route and is reachable from no
-// request at all.
+// WHAT IS HERE NOW, AND WHAT IS STILL TO COME
+// The platform notifier is wired (NT-1): the registry picks this machine's notifier, the
+// notifier applies the one class policy (a resident critical toast for a block, an
+// expiring one for a finished turn, and nothing at all for an fyi), and the delivery
+// policy calls it - it is the one thing in this process that may call a notifier, and
+// the notifier itself is constructed below and injected into the policy, so the restart
+// replay and the live path reach the same one. A platform with no notifier is not wired
+// and says so on health, which is the honest answer rather than a delivered lie
+// (APX-FR-02). The macOS and Windows notifiers arrive in NT-2 and the tray in NT-3.
+// What remains deliberately absent is any route that can spawn, steer, interrupt, prompt
+// or approve anything inside a harness (APX-CON-08): the mutating set in
+// src/hub/server.ts is exactly two signatures, the append-only ingest route and the ack
+// route, and the registry refuses to register anything else that claims to write. The
+// delivery policy is not a route and is reachable from no request at all.
 //
 // THE ORDER THE SHUTDOWN AND THE START SHARE
 // A hub that is starting replays its pending blocks (HC-FR-07) and a hub that is
@@ -110,6 +113,11 @@ import {
 } from '../hub/delivery.js'
 import { createHubLifecycle, type HubLifecycle, type HubState } from '../hub/lifecycle.js'
 import {
+  createPlatformNotifier,
+  toNotifierPort,
+  type NotifierResolution,
+} from '../notify/registry.js'
+import {
   createDashboardRoute,
   startServer,
   DEFAULT_HUB_PORT,
@@ -146,9 +154,8 @@ export interface DesktopBridge {
   /** The origin the hub published, once it is serving. */
   onHubReady?(hub: RunningHub): void
   /**
-   * Mount the tray (NT-2). Absent in HC-1: the tray belongs to
-   * notification-engineer and the hub only provides the seam and the pending count
-   * it will read.
+   * Mount the tray (NT-3). Absent until NT-3: the tray belongs to notification-engineer
+   * and the hub only provides the seam and the pending count it will read.
    */
   mountTray?(hub: RunningHub): void
 }
@@ -179,24 +186,26 @@ export interface StartHubOptions {
    * Overrides for the ingest pipeline (HC-FR-04).
    *
    * Production passes nothing, and the omission is meaningful: the defaults are the
-   * documented bounds, and the delivery port is absent, which the service counts as
-   * `not-wired` rather than passing silently (APX-FR-02). HC-5 supplies the real
-   * notifier through this same option, and a test uses it to observe that the answer
-   * is returned before any delivery work begins.
+   * documented bounds. The delivery port below is the policy, and the policy's `wired` is
+   * what the pipeline is told, so a hub on a platform with no notifier counts
+   * `not-wired` deliveries rather than passing silently (APX-FR-02). A test uses this
+   * option to observe that the answer is returned before any delivery work begins.
    */
   readonly ingest?: Partial<Omit<IngestServiceOptions, 'store'>>
   /**
    * Overrides for the delivery policy (HC-FR-07).
    *
-   * Production passes nothing until NT-1 constructs the platform notifier, and the
-   * absence is meaningful rather than a gap: with no notifier the policy reports
-   * `not-wired` on health and the ingest pipeline counts `not-wired` deliveries, so
-   * "nobody was told" is visible from both ends (APX-FR-02). A test passes a `notifier`
-   * to watch one classified event become one attempt.
+   * Production passes nothing. The notifier is the platform's own, constructed by the
+   * registry below and injected into the policy, so the live path and the restart replay
+   * reach the same notifier without either of them naming a platform. The one override
+   * that matters is `notifier`, and it exists so a test can watch one classified event
+   * become one attempt without a desktop; passing one replaces the platform notifier, so
+   * a test that does it is testing the policy and not the toast, which is the right way
+   * round for both claims.
    *
    * `origin` is not a caller option: it is this file's own live origin, read per
-   * request, because a deep link cannot be built from a port that was only a
-   * preference (HC-FR-01, NT-FR-07).
+   * request, because a deep link cannot be built from a port that was only a preference
+   * (HC-FR-01, NT-FR-07).
    */
   readonly delivery?: Partial<Omit<DeliveryPolicyOptions, 'store' | 'origin'>>
   /**
@@ -305,6 +314,17 @@ export interface RunningHub {
    * running hub and not a service in `HubServices` (APX-CON-08).
    */
   readonly delivery: DeliveryPolicy
+  /**
+   * The notifier resolution this hub was built with (NT-1): which platform answered,
+   * whether one did, and a probe for whether the tool it uses is installed.
+   *
+   * Exposed so `doctor` reports notifier availability from the same resolution the
+   * deliveries went through rather than by constructing a second notifier, and so
+   * NT-3's tray can read the same answer (IO-2, NT-FR-09). Holding it grants nothing:
+   * calling `notifier` is a delivery attempt the policy owns, and `probe` only reports
+   * whether a tool is installed.
+   */
+  readonly notifier: NotifierResolution
   /**
    * The shutdown path (HC-FR-10): PRD 10's lifecycle state, and the one ordered
    * shutdown a signal, an Electron quit and a test all take.
@@ -426,15 +446,45 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
     //     ingest pipeline, because the pipeline's port *is* this policy. Built here
     //     and nowhere else: the composition root is the single place a collaborator is
     //     constructed, which is what keeps a second delivery path from being a diff
-    //     nobody reads. The notifier is the platform's (NT-1) and arrives through the
-    //     `delivery` option; until then the policy reports `not-wired` rather than
-    //     pretending anything was delivered (APX-FR-02).
+    //     nobody reads.
+    //
+    //     The notifier is the platform's (NT-1), resolved here rather than inside the
+    //     policy, for three reasons. The composition root is the one place in this
+    //     product that wires things, so "which notifier answered" is a line of this file
+    //     rather than a search. The policy and the notifier then have no dependency on
+    //     each other at all - the policy only knows a function it was handed - so a
+    //     platform notifier is a replacement rather than an edit. And a platform with no
+    //     notifier leaves the port unwired, which the policy reports as `not-wired` on
+    //     health and the ingest pipeline counts as `not-wired`, so "nobody was told" is
+    //     visible from both ends rather than being papered over with a no-op notifier
+    //     that always succeeds (APX-FR-02).
+    const platformNotifier = createPlatformNotifier({ onDiagnostic: diagnostic })
+    if (!platformNotifier.supported) {
+      // A line, because a hub that cannot notify anybody is degraded in a way an
+      // operator has to be told about, and the state it reports is `not-wired` rather
+      // than a failure (APX-CON-06, APX-FR-02). No notifier is constructed on this
+      // path, so nothing can be delivered by accident.
+      diagnostic(
+        `agent-ping has no notifier for this platform (${platformNotifier.platform}, ` +
+          `${platformNotifier.reason}), so every delivery is recorded as not-wired and no ` +
+          'notification leaves this machine',
+      )
+    }
     delivery = createDeliveryPolicy({
       store: watching,
       // The live origin, read per request rather than captured: the bind below is what
       // chooses the port, and a deep link built from the preferred one would point at
       // a port nobody is listening on (HC-FR-01, NT-FR-07).
       origin: (): string => server?.origin ?? '',
+      // The one conversion between the two notifier shapes: the platform notifier
+      // resolves with an outcome carrying a reason, and the policy's port has only
+      // "resolved" and "thrown" - so the adapter is where a `failed` outcome becomes a
+      // throw the policy records as a failure, with the reason beside it (APX-FR-02,
+      // ADR-010). An `fyi` is refused by the class policy before any platform notifier
+      // is reached and never becomes a command (NT-FR-02).
+      ...(platformNotifier.notifier === null
+        ? {}
+        : { notifier: toNotifierPort(platformNotifier.notifier, { onDiagnostic: diagnostic }) }),
       onDiagnostic: diagnostic,
       // The one place a delivery outcome leaves the policy (HC-6). A `delivered`
       // outcome is the increment for `toast_deliveries`; the other four are handed
@@ -602,6 +652,12 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
        * reach the shutdown from inside the process (HC-FR-07, HC-FR-10).
        */
       delivery,
+      /**
+       * The notifier resolution, so `doctor` and NT-3's tray can ask whether a
+       * notifier exists and whether its tool is installed without building a second
+       * one. The same object the policy above was given (NT-1).
+       */
+      notifier: platformNotifier,
       lifecycle,
       /**
        * The security boundary: this install's write token, the header it travels in
@@ -909,8 +965,11 @@ async function importModule(specifier: string): Promise<unknown> {
  * adapters and the CLI read. Both or neither.
  *
  * No window is opened here. The dashboard is an on-demand surface (ADR-009), and
- * the tray that opens it belongs to NT-2, so the only thing this function does
- * with the desktop is keep the process alive until the hub is closed.
+ * the tray that opens it belongs to NT-3, so the only thing this function does
+ * with the desktop is keep the process alive until the hub is closed. The notifier
+ * the hub is started with is the same one a plain `startHub` gets, because it is
+ * resolved inside `startHub` (NT-1) rather than here: an Electron process and a
+ * plain Node process on the same machine must notify the same way.
  */
 export async function startElectronMain(): Promise<RunningHub | null> {
   const electron = (await importModule('electron')) as { app?: ElectronAppLike }

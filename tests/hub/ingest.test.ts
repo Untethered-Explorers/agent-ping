@@ -595,10 +595,12 @@ describe('the answer does not wait for delivery', () => {
   })
 
   it('counts a delivery that is not wired yet rather than passing silently', async () => {
-    // Every build before HC-5 has no port. "We did not deliver" is a fact an operator
-    // can see instead of a bug they infer from a missing toast months later
-    // (APX-FR-02).
-    const hub = await startFixtureHub()
+    // A hub with nothing behind the port - which is every build before HC-5, and every
+    // build on a platform whose notifier is not written yet. Since NT-1 the composition
+    // root wires the platform notifier by default, so the state is asked for here rather
+    // than inherited. "We did not deliver" is a fact an operator can see instead of a bug
+    // they infer from a missing toast months later (APX-FR-02).
+    const hub = await startFixtureHub({ delivery: { notifier: undefined } })
 
     await post(hub, blockBody())
     await hub.ingest.idle()

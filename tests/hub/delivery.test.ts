@@ -51,8 +51,9 @@
 //     bounded concurrency - asserted with a real set of pending items rather than with
 //     one.
 //   - A hub with no notifier behind the port says `not-wired` rather than reporting a
-//     delivery, which is the state of every build until NT-1 constructs the platform
-//     notifier, and which must never be mistaken for a delivered run.
+//     delivery, which must never be mistaken for a delivered run. Since NT-1 the
+//     composition root wires the platform notifier by default, so the suite asks for
+//     that state explicitly where it is the thing under test.
 
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { request } from 'node:http'
@@ -694,9 +695,14 @@ describe('health reports the delivery status a doctor run needs', () => {
   })
 
   it('reports not-wired for a hub with no notifier, and delivers nothing', async () => {
-    // The state of every build until NT-1 constructs the platform notifier. Visible,
-    // counted, and never a success (APX-FR-02).
-    const hub = await startFixtureHub(undefined)
+    // `not-wired` means "this hub has no notifier behind the port", and it is now a state
+    // a caller asks for rather than the default: since NT-1 the composition root
+    // constructs the platform's notifier, so a hub that wanted the unwired state has to
+    // say so. Two things in the product still produce it without asking - a platform with
+    // no notifier (APX-CON-06, and the reason `createPlatformNotifier` reports rather than
+    // throws), and this explicit override, which is how the state stays tested after the
+    // default changed. Visible, counted, and never a success (APX-FR-02).
+    const hub = await startFixtureHub(undefined, { delivery: { notifier: undefined } })
     const store = observeLog(hub)
 
     await post(hub, blockBody())
