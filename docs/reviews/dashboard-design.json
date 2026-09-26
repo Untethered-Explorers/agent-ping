@@ -1,0 +1,13 @@
+{
+  "taskId": "DP-4",
+  "taskDigest": "a30d80f94beb47288c140e79836b7ad6e069e8cfc8009b9996b2677cdf3f309e",
+  "reviewer": "Doug McCusker",
+  "reviewedAt": "2026-09-26T13:03:33.382Z",
+  "decision": "approved",
+  "evidence": [
+    {
+      "path": "docs/reviews/DP-4-console-review.md",
+      "sha256": "14ec6aa7f6d199766e08d66aaf3aa568938ade9459ab37508dead1468fef515e"
+    }
+  ]
+}
