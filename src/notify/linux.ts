@@ -71,7 +71,13 @@
 // table. This file puts them on a command line and nowhere else - not in a log line, not
 // in a diagnostic, not in a record (APX-FR-01, APX-CON-12).
 
-import { spawn, type ChildProcess } from 'node:child_process'
+import {
+  createNodeCommandRunner,
+  probeAvailability,
+  refusedOutcome,
+  reportCommandResult,
+  RUNNER_REJECTED,
+} from './command.js'
 import { decideNotification } from './policy.js'
 import {
   NOTIFICATION_APP_NAME,
@@ -83,6 +89,14 @@ import {
   type NotificationRequest,
   type Notifier,
 } from './types.js'
+
+/**
+ * Re-exported so a reader of this file finds the runner beside the constants that size it,
+ * and so the platform files that need the same runner do not have to import it from Linux's
+ * notifier. The implementation and the failure vocabulary it is paired with live in
+ * ./command.ts, because all three platforms use them unchanged.
+ */
+export { createNodeCommandRunner }
 
 /**
  * The tool.
@@ -134,19 +148,6 @@ export const RESIDENT_HINT = '--hint=boolean:resident:true'
  */
 export const NOTIFY_COMMAND_TIMEOUT_MS = 1_500
 
-/**
- * How much of a tool's stderr is kept.
- *
- * The first 512 characters of it, and the runner stops appending at that. The text exists
- * so an operator can read why a delivery failed (NT-FR-09); it is never stored, never
- * served and never put in a record, and a bound is what keeps a chatty tool from turning a
- * diagnostic into something this product has to keep (APX-FR-01).
- */
-export const NOTIFY_STDERR_MAX_BYTES = 512
-
-/** How long a wedged process has to die on SIGTERM before it is killed outright. */
-const KILL_GRACE_MS = 250
-
 // ---------------------------------------------------------------------------
 // The argument list
 // ---------------------------------------------------------------------------
@@ -184,106 +185,6 @@ export function buildNotifySendCommand(request: NotificationRequest): Notificati
 }
 
 // ---------------------------------------------------------------------------
-// The real runner
-// ---------------------------------------------------------------------------
-
-/**
- * Run one command, with no shell and with a bound.
- *
- * The production implementation of `NotificationCommandRunner`, and the reason a test
- * can substitute a recording function. Four properties, all of them load-bearing:
- *
- *   - `shell: false` is passed explicitly rather than left to the default, because the
- *     default is a promise and this is the line that would be read by whoever changes it
- *   - stdin is closed and stdout is discarded, so a tool that decides it is interactive
- *     cannot block the hub waiting for a person who is not there
- *   - stderr is collected to a bound, because it is the only text a failing tool
- *     produces and it is a diagnostic rather than a record
- *   - the bound kills the process rather than abandoning the promise, so a wedged
- *     `notify-send` cannot outlive the delivery that started it
- *
- * It never rejects. Every path resolves with a result, because a runner that threw would
- * leave the notifier with an exception where it expects a reason (APX-FR-02).
- */
-export function createNodeCommandRunner(
-  options: { readonly timeoutMs?: number } = {},
-): NotificationCommandRunner {
-  const timeoutMs = options.timeoutMs ?? NOTIFY_COMMAND_TIMEOUT_MS
-  return (command: NotificationCommand): Promise<NotificationCommandResult> =>
-    new Promise<NotificationCommandResult>((resolve) => {
-      let settled = false
-      let stderr = ''
-      let killGrace: NodeJS.Timeout | undefined
-      const bound = setTimeout(() => {
-        // Terminate first, then insist. SIGTERM is what a well-behaved tool exits on;
-        // SIGKILL is what a wedged one needs, and the grace between them is short enough
-        // that a hung delivery is bounded by this file's own constant rather than by
-        // whatever the child decides to do. The promise settles immediately rather than
-        // waiting for the child, so a tool that ignores both signals still cannot hold a
-        // delivery open.
-        child.kill('SIGTERM')
-        killGrace = setTimeout(() => {
-          child.kill('SIGKILL')
-        }, KILL_GRACE_MS)
-        killGrace.unref?.()
-        finish({ code: null, signal: null, spawnError: 'ETIMEDOUT', stderr })
-      }, timeoutMs)
-      bound.unref?.()
-
-      const child = spawnNotificationProcess(command, (chunk: string) => {
-        if (stderr.length < NOTIFY_STDERR_MAX_BYTES) {
-          stderr = (stderr + chunk).slice(0, NOTIFY_STDERR_MAX_BYTES)
-        }
-      })
-
-      const finish = (result: NotificationCommandResult): void => {
-        if (settled) return
-        settled = true
-        clearTimeout(bound)
-        if (killGrace !== undefined) clearTimeout(killGrace)
-        resolve(result)
-      }
-
-      child.on('error', (error: NodeJS.ErrnoException) => {
-        // The process never started, or could not be started at all: a missing
-        // `notify-send` (`ENOENT`), a permission problem, an exhausted process table.
-        // There is no exit code for this, which is why the result carries both.
-        finish({ code: null, signal: null, spawnError: error.code ?? 'ESPAWN', stderr })
-      })
-      child.on('close', (code: number | null, signal: NodeJS.Signals | null) => {
-        finish({ code, signal, spawnError: null, stderr })
-      })
-    })
-}
-
-/**
- * Start the process, with the options this file's argument list depends on.
- *
- * Separate from the runner so the real spawn is one small, readable function: a
- * reviewer can confirm the two things that matter here - that the arguments are passed
- * as an array and that `shell` is false - without reading the promise bookkeeping
- * around them. stderr is decoded as utf8 and handed upwards; nothing is read from the
- * process that this product keeps.
- */
-function spawnNotificationProcess(
-  command: NotificationCommand,
-  onStderr: (chunk: string) => void,
-): ChildProcess {
-  const child = spawn(command.file, [...command.args], {
-    // Stated, not defaulted. Every argument in `command.args` reaches the operating
-    // system as one argument, and no shell ever sees the title or the body.
-    shell: false,
-    // stdin closed, stdout discarded, stderr piped: a tool that expects a terminal
-    // cannot make the hub wait for one, and its only useful complaint is collected.
-    stdio: ['ignore', 'ignore', 'pipe'],
-    windowsHide: true,
-  })
-  child.stderr?.setEncoding('utf8')
-  child.stderr?.on('data', onStderr)
-  return child
-}
-
-// ---------------------------------------------------------------------------
 // The notifier
 // ---------------------------------------------------------------------------
 
@@ -318,7 +219,6 @@ export interface CreateLinuxNotifierOptions {
  */
 export function createLinuxNotifier(options: CreateLinuxNotifierOptions = {}): Notifier {
   const timeoutMs = options.timeoutMs ?? NOTIFY_COMMAND_TIMEOUT_MS
-  const diagnostic = options.onDiagnostic ?? ((): void => {})
   const run = options.run ?? createNodeCommandRunner({ timeoutMs })
 
   return async (request: NotificationRequest): Promise<NotificationOutcome> => {
@@ -326,154 +226,57 @@ export function createLinuxNotifier(options: CreateLinuxNotifierOptions = {}): N
     // notifier is handed one directly, which is what makes "an fyi never reaches
     // notify-send" true of the notifier and not only of the planner.
     const policy = decideNotification(request.class)
-    if (policy.kind === 'refuse') {
-      return { status: 'refused', reason: policy.reason, platform: 'linux' }
-    }
+    if (policy.kind === 'refuse') return refusedOutcome('linux', policy.reason)
     const command = buildNotifySendCommand(request)
     let result: NotificationCommandResult
     try {
       result = await run(command)
     } catch {
-      // A runner that rejects is a broken runner, not a delivered toast, and the reason
-      // it cannot say more is itself the fact worth recording (APX-FR-02).
-      return failedOutcome(command, null, 'command-failed', 'the command runner rejected')
+      // A runner that rejects is a broken runner, not a delivered toast. The result it is
+      // turned into is the shared one, so the reason and the diagnostic line are the same
+      // words the other two platforms use (APX-FR-02).
+      result = RUNNER_REJECTED
     }
-    const detail = firstLine(result.stderr)
-    if (result.spawnError === 'ENOENT') {
-      const outcome = failedOutcome(
-        command,
-        null,
-        'command-not-found',
-        detail ?? `${NOTIFY_SEND} is not on PATH`,
-      )
-      reportFailure(outcome, detail)
-      return outcome
-    }
-    if (result.spawnError === 'ETIMEDOUT') {
-      const outcome = failedOutcome(command, null, 'command-timed-out', detail)
-      reportFailure(outcome, detail)
-      return outcome
-    }
-    if (result.spawnError !== null) {
-      const outcome = failedOutcome(command, null, 'command-failed', detail ?? result.spawnError)
-      reportFailure(outcome, detail)
-      return outcome
-    }
-    if (result.signal !== null) {
-      const outcome = failedOutcome(
-        command,
-        null,
-        'command-signalled',
-        detail ?? `killed by ${result.signal}`,
-      )
-      reportFailure(outcome, detail)
-      return outcome
-    }
-    if (result.code !== 0) {
-      // The exit status is recorded rather than interpreted, because this product does
-      // not control the reasons a notification server refuses a notification: no
-      // session bus, no display server, a rejected hint, a saturated queue. All of them
-      // mean the same thing here - nobody was told - and the tool's own complaint is
-      // beside them in the diagnostic.
-      const outcome = failedOutcome(command, result.code, 'command-failed', detail)
-      reportFailure(outcome, detail)
-      return outcome
-    }
-    return {
-      status: 'delivered',
-      reason: 'delivered-to-desktop',
+    // One classification for three platforms: which reason a process that did not deliver
+    // failed for, and the one line that says so. The exit status is carried rather than
+    // interpreted, because this product does not control the reasons a notification server
+    // refuses a notification - no session bus, no display server, a rejected hint, a
+    // saturated queue. All of them mean the same thing here: nobody was told (ADR-010).
+    return reportCommandResult({
+      command,
       platform: 'linux',
-      command: [...command.args],
-      exitCode: 0,
-    }
-  }
-
-  /** One line naming the reason, the exit code and the tool's complaint. No content. */
-  function reportFailure(outcome: NotificationOutcome, detail: string | undefined): void {
-    diagnostic(
-      `notify: a ${NOTIFY_SEND} delivery did not happen (${outcome.reason}` +
-        `${outcome.exitCode === undefined || outcome.exitCode === null ? '' : `, exit ${String(outcome.exitCode)}`}` +
-        `). The event is stored and the block is still pending; nothing was retried, and no sound was ` +
-        `requested (APX-FR-02, APX-CON-04, NT-FR-09)${detail === undefined ? '' : `: ${detail}`}`,
-    )
+      result,
+      toolName: NOTIFY_SEND,
+      ...(options.onDiagnostic === undefined ? {} : { onDiagnostic: options.onDiagnostic }),
+    })
   }
 }
+
+/**
+ * What a reachability probe asks `notify-send`.
+ *
+ * `--version`, which the real tool answers and exits on without contacting a notification
+ * server, so a probe cannot itself put a toast on a developer's screen. Named rather than
+ * written inline so the probe's command and the test that asserts a probe delivers nothing
+ * cannot disagree about it.
+ */
+export const NOTIFY_SEND_VERSION_ARGS: readonly string[] = ['--version']
 
 /**
  * Is there a notifier to deliver with on this machine?
  *
- * A reachability probe for `install` and `doctor` (IO-2), and the reason a Linux hub can
- * tell "there is no notifier" (nothing is attempted, health says `not-wired`) from "the
- * notifier cannot work" (every delivery is attempted and every one fails with
- * `command-not-found`) - a distinction an operator needs and a health payload alone
- * cannot express (APX-FR-02, NT-FR-09).
- *
- * `--version`, which the real tool answers and exits on without contacting a
- * notification server, so a probe cannot itself put a toast on a developer's screen. The
- * command's output is not read: availability is a boolean and a closed reason, because
- * the string a tool prints about its own version is not a fact this product keeps.
+ * A reachability probe for `install` and `doctor` (IO-2), implemented by the shared probe
+ * in ./command.ts with this platform's tool and this platform's bound. Which reason it
+ * reports is a closed token rather than prose, and it is the same set on all three
+ * platforms so an operator reads one vocabulary (NT-FR-09, APX-FR-02).
  */
 export async function probeLinuxNotifier(
   options: CreateLinuxNotifierOptions = {},
 ): Promise<NotificationAvailability> {
-  const run = options.run ?? createNodeCommandRunner({ timeoutMs: options.timeoutMs })
-  const command: NotificationCommand = { file: NOTIFY_SEND, args: ['--version'] }
-  let result: NotificationCommandResult
-  try {
-    result = await run(command)
-  } catch {
-    return { available: false, platform: 'linux', reason: 'command-unusable' }
-  }
-  if (result.spawnError === 'ENOENT') {
-    return { available: false, platform: 'linux', reason: 'command-not-found' }
-  }
-  if (result.spawnError === 'ETIMEDOUT') {
-    return { available: false, platform: 'linux', reason: 'probe-timed-out' }
-  }
-  if (result.spawnError !== null || result.code !== 0) {
-    return { available: false, platform: 'linux', reason: 'command-unusable', detail: firstLine(result.stderr) }
-  }
-  return { available: true, platform: 'linux', reason: 'available' }
-}
-
-// ---------------------------------------------------------------------------
-// The helpers
-// ---------------------------------------------------------------------------
-
-/**
- * A failed outcome, built the same way in every failure branch.
- *
- * The command is copied rather than referenced so an outcome cannot be changed by
- * anything that still holds the array it was built from, and `exitCode` is the process's
- * own: null when it never ran or was killed, which is a different fact from a non-zero
- * code and reads as one on `doctor`.
- */
-function failedOutcome(
-  command: NotificationCommand,
-  exitCode: number | null,
-  reason: 'command-not-found' | 'command-failed' | 'command-signalled' | 'command-timed-out',
-  detail?: string,
-): NotificationOutcome {
-  return {
-    status: 'failed',
-    reason,
+  return probeAvailability({
     platform: 'linux',
-    command: [...command.args],
-    exitCode,
-    ...(detail === undefined || detail === '' ? {} : { detail }),
-  }
-}
-
-/**
- * A tool's complaint, as one bounded line.
- *
- * A newline in a diagnostic is two lines in whatever reads it, and a bound is what keeps
- * a verbose tool from becoming a paragraph in the middle of a shutdown. Empty rather than
- * undefined when the tool said nothing, so a caller can tell "no complaint" from "no
- * detail yet".
- */
-function firstLine(stderr: string): string | undefined {
-  const first = stderr.split('\n', 1)[0]?.trim() ?? ''
-  if (first === '') return undefined
-  return first.length > NOTIFY_STDERR_MAX_BYTES ? first.slice(0, NOTIFY_STDERR_MAX_BYTES) : first
+    command: { file: NOTIFY_SEND, args: NOTIFY_SEND_VERSION_ARGS },
+    timeoutMs: options.timeoutMs ?? NOTIFY_COMMAND_TIMEOUT_MS,
+    ...(options.run === undefined ? {} : { run: options.run }),
+  })
 }

@@ -24,11 +24,12 @@
 // is worth stating plainly rather than leaving as a surprise. The contract is
 // `?session=<id>` on the loopback dashboard URL, published by src/hub/metrics.ts as
 // DEEP_LINK_QUERY_KEY so the notifier, the dashboard and the counter cannot disagree
-// (NT-FR-07). The `notify-send` tool exposes no action to receive an activation, so
-// the Linux path cannot put the link on screen as a clickable target; the link is
-// built, carried and available, and NT-3's tray is what resolves it on this platform.
-// The badge and the dashboard are the recovery path, which is why PRD 16 Open Question
-// 3 says the badge carries the durable signal rather than a clickable toast.
+// (NT-FR-07). No platform in v1 can act on it: the `notify-send` tool exposes no
+// activation, the `osascript` notification-centre call reports no click, and the
+// PowerShell toast this build sends carries no activation handler. So on all three the
+// link is built, carried and available, and NT-3's tray is what resolves it. The badge
+// and the dashboard are the recovery path, which is why PRD 16 Open Question 3 says the
+// badge carries the durable signal rather than a clickable toast.
 //
 // THREE OUTCOMES, AND WHY A REFUSAL IS NOT ONE OF THEM
 // `delivered` means a process was started and it exited zero. `failed` means it did
@@ -59,9 +60,10 @@
 //
 // VERIFICATION STATE, STATED THE SAME WAY IN EVERY FILE HERE
 // The Linux path in ./linux.ts is implemented, unit-tested, and exercised against the
-// real `notify-send` binary in this repository's tests. The macOS and Windows paths are
-// NOT live-verified on the authoring machine: they arrive in NT-2 with scripted checks
-// and a runbook, and their human gate (NT-5) can only be completed on those platforms
+// real `notify-send` binary in this repository's tests. The macOS path in ./macos.ts and
+// the Windows path in ./windows.ts are implemented and unit-tested but are NOT
+// live-verified on the authoring machine: this was built on Linux, neither has been run
+// on its own platform, and their human gate (NT-5) can only be completed there
 // (APX-CON-06).
 
 import type { EventClass } from '../storage/eventStore.js'

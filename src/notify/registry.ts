@@ -1,32 +1,33 @@
 // The platform registry: which notifier this machine gets, and the one adapter that
-// carries a notifier's outcome across the hub's boundary (NT-FR-01, NT-FR-02,
-// NT-FR-09, APX-CON-06, APX-FR-02, ADR-010).
+// carries a notifier's outcome across the hub's boundary (NT-FR-01, NT-FR-02, NT-FR-03,
+// NT-FR-04, NT-FR-09, APX-CON-06, APX-FR-02, ADR-010).
 //
 // WHAT THIS FILE DECIDES, AND WHAT IT REFUSES TO DECIDE
 // It decides which implementation answers on this platform, and it reports an explicit
-// answer for every platform rather than a throw: a platform with a notifier gets one, a
-// platform whose notifier has not been written yet says so, and a platform nobody
-// supports says so differently. All three are values, because the caller is a hub that
-// must be able to start on all of them and report what it will not be able to do
-// (APX-CON-06, APX-FR-02). What it does not decide is the class policy - that is one
-// table in ./policy.ts, and it is applied here to every platform rather than
-// reimplemented per platform, which is the requirement NT-2 inherits (NT-FR-03,
-// NT-FR-04).
+// answer for every platform rather than a throw: a platform with an entry in the table
+// below gets that notifier, a supported platform with no entry says it is not implemented
+// yet, and a platform nobody supports says so differently. All three are values, because
+// the caller is a hub that must be able to start on all of them and report what it will
+// not be able to do (APX-CON-06, APX-FR-02). What it does not decide is the class policy -
+// that is one table in ./policy.ts, and it is applied here to every platform rather than
+// reimplemented per platform, which is what NT-FR-03 and NT-FR-04 ask for.
 //
-// LINUX IS IMPLEMENTED HERE; macOS AND WINDOWS ARE NOT, AND SAY SO
-// `IMPLEMENTED_NOTIFY_PLATFORMS` carries one entry. NT-2 adds the other two and changes
-// nothing else about this file's shape. The distinction is worth a separate reason token
-// rather than one "unsupported" answer, because the two cases mean different things to
-// an operator on a developer machine: `not-implemented-for-this-platform` says the
-// product intends to support it, and `unsupported-platform` says it does not (APX-CON-06).
+// THE TABLE IS THE ONLY SOURCE OF TRUTH FOR "WHICH PLATFORMS ARE IMPLEMENTED"
+// `IMPLEMENTED_NOTIFY_PLATFORMS` is derived from the keys of `PLATFORM_NOTIFIERS` rather
+// than written beside it. Two hand-maintained lists would eventually disagree, and the
+// disagreement would be invisible: the array would claim a platform whose notifier nobody
+// constructed. Deriving it means the claim and the construction are the same fact, and a
+// platform added to `NOTIFY_PLATFORMS` without an entry here is reported honestly as
+// `not-implemented-for-this-platform` instead of being quietly wired to nothing.
 //
-// VERIFICATION STATE
-// The Linux notifier this registry constructs is implemented, unit-tested, and exercised
-// in this repository's tests against the real `notify-send` binary. The macOS and
-// Windows notifiers are NOT live-verified on the authoring machine and are not in this
-// build: they arrive in NT-2 with scripted checks, a runbook, and a human gate (NT-5)
-// that can only be completed on those platforms. Nothing in this file may be read as
-// evidence that either of them works.
+// VERIFICATION STATE, AND IT DIFFERS BY PLATFORM
+// The Linux notifier is implemented, unit-tested, and exercised in this repository's tests
+// against the real `notify-send` binary. The macOS and Windows notifiers are implemented
+// and unit-tested but are NOT live-verified on the authoring machine: this was built on
+// Linux, neither path has been run on its own platform, and nothing in this file may be
+// read as evidence that either works there. Their human gate (NT-5) can only be completed
+// on macOS and on Windows; per-platform commands and the specific facts only those
+// machines can confirm are in docs/runbooks/notify-platforms.md (APX-CON-06).
 //
 // THE BOUNDARY, AND THE ONE PLACE A NOTIFIER MEETS THE HUB
 // Two shapes meet here and nowhere else:
@@ -60,6 +61,8 @@
 // counted, not hidden, and the fyi event is still in the dashboard where it belongs.
 
 import { createLinuxNotifier, probeLinuxNotifier } from './linux.js'
+import { createMacosNotifier, probeMacosNotifier } from './macos.js'
+import { createWindowsNotifier, probeWindowsNotifier } from './windows.js'
 import { planNotification } from './policy.js'
 import {
   NotificationFailedError,
@@ -79,29 +82,30 @@ import type { NotificationRequest as HubNotificationRequest, Notifier as HubNoti
  * The platforms agent-ping supports in v1 (APX-CON-06).
  *
  * All three, in every build: the *product* supports them. Which of them has a notifier in
- * this build is the next constant, and keeping the two apart is what lets a build say
- * "this platform is supported and its notifier is not written yet" rather than implying
- * agent-ping does not run there.
+ * this build is derived from the table below, and keeping the two apart is what lets a
+ * build say "this platform is supported and its notifier is not written yet" rather than
+ * implying agent-ping does not run there.
  */
 export const NOTIFY_PLATFORMS = ['linux', 'macos', 'windows'] as const
 
-/**
- * The platforms whose notifier exists in this build.
- *
- * One entry. NT-2 adds `macos` and `windows` to this array and the resolution below
- * gains a branch per platform; nothing else in this file, and nothing in the class
- * policy, changes when it does.
- */
-export const IMPLEMENTED_NOTIFY_PLATFORMS = ['linux'] as const
+/** One of the platforms in `NOTIFY_PLATFORMS`: the two sets are the same three names. */
+export type SupportedNotifyPlatform = (typeof NOTIFY_PLATFORMS)[number]
 
 /**
  * Why a notifier was chosen, or why there is none.
  *
- * `linux-notifier` names the implementation, so a diagnostic or a doctor line can say
- * what answered rather than only that something did. The other two are the explicit
- * answers this file must never replace with a throw.
+ * `linux-notifier`, `macos-notifier` and `windows-notifier` name the implementation, so a
+ * diagnostic or a doctor line can say what answered rather than only that something did.
+ * The other two are the explicit answers this file must never replace with a throw, and
+ * they are different tokens because they mean different things to an operator:
+ * `not-implemented-for-this-platform` says the product intends to support the platform and
+ * its notifier is not written, `unsupported-platform` says the product does not support it
+ * at all.
  */
-export type PlatformNotifierReason = 'linux-notifier'
+export type PlatformNotifierReason =
+  | 'linux-notifier'
+  | 'macos-notifier'
+  | 'windows-notifier'
 export type MissingNotifierReason = 'not-implemented-for-this-platform' | 'unsupported-platform'
 
 /**
@@ -123,6 +127,93 @@ export function resolveNotifyPlatform(value: string | undefined): NotifyPlatform
       return 'windows'
     default:
       return 'other'
+  }
+}
+
+// ---------------------------------------------------------------------------
+// The table
+// ---------------------------------------------------------------------------
+
+/**
+ * One platform's notifier, as the two things the registry needs from it.
+ *
+ * An object rather than a bare factory because the registry also has to answer
+ * "can this machine deliver at all" for `install` and `doctor` (IO-2), and a table with a
+ * probe beside its factory is what keeps those two from being wired to different platforms
+ * by accident.
+ */
+interface PlatformNotifierBinding {
+  /** Why this notifier was chosen, as a closed token an operator can read. */
+  readonly reason: PlatformNotifierReason
+  readonly create: (options: NotifyOptions) => Notifier
+  readonly probe: (options: NotifyOptions) => Promise<NotificationAvailability>
+}
+
+/** The options every platform notifier takes, in one shape so the table can hold any of them. */
+interface NotifyOptions {
+  readonly run?: NotificationCommandRunner
+  readonly timeoutMs?: number
+  readonly onDiagnostic?: (message: string) => void
+}
+
+/**
+ * Which notifier answers on which platform.
+ *
+ * Every entry names the tool it drives and nothing else: `notify-send` and libnotify on
+ * Linux, an `osascript` notification-centre call on macOS, a PowerShell toast on Windows
+ * (NT-FR-02, NT-FR-03, NT-FR-04, PRD 16 Open Question 3). The options are spread through
+ * individually rather than passed whole, so an absent option stays absent - a runner the
+ * caller did not inject must not become a no-op override somewhere in the middle.
+ *
+ * Verification state differs between these rows and is not hidden by the table: the Linux
+ * row has been exercised against its real tool in this repository's tests; the macOS and
+ * Windows rows are implemented and unit-tested but NOT live-verified here, and their
+ * human gate is NT-5 on those platforms (APX-CON-06).
+ */
+const PLATFORM_NOTIFIERS: Readonly<Partial<Record<SupportedNotifyPlatform, PlatformNotifierBinding>>> =
+  {
+    linux: {
+      reason: 'linux-notifier',
+      create: (options) => createLinuxNotifier(spread(options)),
+      probe: (options) => probeLinuxNotifier(spread(options)),
+    },
+    macos: {
+      reason: 'macos-notifier',
+      create: (options) => createMacosNotifier(spread(options)),
+      probe: (options) => probeMacosNotifier(spread(options)),
+    },
+    windows: {
+      reason: 'windows-notifier',
+      create: (options) => createWindowsNotifier(spread(options)),
+      probe: (options) => probeWindowsNotifier(spread(options)),
+    },
+  }
+
+/**
+ * The platforms whose notifier exists in this build.
+ *
+ * Derived from the table rather than written beside it, so the claim and the construction
+ * cannot drift. All three entries are there as of NT-2, and the export exists so a test can
+ * enumerate the relation between this and `NOTIFY_PLATFORMS` without duplicating either.
+ */
+export const IMPLEMENTED_NOTIFY_PLATFORMS: readonly SupportedNotifyPlatform[] = Object.freeze(
+  Object.keys(PLATFORM_NOTIFIERS) as SupportedNotifyPlatform[],
+)
+
+/**
+ * Pass a caller's options through, dropping the ones it did not set.
+ *
+ * A no-op `run: undefined` would be a different value from an absent one for a caller that
+ * checks `'run' in options`, and `timeoutMs: undefined` would silently become a default
+ * in a notifier that reads it that way. Spreading explicitly keeps "the caller said
+ * nothing" distinguishable from "the caller said undefined", which is the kind of thing
+ * that otherwise shows up as a test that passes for the wrong reason.
+ */
+function spread(options: NotifyOptions): NotifyOptions {
+  return {
+    ...(options.run === undefined ? {} : { run: options.run }),
+    ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
+    ...(options.onDiagnostic === undefined ? {} : { onDiagnostic: options.onDiagnostic }),
   }
 }
 
@@ -199,33 +290,30 @@ export interface CreatePlatformNotifierOptions {
  * Never throws, and never returns a notifier that is not wired to something real: a
  * caller can put the result straight into the delivery policy, and the hub's
  * `not-wired` state then means exactly "this platform has no notifier" (APX-FR-02).
+ *
+ * Three answers, in the order they are checked, and the difference between the last two is
+ * the whole reason this is a table and not a guess: a table entry gives a notifier, a
+ * supported platform with no entry says the product means to run there but has no notifier
+ * for it yet, and anything else says the product does not support the platform at all.
  */
 export function createPlatformNotifier(
   options: CreatePlatformNotifierOptions = {},
 ): NotifierResolution {
   const platform = resolveNotifyPlatform(options.platform ?? process.platform)
-  if (platform === 'linux') {
-    const deliver = createLinuxNotifier({
-      ...(options.run === undefined ? {} : { run: options.run }),
-      ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
-      ...(options.onDiagnostic === undefined ? {} : { onDiagnostic: options.onDiagnostic }),
-    })
+  const binding =
+    platform === 'other' ? undefined : PLATFORM_NOTIFIERS[platform as SupportedNotifyPlatform]
+  if (binding !== undefined) {
+    const notifierOptions = spread(options)
     return {
       supported: true,
       platform,
-      reason: 'linux-notifier',
-      notifier: composeNotifier(platform, deliver),
-      probe: (): Promise<NotificationAvailability> =>
-        probeLinuxNotifier({
-          ...(options.run === undefined ? {} : { run: options.run }),
-          ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
-        }),
+      reason: binding.reason,
+      notifier: composeNotifier(platform, binding.create(notifierOptions)),
+      probe: (): Promise<NotificationAvailability> => binding.probe(notifierOptions),
     }
   }
-  const reason =
-    platform === 'macos' || platform === 'windows'
-      ? 'not-implemented-for-this-platform'
-      : 'unsupported-platform'
+  const reason: MissingNotifierReason =
+    platform === 'other' ? 'unsupported-platform' : 'not-implemented-for-this-platform'
   return {
     supported: false,
     platform,

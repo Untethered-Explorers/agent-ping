@@ -41,7 +41,9 @@
 // the notifier itself is constructed below and injected into the policy, so the restart
 // replay and the live path reach the same one. A platform with no notifier is not wired
 // and says so on health, which is the honest answer rather than a delivered lie
-// (APX-FR-02). The macOS and Windows notifiers arrive in NT-2 and the tray in NT-3.
+// (APX-FR-02). All three v1 platforms have a notifier now (NT-2 added macOS and Windows,
+// which ship with scripted checks and a runbook and are not live-verified on the Linux
+// machine that built them); the tray arrives in NT-3.
 // What remains deliberately absent is any route that can spawn, steer, interrupt, prompt
 // or approve anything inside a harness (APX-CON-08): the mutating set in
 // src/hub/server.ts is exactly two signatures, the append-only ingest route and the ack

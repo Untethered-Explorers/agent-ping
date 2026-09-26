@@ -1,10 +1,10 @@
 # Project Progress
 
 ## Current State
-**Phase**: OPENCODE-PLUGIN-ADAPTER-1
+**Phase**: NOTIFICATION-AND-TRAY-PRESENCE-1
 **Status**: In Progress
-**Validation Gaps**: 39 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-26T19:08:03.294Z
+**Validation Gaps**: 44 unverified check(s) - see "Validation Gaps"
+**Last Updated**: 2026-09-26T19:37:59.511Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -42,6 +42,8 @@
   - Files: docs/reviews/hub-core.json
 - [x] Phase NOTIFICATION-AND-TRAY-PRESENCE-1, Task NT-1: Define the notifier interface and the Linux notifier (@notification-engineer)
   - Files: src/notify/types.ts, src/notify/policy.ts, src/notify/linux.ts, src/notify/registry.ts, src/main/index.ts, tests/notify/policy.test.ts, tests/notify/linux.test.ts, tests/notify/registry-selection.test.ts, tests/hub/delivery.test.ts, tests/hub/ingest.test.ts, tests/hub/metrics.test.ts, tests/hub/server.test.ts
+- [x] Phase NOTIFICATION-AND-TRAY-PRESENCE-1, Task NT-2: Add the macOS and Windows notifiers (@notification-engineer)
+  - Files: src/notify/macos.ts, src/notify/windows.ts, tests/notify/macos.test.ts, tests/notify/windows.test.ts, docs/runbooks/notify-platforms.md, src/main/index.ts, src/notify/linux.ts, src/notify/registry.ts, src/notify/types.ts, tests/notify/registry-selection.test.ts, src/notify/command.ts
 - [x] Phase OPENCODE-PLUGIN-ADAPTER-1, Task OA-1: Translate opencode events into the normalized envelope (@connector-engineer)
   - Files: src/plugin/opencode/index.ts, src/plugin/opencode/translate.ts, src/plugin/opencode/work-signal.ts, tests/plugin/opencode-translate.test.ts, tests/plugin/opencode-work-signal.test.ts, docs/engine-config.json
 
@@ -49,7 +51,6 @@
 - None currently running
 
 ## Remaining
-- [ ] Phase NOTIFICATION-AND-TRAY-PRESENCE-1: Phase 1: Notifier and toast policy
 - [ ] Phase NOTIFICATION-AND-TRAY-PRESENCE-2: Phase 2: Tray presence
 - [ ] Phase NOTIFICATION-AND-TRAY-PRESENCE-3: Phase 3: Live notification gates
 - [ ] Phase OPENCODE-PLUGIN-ADAPTER-1: Phase 1: Event translation and delivery
@@ -104,6 +105,11 @@
 - Task NT-1: The two tests that run against the installed notify-send branch on whether the binary exists: without it they assert the honest 'command-not-found' outcome rather than the parsing claim, so on a machine without libnotify the parsing assertions are not exercised (both branches are real, only one proves the parser).
 - Task NT-1: The delivery timeouts and the health route are asserted over real sockets in process; the restart replay test uses two hubs in one process rather than two OS processes, because the process-level restart evidence is HC-5's and tests/hub/delivery.test.ts.
 - Task NT-1: The unavailable-platform answers for macOS and Windows are verified as values only (no notifier, correct reason, probe reports it); no macOS or Windows behaviour of any kind is exercised.
+- Task NT-2: The macOS and Windows argv and payload claims are proven against real stub executables placed at the front of PATH, so what a real process received is what the OS was handed - but the stub is not osascript and not powershell.exe, so nothing here exercises how either tool parses its arguments.
+- Task NT-2: The PowerShell script has never been parsed by PowerShell. Its structure is asserted as an exact string (one line, ErrorActionPreference, try, catch, stderr write, exit 1, the WinRT type projections, the toast call), and the base64 round-trip is proven against real processes, but the script's syntax and its runtime behaviour on Windows are unverified.
+- Task NT-2: The macOS AppleScript has never been compiled by AppleScript. The same applies: the argument list, the constant script and the payload placement are asserted exactly and reach a real process intact, but osascript's own parsing of `on run argv` on a Mac is unverified.
+- Task NT-2: A real process receiving a hostile title and body proves nothing expanded, split or was reinterpreted on the way to the process. It does not prove what a notification centre would do with the text afterwards.
+- Task NT-2: No badge, tray or deep-link behaviour is exercised here; the tray and badge are NT-3 and this task deliberately excluded them.
 - Task OA-1: No live opencode session was run. The payload shapes are the 1.18.32 type declarations, not a capture from a running harness; proving the harness delivers them is OA-5's script and OA-6's gate, not this task.
 - Task OA-1: The one-envelope and block-lifecycle tests use the real ingest pipeline and the real SQLite log but drive it from fixtures rather than from a harness's event stream.
 - Task OA-1: The plugin was not loaded by opencode itself. Its structural plugin and client types mirror the 1.18.32 declarations rather than importing @opencode-ai/plugin, which is deliberate (the adapter must load with no dependency), so a signature change upstream would not be caught by a compile error here - the OA-3 install and OA-5 live run are where that surfaces.

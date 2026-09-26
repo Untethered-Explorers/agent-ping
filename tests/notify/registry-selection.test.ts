@@ -247,6 +247,29 @@ async function startFixtureHub(stateDir: string, overrides: Partial<StartHubOpti
   return hub
 }
 
+/** One block as the hub's own request, the shape a platform notifier is handed. */
+function hubRequestFor(eventClass: 'needs-you' | 'fyi'): Parameters<ComposedNotifier>[0] {
+  return {
+    event: {
+      eventId: `evt_${eventClass}`,
+      sessionId: SESSION,
+      class: eventClass,
+      subtype: null,
+      rawEventType: 'permission.asked',
+      occurredAt: OCCURRED_AT,
+      receivedAt: OCCURRED_AT,
+      dedupeKey: `opencode:${SESSION}:${eventClass}`,
+      ackState: 'unacknowledged',
+      resolutionState: 'unresolved',
+    },
+    class: eventClass,
+    pendingCount: 1,
+    repoShortName: REPO,
+    origin: `http://127.0.0.1:${String(NOTIFY_PORT_BASE)}`,
+    source: 'event',
+  }
+}
+
 function deliveryOf(health: HealthPayload): DeliveryStatus {
   return health.delivery
 }
@@ -285,20 +308,64 @@ describe('the registry answers for every platform, and never throws', () => {
     expect(typeof resolution.notifier).toBe('function')
   })
 
-  it('says macOS and Windows are not implemented yet, rather than throwing or lying', () => {
-    // Two tokens rather than one, because the two cases mean different things to an
-    // operator: agent-ping intends to run on those platforms, and their notifiers arrive
-    // in NT-2. Reporting them as unsupported would tell a macOS developer the product
-    // does not support their machine (APX-CON-06).
-    for (const platform of ['darwin', 'win32']) {
+  it('gives macOS and Windows their own notifier, and names which one', () => {
+    // NT-2's addition. Three platforms, three tools, three reasons - and the reason is
+    // checked from the table rather than restated per platform, so a fourth platform would
+    // be one row here rather than three edits (APX-CON-06, NT-FR-03, NT-FR-04).
+    for (const [platform, reason] of [
+      ['darwin', 'macos-notifier'],
+      ['win32', 'windows-notifier'],
+    ] as const) {
       const resolution = createPlatformNotifier({ platform })
+      expect(resolution, platform).toMatchObject({ supported: true, reason })
+      if (!resolution.supported) throw new Error('expected a supported platform')
+      expect(resolution.notifier).toBeTypeOf('function')
+    }
+  })
+
+  it('drives a different tool on each platform, so a notifier is never the wrong one', async () => {
+    // The check that matters once there is more than one notifier: the registry is asked
+    // for a platform and the platform's own tool is what reaches the runner. Asserting the
+    // tool rather than the reason catches a copy-paste that wired macOS to `notify-send`,
+    // which no assertion about reasons or counts would ever notice.
+    const tools: string[] = []
+    const run = (command: NotificationCommand) => {
+      tools.push(command.file)
+      return Promise.resolve({ code: 0, signal: null, spawnError: null, stderr: '' })
+    }
+    for (const [platform, tool] of [
+      ['linux', 'notify-send'],
+      ['darwin', 'osascript'],
+      ['win32', 'powershell.exe'],
+    ] as const) {
+      const resolution = createPlatformNotifier({ platform, run })
+      if (!resolution.supported) throw new Error(`expected ${platform} to be supported`)
+      await resolution.notifier(hubRequestFor('needs-you'))
+      expect(tools.pop(), platform).toBe(tool)
+    }
+    expect(tools).toEqual([])
+  })
+
+  it('says a supported platform with no notifier is not implemented, rather than throwing or lying', () => {
+    // The third answer, kept honest by construction: `NOTIFY_PLATFORMS` is the set of
+    // platforms the product supports and `IMPLEMENTED_NOTIFY_PLATFORMS` is derived from
+    // the table of notifiers, so a platform added to the first without an entry in the
+    // second is reported as not-implemented rather than wired to nothing. In this build
+    // the two sets are equal, which the enumeration test above asserts; this test pins the
+    // reason a future build would produce if they stopped being equal.
+    const supported = new Set<string>(NOTIFY_PLATFORMS)
+    const implemented = new Set<string>(IMPLEMENTED_NOTIFY_PLATFORMS)
+    for (const platform of supported) {
+      if (implemented.has(platform)) continue
+      const resolution = createPlatformNotifier({ platform: NODE_PLATFORM_NAMES[platform as keyof typeof NODE_PLATFORM_NAMES] })
       expect(resolution, platform).toMatchObject({
         supported: false,
         reason: 'not-implemented-for-this-platform',
         notifier: null,
       })
-      expect(resolveNotifyPlatform(platform), platform).not.toBe('other')
     }
+    // ...and the reason is still a value the caller can read, not a throw.
+    expect(createPlatformNotifier({ platform: 'freebsd' }).reason).toBe('unsupported-platform')
   })
 
   it('says a platform nobody supports is unsupported, with a third reason', () => {
@@ -348,18 +415,44 @@ describe('the registry answers for every platform, and never throws', () => {
     expect(resolution.supported).toBe(implemented)
   })
 
-  it('probes without delivering, and says the same reason the resolution did', async () => {
-    // A probe is for `install` and `doctor`: does this machine have a way to deliver? On a
-    // platform with no notifier the answer is the resolution's own reason, and no process
-    // is started at all.
-    const implemented = createPlatformNotifier({ platform: 'linux' })
-    expect((await implemented.probe()).platform).toBe('linux')
-    const missing = createPlatformNotifier({ platform: 'darwin' })
+  it('probes each platform with its own harmless command, and delivers nothing', async () => {
+    // A probe is for `install` and `doctor`: can this machine deliver at all? The claim
+    // here is that asking costs no toast - each platform's probe command is asserted
+    // exactly, and none of them contains a notification call. `install` runs this on a
+    // developer's machine, so a probe that could show a banner is a probe nobody runs.
+    const commands: NotificationCommand[] = []
+    const probed: string[] = []
+    const run = (command: NotificationCommand) => {
+      commands.push(command)
+      probed.push(command.file)
+      return Promise.resolve({ code: 0, signal: null, spawnError: null, stderr: '' })
+    }
+    const expectTool = async (node: string, platform: string): Promise<void> => {
+      const resolution = createPlatformNotifier({ platform: node, run })
+      const availability = await resolution.probe()
+      expect(availability, node).toEqual({ available: true, platform, reason: 'available' })
+    }
+    // Asked for in Node's vocabulary, answered in the product's - the same correspondence
+    // the enumeration test above pins, exercised here on the probe's own output.
+    await expectTool('linux', 'linux')
+    await expectTool('darwin', 'macos')
+    await expectTool('win32', 'windows')
+
+    // A platform with no notifier is answered from the resolution, and starts no process
+    // at all - the count is unchanged after the three probes above.
+    const missing = createPlatformNotifier({ platform: 'freebsd' })
     expect(await missing.probe()).toEqual({
       available: false,
-      platform: 'macos',
-      reason: 'not-implemented-for-this-platform',
+      platform: 'other',
+      reason: 'unsupported-platform',
     })
+    // Three probes, three tools, and no notification call among them: the recorded
+    // commands are the ones asserted in each platform's own test file.
+    expect(probed).toEqual(['notify-send', 'osascript', 'powershell.exe'])
+    expect(commands).toHaveLength(3)
+    for (const command of commands) {
+      expect(command.args.join(' ')).not.toMatch(/display notification|ToastNotification|notification/i)
+    }
   })
 })
 
@@ -403,26 +496,6 @@ describe('the port adapter is the only place a failure becomes a throw', () => {
       diagnostics,
     }
   }
-
-  const hubRequestFor = (eventClass: 'needs-you' | 'fyi'): Parameters<ComposedNotifier>[0] => ({
-    event: {
-      eventId: `evt_${eventClass}`,
-      sessionId: SESSION,
-      class: eventClass,
-      subtype: null,
-      rawEventType: 'permission.asked',
-      occurredAt: OCCURRED_AT,
-      receivedAt: OCCURRED_AT,
-      dedupeKey: `opencode:${SESSION}:${eventClass}`,
-      ackState: 'unacknowledged',
-      resolutionState: 'unresolved',
-    },
-    class: eventClass,
-    pendingCount: 1,
-    repoShortName: REPO,
-    origin: `http://127.0.0.1:${String(NOTIFY_PORT_BASE)}`,
-    source: 'event',
-  })
 
   it('resolves for a delivered outcome', async () => {
     const { port } = composedAnswering('delivered')
