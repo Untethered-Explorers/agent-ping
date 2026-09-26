@@ -650,7 +650,18 @@ describe('what the storage sources do not do', () => {
     .map((name) => ({ name, text: readFileSync(path.join(storageDir, name), 'utf8') }))
 
   it('finds the storage sources at all, so the scan below is not vacuous', () => {
-    expect(sources.map((source) => source.name).sort()).toEqual(['db.ts', 'eventStore.ts', 'paths.ts', 'schema.sql'])
+    // Every module in src/storage is listed, so a new one cannot join the scan
+    // silently. retention.ts and counters.ts (EL-2) each open the same file with
+    // their own connection rather than borrowing the store's handle, which is why
+    // they are covered by these two checks as well as by their own suites.
+    expect(sources.map((source) => source.name).sort()).toEqual([
+      'counters.ts',
+      'db.ts',
+      'eventStore.ts',
+      'paths.ts',
+      'retention.ts',
+      'schema.sql',
+    ])
   })
 
   it('imports nothing that could open a socket, spawn a process or render a surface', () => {

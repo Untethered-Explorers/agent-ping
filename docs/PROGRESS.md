@@ -1,10 +1,10 @@
 # Project Progress
 
 ## Current State
-**Phase**: DASHBOARD-DESIGN-PROTOTYPE-1
+**Phase**: EVENT-MODEL-AND-DURABLE-LOG-1
 **Status**: In Progress
 **Validation Gaps**: 11 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-26T12:15:36.628Z
+**Last Updated**: 2026-09-26T12:27:07.284Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -18,13 +18,14 @@
   - Files: src/dashboard/prototype/main.ts, src/dashboard/a11y/dom-mirror.ts, src/dashboard/a11y/keyboard-nav.ts, src/dashboard/theme/motion.ts, tests/dashboard/dom-mirror.test.ts, tests/dashboard/keyboard-nav.test.ts, tests/dashboard/prototype-scene.test.ts, tests/dashboard/prototype-harness.ts
 - [x] Phase EVENT-MODEL-AND-DURABLE-LOG-1, Task EL-1: Create the content-free schema and store API (@domain-engineer)
   - Files: src/storage/schema.sql, src/storage/db.ts, src/storage/paths.ts, src/storage/eventStore.ts, tests/storage/schema.test.ts, tests/storage/eventStore.test.ts, package-lock.json, package.json
+- [x] Phase EVENT-MODEL-AND-DURABLE-LOG-1, Task EL-2: Add retention pruning and local counters (@domain-engineer)
+  - Files: src/storage/retention.ts, src/storage/counters.ts, tests/storage/retention.test.ts, tests/storage/counters.test.ts, tests/storage/eventStore.test.ts
 
 ## Current Task
 - None currently running
 
 ## Remaining
 - [ ] Phase DASHBOARD-DESIGN-PROTOTYPE-2: Phase 2: Design review gate
-- [ ] Phase EVENT-MODEL-AND-DURABLE-LOG-1: Phase 1: Durable store
 - [ ] Phase EVENT-MODEL-AND-DURABLE-LOG-2: Phase 2: Event model and pending lifecycle
 - [ ] Phase HUB-CORE-AND-DELIVERY-POLICY-1: Phase 1: Process, read surface and live stream
 - [ ] Phase HUB-CORE-AND-DELIVERY-POLICY-2: Phase 2: Write surface, security, delivery and metrics

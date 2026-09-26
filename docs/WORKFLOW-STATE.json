@@ -1,12 +1,12 @@
 {
   "runId": "7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8",
   "startedAt": "2026-09-26T10:43:05.421Z",
-  "lastUpdatedAt": "2026-09-26T12:15:36.623Z",
+  "lastUpdatedAt": "2026-09-26T12:27:07.278Z",
   "manifestPath": "/home/mcfuzzysquirrel/Projects/agent-ping/docs/EXECUTION-MANIFEST.json",
   "manifestVersion": "1.0",
   "harness": "opencode",
   "status": "running",
-  "currentPhase": "DASHBOARD-DESIGN-PROTOTYPE-1",
+  "currentPhase": "EVENT-MODEL-AND-DURABLE-LOG-1",
   "tasks": {
     "DP-1": {
       "taskId": "DP-1",
@@ -167,10 +167,30 @@
     },
     "EL-2": {
       "taskId": "EL-2",
-      "status": "pending",
+      "status": "complete",
       "ownerAgent": "domain-engineer",
-      "attempt": 0,
-      "outputFiles": []
+      "attempt": 1,
+      "outputFiles": [
+        "src/storage/retention.ts",
+        "src/storage/counters.ts",
+        "tests/storage/retention.test.ts",
+        "tests/storage/counters.test.ts",
+        "tests/storage/eventStore.test.ts"
+      ],
+      "startedAt": "2026-09-26T12:15:36.678Z",
+      "attemptHistory": [
+        {
+          "attempt": 1,
+          "outcome": "passed",
+          "resultPath": "docs/artifacts/EL-2.2026-09-26T12-27-07-275Z.attempt-1.result.json"
+        }
+      ],
+      "completedAt": "2026-09-26T12:27:07.278Z",
+      "agentOutput": "I'll start by reading the execution file.\nNow I have the full picture. Let me set up the work plan.\nNow the counters module:\nNow the retention tests:\nNow the counters test:\nNow update the mandatory file-list assertion in the existing store test:\nNow fix the unused constants in the retention test by making them carry real assertions:\nEL-2 is complete. Report below.\n\n## What I built\n\n**`src/storage/retention.ts`** — three rules in a fixed order, all in one SQL statement so a change to one cannot be applied to the candidate query and forgotten in the delete:\n1. **Age** — `occurred_at <= cutoff`, inclusive, so \"exactly thirty days old\" is a decision not an accident.\n2. **Per-session floor** — the 500 most recent events of *each session* (`event_id NOT IN (SELECT … WHERE recent.session_id = events.session_id ORDER BY occurred_at DESC, event_id DESC LIMIT ?)`). The subquery *is* the floor; a session at or under 500 events is never a candidate at any age. The floor wins over the age rule.\n3. **Pending protection** — the exact condition `eventStore.readPending` uses (needs-you, unacknowledged, unresolved), negated. Never pruned, at any age, even far outside the floor.\n\nBoth numbers are parameters (defaults 30 / 500) per PRD 16 #8; a negative floor is refused because SQLite reads `LIMIT -1` as *no limit* and the age rule would then delete everything. It deletes events only, never a session row, so a summary never outlives nothing and a prune cannot orphan one. `PruneResult` returns `cutoff`, `policy`, `prunedEventIds`, `prunedCount`, `keptPendingCount` and `rebuiltFromMigrations` (rebuild, do not refuse).\n\n**`src/storage/counters.ts`** — four counters as a closed union (`dashboard_opens`, `toast_deliveries`, `deep_link_opens`, `pending_count_snapshots`), one write method each, and **exactly one read accessor** `read()` returning `{ counter, value, updatedAt }`. No handle, no SQL, no `increment(name)`. A row this module did not write is not readable through it. The pending *count* is not stored — `readPending()` already derives it, and PRD 16 #3 settles the per-repository question as no. `flush()` folds the WAL back in so a single-file copy is complete (PRD 10 stopping state).\n\nBoth modules open their own connection to the same file, because the store deliberately does not hand out its handle; WAL + the existing busy timeout make that safe, and the prune is one immediate transaction.\n\n## Privacy boundary\n**Columns added: none. Envelope fields added: none.** No schema change, no migration, no new table, no new index. The only events-table columns retention reads are asserted exactly: `ack_state, class, event_id, occurred_at, resolution_state, session_id`. The counters table is the approved `name, value, updated_at` and nothing else.\n\n## Files created\n- `src/storage/retention.ts`\n- `src/storage/counters.ts`\n- `tests/storage/retention.test.ts` (20 tests)\n- `tests/storage/counters.test.ts` (13 tests)\n\n## File changed\n- `tests/storage/eventStore.test.ts` — its \"finds the storage sources at all\" assertion listed the four EL-1 files exactly; the whole suite fails if it does not list the new ones. Comment explains why both modules are covered by that directory scan too.\n\n(`docs/EXECUTION-AUDIT.jsonl` and `docs/WORKFLOW-STATE.json` show as modified — engine-owned, not touched by me. `docs/artifacts/` untouched.)\n\n## Verification\n- `npm test -- tests/storage/retention.test.ts tests/storage/counters.test.ts` → **exit 0, 33 passed**\n- `npm run typecheck` → exit 0 · `npm run lint` → exit 0 · `npm run build` → exit 0 · whole suite `npm test` → **166 passed**\n- **Mutation-proven, not assumed.** I broke each rule in turn and confirmed a test fails: exclusive cutoff (3 fail), pending protection removed (2 fail), floor removed (11 fail), floor made global instead of per-session (3 fail), counter overwriting instead of incrementing (3 fail), read returning arbitrary rows instead of the closed union (5 fail). Sources restored byte-identical afterwards.\n\n```forge-result\n{\"summary\":\"Implemented retention pruning and local counters with 33 new tests. Retention prunes by an inclusive 30-day cutoff, keeps the 500 most recent per session (floor wins over age), and never prunes an unacknowledged unresolved needs-you row; counters are four closed-union names with one read accessor. All three acceptance criteria are covered by real-database tests and each rule was mutation-proven to fail when broken. Verified: npm test -- tests/storage/retention.test.ts tests/storage/counters.test.ts exit 0 (33 tests), npm run typecheck, npm run lint, npm run build all exit 0, whole suite exit 0 (166 tests). No column and no envelope field was added.\",\"unresolved\":[],\"decisions\":[\"The retention cutoff is inclusive, so an event exactly retentionDays old is pruned; this is what makes the acceptance criterion's boundary row a decision rather than a comparison accident.\",\"Pending protection uses the store's own pending condition (needs-you, unacknowledged, unresolved), so a block resolved by the harness or acknowledged by the developer ages out like any other history row; both sides of that line are asserted by tests.\",\"Retention counts the floor only through the correlated per-session subquery, with no second session-level count, because a second copy of the rule is a second thing to drift.\",\"The four counters are cumulative: pending_count_snapshots records that a snapshot was taken, not the count, because readPending already derives the count and a second copy of a fact is a second thing to reconcile (PRD 16 #3).\",\"flush() folds the write-ahead log back into the database file rather than being a no-op, so PRD 10's counters-flushed step is real and a single-file copy is complete afterwards; a test also proves durability does not depend on it.\",\"Both modules open their own connection to the same file, because the store deliberately exposes no handle; the store API was not widened.\"],\"tests\":[\"npm test -- tests/storage/retention.test.ts tests/storage/counters.test.ts: exit 0, 33 tests passed\",\"npm run typecheck: exit 0\",\"npm run lint: exit 0\",\"npm run build: exit 0\",\"npm test (whole suite): exit 0, 166 tests passed\",\"mutation checks (6 rules broken in turn, each caught by named tests, sources restored byte-identical)\"],\"warnings\":[\"The counters table constrains its name column only as a TEXT primary key, so an arbitrary string could be inserted there by some other writer with SQL access. This module cannot read such a row and a test proves it, but closing the hole at the database level would need a migration that rebuilds the counters table with a name CHECK. schema.sql is not in this task's expected outputs, so I did not author that migration; the next schema owner should consider it.\",\"I had to update one assertion in tests/storage/eventStore.test.ts: its directory-scan file list named the four EL-1 sources exactly, and the suite fails outright if a new module in src/storage is not listed.\",\"tSC still emits JavaScript only, so dist/main/storage/schema.sql is still not copied; the pre-existing build-script gap EL-1 recorded stands and is unaffected by this task, since both new modules reach the schema through src/storage/db.ts exactly as the store does.\"]}\n```\n",
+      "artifactId": "work-el-2-001",
+      "inputArtifactIds": [
+        "work-el-1-001"
+      ]
     },
     "EL-3": {
       "taskId": "EL-3",
