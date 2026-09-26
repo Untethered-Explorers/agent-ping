@@ -1,0 +1,13 @@
+{
+  "taskId": "NT-4",
+  "taskDigest": "e536553f9324bb503a503d821a30365ff88be1f135c2df59200f058211d03088",
+  "reviewer": "Doug McCusker",
+  "reviewedAt": "2026-09-26T22:43:10.022Z",
+  "decision": "approved",
+  "evidence": [
+    {
+      "path": "docs/reviews/NT-4-console-review.md",
+      "sha256": "795e75d24d0bdb8759c587df869cd5b926f4957745b742fe8a142a25f14e8e51"
+    }
+  ]
+}

@@ -1,10 +1,10 @@
 # Project Progress
 
 ## Current State
-**Phase**: OPENCODE-PLUGIN-ADAPTER-1
+**Phase**: NOTIFICATION-AND-TRAY-PRESENCE-3
 **Status**: In Progress
 **Validation Gaps**: 58 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-26T21:39:59.059Z
+**Last Updated**: 2026-09-26T22:43:17.971Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -46,6 +46,8 @@
   - Files: src/notify/macos.ts, src/notify/windows.ts, tests/notify/macos.test.ts, tests/notify/windows.test.ts, docs/runbooks/notify-platforms.md, src/main/index.ts, src/notify/linux.ts, src/notify/registry.ts, src/notify/types.ts, tests/notify/registry-selection.test.ts, src/notify/command.ts
 - [x] Phase NOTIFICATION-AND-TRAY-PRESENCE-2, Task NT-3: Add the tray icon with its pending-count badge (@notification-engineer)
   - Files: src/hub/tray.ts, src/tray/badge.ts, src/main/index.ts, tests/hub/tray.test.ts, tests/tray/badge.test.ts, src/hub/metrics.ts
+- [x] Phase NOTIFICATION-AND-TRAY-PRESENCE-3, Task NT-4: Verify real toasts and the badge on Linux
+  - Files: docs/reviews/notification-linux.json
 - [x] Phase OPENCODE-PLUGIN-ADAPTER-1, Task OA-1: Translate opencode events into the normalized envelope (@connector-engineer)
   - Files: src/plugin/opencode/index.ts, src/plugin/opencode/translate.ts, src/plugin/opencode/work-signal.ts, tests/plugin/opencode-translate.test.ts, tests/plugin/opencode-work-signal.test.ts, docs/engine-config.json
 - [x] Phase OPENCODE-PLUGIN-ADAPTER-1, Task OA-2: Deliver events to the hub and leave a breadcrumb on failure (@connector-engineer)

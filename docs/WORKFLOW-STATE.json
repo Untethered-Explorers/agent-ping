@@ -1,12 +1,12 @@
 {
   "runId": "7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8",
   "startedAt": "2026-09-26T10:43:05.421Z",
-  "lastUpdatedAt": "2026-09-26T21:39:59.055Z",
+  "lastUpdatedAt": "2026-09-26T22:43:17.967Z",
   "manifestPath": "/home/mcfuzzysquirrel/Projects/agent-ping/docs/EXECUTION-MANIFEST.json",
   "manifestVersion": "1.0",
   "harness": "opencode",
   "status": "running",
-  "currentPhase": "OPENCODE-PLUGIN-ADAPTER-1",
+  "currentPhase": "NOTIFICATION-AND-TRAY-PRESENCE-3",
   "tasks": {
     "DP-1": {
       "taskId": "DP-1",
@@ -623,9 +623,15 @@
     },
     "NT-4": {
       "taskId": "NT-4",
-      "status": "pending",
-      "attempt": 0,
-      "outputFiles": []
+      "status": "complete",
+      "attempt": 1,
+      "outputFiles": [
+        "docs/reviews/notification-linux.json"
+      ],
+      "startedAt": "2026-09-26T22:43:17.967Z",
+      "completedAt": "2026-09-26T22:43:17.967Z",
+      "agentOutput": "Human review approved with evidence.",
+      "artifactId": "work-nt-4-001"
     },
     "NT-5": {
       "taskId": "NT-5",
