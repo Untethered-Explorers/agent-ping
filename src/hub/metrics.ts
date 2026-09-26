@@ -310,6 +310,44 @@ export function createMetricsRecorder(options: CreateMetricsRecorderOptions): Me
 }
 
 // ---------------------------------------------------------------------------
+// An open a surface recorded rather than a request
+// ---------------------------------------------------------------------------
+
+/** What a resolved link was for: a session to focus, or the dashboard itself. */
+export type DeepLinkTarget = 'deep-link' | 'dashboard'
+
+/**
+ * Record a dashboard open that no request reported.
+ *
+ * NT-FR-07 says opening a toast's link "focuses the session in the dashboard and
+ * counts as a dashboard open", and NT-3's tray resolves that link in the Electron main
+ * process - where no HTTP request necessarily happens. A desktop that pointed a window
+ * at the URL produces a document request, and the route's own handler above counts the
+ * open; a desktop that resolved the target some other way produces no request at all,
+ * and then nobody else will count it. This is that second case, and it is the reason
+ * `recordDashboardOpen` and `recordDeepLinkOpen` are public.
+ *
+ * It lives here rather than in the tray for the reason every other decision in this
+ * file lives here: `src/hub/metrics.ts` is the only module allowed to call a counter
+ * write (tests/hub/metrics.test.ts walks the product's own source and asserts it), so
+ * a tray that counted its own open would either break that guarantee or need this
+ * function. The decision - which of the two counters a resolved deep link moves - is a
+ * counting rule, and the counting rules are this file's.
+ *
+ * A deep link counts as both, because NT-FR-07 says so in one sentence; the plain
+ * dashboard counts as the open alone, because an empty target is explicitly not a deep
+ * link (see `isDeepLinkRequest` above). Both writes are guarded inside the recorder, so
+ * a failing counter cannot turn a click into an error.
+ */
+export function recordOpenWithoutRequest(
+  metrics: Pick<MetricsRecorder, 'recordDashboardOpen' | 'recordDeepLinkOpen'>,
+  target: DeepLinkTarget,
+): void {
+  metrics.recordDashboardOpen()
+  if (target === 'deep-link') metrics.recordDeepLinkOpen()
+}
+
+// ---------------------------------------------------------------------------
 // The store wrapper: a snapshot on every change to the pending set
 // ---------------------------------------------------------------------------
 

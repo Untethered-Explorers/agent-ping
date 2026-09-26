@@ -1,10 +1,10 @@
 # Project Progress
 
 ## Current State
-**Phase**: OPENCODE-PLUGIN-ADAPTER-1
+**Phase**: NOTIFICATION-AND-TRAY-PRESENCE-2
 **Status**: In Progress
-**Validation Gaps**: 49 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-26T19:53:15.249Z
+**Validation Gaps**: 54 unverified check(s) - see "Validation Gaps"
+**Last Updated**: 2026-09-26T20:33:12.815Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -44,6 +44,8 @@
   - Files: src/notify/types.ts, src/notify/policy.ts, src/notify/linux.ts, src/notify/registry.ts, src/main/index.ts, tests/notify/policy.test.ts, tests/notify/linux.test.ts, tests/notify/registry-selection.test.ts, tests/hub/delivery.test.ts, tests/hub/ingest.test.ts, tests/hub/metrics.test.ts, tests/hub/server.test.ts
 - [x] Phase NOTIFICATION-AND-TRAY-PRESENCE-1, Task NT-2: Add the macOS and Windows notifiers (@notification-engineer)
   - Files: src/notify/macos.ts, src/notify/windows.ts, tests/notify/macos.test.ts, tests/notify/windows.test.ts, docs/runbooks/notify-platforms.md, src/main/index.ts, src/notify/linux.ts, src/notify/registry.ts, src/notify/types.ts, tests/notify/registry-selection.test.ts, src/notify/command.ts
+- [x] Phase NOTIFICATION-AND-TRAY-PRESENCE-2, Task NT-3: Add the tray icon with its pending-count badge (@notification-engineer)
+  - Files: src/hub/tray.ts, src/tray/badge.ts, src/main/index.ts, tests/hub/tray.test.ts, tests/tray/badge.test.ts, src/hub/metrics.ts
 - [x] Phase OPENCODE-PLUGIN-ADAPTER-1, Task OA-1: Translate opencode events into the normalized envelope (@connector-engineer)
   - Files: src/plugin/opencode/index.ts, src/plugin/opencode/translate.ts, src/plugin/opencode/work-signal.ts, tests/plugin/opencode-translate.test.ts, tests/plugin/opencode-work-signal.test.ts, docs/engine-config.json
 - [x] Phase OPENCODE-PLUGIN-ADAPTER-1, Task OA-2: Deliver events to the hub and leave a breadcrumb on failure (@connector-engineer)
@@ -53,7 +55,6 @@
 - None currently running
 
 ## Remaining
-- [ ] Phase NOTIFICATION-AND-TRAY-PRESENCE-2: Phase 2: Tray presence
 - [ ] Phase NOTIFICATION-AND-TRAY-PRESENCE-3: Phase 3: Live notification gates
 - [ ] Phase OPENCODE-PLUGIN-ADAPTER-1: Phase 1: Event translation and delivery
 - [ ] Phase OPENCODE-PLUGIN-ADAPTER-2: Phase 2: Polling fallback and live verification
@@ -112,6 +113,11 @@
 - Task NT-2: The macOS AppleScript has never been compiled by AppleScript. The same applies: the argument list, the constant script and the payload placement are asserted exactly and reach a real process intact, but osascript's own parsing of `on run argv` on a Mac is unverified.
 - Task NT-2: A real process receiving a hostile title and body proves nothing expanded, split or was reinterpreted on the way to the process. It does not prove what a notification centre would do with the text afterwards.
 - Task NT-2: No badge, tray or deep-link behaviour is exercised here; the tray and badge are NT-3 and this task deliberately excluded them.
+- Task NT-3: No Electron process was started and no icon was ever displayed. Every tray assertion is made against the TrayBridge interface, which is what this product decides and what the platform is asked to do; the bridge's own behaviour on a real desktop is unobserved.
+- Task NT-3: Whether a real desktop shows a drawn badge legibly at its real tray size is unverified, as is whether a click reaches the handler. NT-4's Linux gate and NT-5's macOS/Windows gate are where both belong.
+- Task NT-3: The claim 'the tray is mounted before the hub reports running' is asserted against the composition root's source order rather than observed at runtime: the mount is synchronous and holds the event loop, so a health request cannot be answered during it and the two orders answer it identically. The observable half - the icon is on the desktop before the desktop is told the hub is ready - is asserted behaviourally.
+- Task NT-3: The badge above ninety-nine is driven on a mounted tray with a synthetic hundred-and-one-item pending set rather than a hundred and one real ingests, because the rule is the count's and not the store's; the store's real transitions are driven through the entry point at counts 0, 1 and 2 and compared against a real GET /api/pending each time.
+- Task NT-3: The tray's sound and telemetry properties are asserted by reading both modules' source with their prose stripped, so the check is about the values and the calls rather than the sentences; it would not see a capability reached through a computed property name.
 - Task OA-1: No live opencode session was run. The payload shapes are the 1.18.32 type declarations, not a capture from a running harness; proving the harness delivers them is OA-5's script and OA-6's gate, not this task.
 - Task OA-1: The one-envelope and block-lifecycle tests use the real ingest pipeline and the real SQLite log but drive it from fixtures rather than from a harness's event stream.
 - Task OA-1: The plugin was not loaded by opencode itself. Its structural plugin and client types mirror the 1.18.32 declarations rather than importing @opencode-ai/plugin, which is deliberate (the adapter must load with no dependency), so a signature change upstream would not be caught by a compile error here - the OA-3 install and OA-5 live run are where that surfaces.

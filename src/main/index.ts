@@ -13,7 +13,8 @@
 //   5. the route registry, with every route registered in one array
 //   6. the loopback server, which chooses the live port
 //   7. the runtime file again, this time with that port in it
-//   8. the desktop shell: window, tray, quit
+//   8. the restart replay, with the socket bound and the port published
+//   9. the desktop shell: the tray icon, then the hub reporting `running`
 //
 // Each step exists so a later step cannot run in a half-started hub. If the store
 // will not open, nothing is listening and no file claims a port. If the port
@@ -43,7 +44,12 @@
 // and says so on health, which is the honest answer rather than a delivered lie
 // (APX-FR-02). All three v1 platforms have a notifier now (NT-2 added macOS and Windows,
 // which ship with scripted checks and a runbook and are not live-verified on the Linux
-// machine that built them); the tray arrives in NT-3.
+// machine that built them).
+// The tray is wired too (NT-3): the icon is mounted here, over the desktop bridge's five
+// platform calls and this file's own pending set, its badge is the pure function in
+// src/tray/badge.ts, its menu is two rows and has no suppression control in it, and its
+// click resolves the deep link the notifier builds. The icon goes down first in the
+// shutdown, because it reads the log this file closes.
 // What remains deliberately absent is any route that can spawn, steer, interrupt, prompt
 // or approve anything inside a harness (APX-CON-08): the mutating set in
 // src/hub/server.ts is exactly two signatures, the append-only ingest route and the ack
@@ -81,7 +87,7 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { openCounters, type Counters } from '../storage/counters.js'
-import { openEventStore, type EventStore } from '../storage/eventStore.js'
+import { openEventStore, type EventStore, type PendingItem } from '../storage/eventStore.js'
 import { databaseFilePath, ensureStateDir, resolveStateDir } from '../storage/paths.js'
 import { createPendingLifecycle, type PendingLifecycle } from '../domain/pending.js'
 import { READ_ROUTES, type HubIdentity, type HubServices } from '../hub/routes/read.js'
@@ -114,6 +120,12 @@ import {
   type DeliveryPolicyOptions,
 } from '../hub/delivery.js'
 import { createHubLifecycle, type HubLifecycle, type HubState } from '../hub/lifecycle.js'
+import {
+  createHubTray,
+  type DeepLinkDispatch,
+  type HubTray,
+  type TrayBridge,
+} from '../hub/tray.js'
 import {
   createPlatformNotifier,
   toNotifierPort,
@@ -153,13 +165,26 @@ export interface DesktopBridge {
    * second, and it still refuses a second instance.
    */
   readonly isPrimaryInstance: boolean
+  /**
+   * The platform's tray surface, and the only way this product can put an icon on a
+   * desktop (NT-3, NT-FR-05).
+   *
+   * Absent in a headless run - a test, `agent-ping status`, a verification script -
+   * and then the hub runs without an icon, which is a supported run rather than a
+   * degraded one: those callers read the same loopback origin this process serves.
+   * Present, the composition root builds the tray over it (src/hub/tray.ts) and mounts
+   * it before the hub reports `running`, because PRD 10's `running` means "accepting
+   * events, with the tray present".
+   *
+   * This replaced a bare `mountTray?(hub)` seam that HC-1 left for NT-3 to fill. The
+   * seam was a callback with nowhere to get a tray *from*; the tray is this product's
+   * behaviour and the desktop supplies only the five platform calls, so asking the
+   * desktop to mount it would have made the platform the owner of a decision it
+   * cannot make (which session a click focuses, and when a badge is redrawn).
+   */
+  readonly tray?: TrayBridge
   /** The origin the hub published, once it is serving. */
   onHubReady?(hub: RunningHub): void
-  /**
-   * Mount the tray (NT-3). Absent until NT-3: the tray belongs to notification-engineer
-   * and the hub only provides the seam and the pending count it will read.
-   */
-  mountTray?(hub: RunningHub): void
 }
 
 export interface StartHubOptions {
@@ -333,6 +358,19 @@ export interface RunningHub {
    */
   readonly lifecycle: HubLifecycle
   /**
+   * The tray, once it is mounted (NT-FR-05): the icon's badge, the two menu actions
+   * and the deep link a click resolves.
+   *
+   * Null on a headless run, which is the honest answer rather than a stub that looks
+   * mounted: there is no desktop to be present on. Exposed for `doctor` and for a test
+   * that has to watch a badge follow the pending set through the real entry point, and
+   * because the hub's own shutdown has to take the icon down. Holding it grants
+   * nothing beyond reading a number and opening a dashboard - the menu has no
+   * suppression control and the tray cannot acknowledge anything (NT-FR-06,
+   * APX-CON-08).
+   */
+  readonly tray: HubTray | null
+  /**
    * The security boundary: this install's write token, the header it travels in, and
    * where the token file is. In-process only - the token is on no read route, in no
    * response body and in no served asset (HC-FR-06).
@@ -373,6 +411,15 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
   let stream: ChangeFeed | undefined
   let ingest: IngestService | undefined
   let delivery: DeliveryPolicy | undefined
+  // The tray (NT-3). Out here with the other half-started objects because both
+  // shutdown paths have to be able to take it down: the one inside the try below and
+  // the one in the catch, which is a start that failed after it was mounted.
+  let tray: HubTray | null = null
+  // Read through a function rather than directly, because a `let` the type checker
+  // has narrowed to `null` at the declaration is still the live tray by the time the
+  // catch below runs, and the honest reading is a function whose return type the
+  // checker cannot narrow.
+  const mountedTray = (): HubTray | null => tray
 
   // The lifecycle exists before anything is opened, because a termination signal can
   // arrive at any point in this function. What it calls before the hub exists is the
@@ -662,6 +709,14 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
       notifier: platformNotifier,
       lifecycle,
       /**
+       * The tray, behind a getter because it is mounted after this object is built.
+       * Null on a headless run and on a hub whose desktop bridge could not mount one;
+       * never a stub that answers as though an icon were on a desktop.
+       */
+      get tray(): HubTray | null {
+        return mountedTray()
+      },
+      /**
        * The security boundary: this install's write token, the header it travels in
        * and where the token file is. In-process only - the token is on no read route,
        * in no response and in no served asset (HC-FR-06).
@@ -684,10 +739,19 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
         // Beginning the shutdown also removes the signal handlers, so a second Ctrl-C
         // is the operating system's answer rather than a second ordered close.
         lifecycle.begin('close')
-        // The order a shutdown has to have: refuse new deliveries, stop accepting
-        // events, end the live streams, stop answering, fold the counters into the
-        // file, close the log, then give the runtime file back. The delivery drain
-        // goes first of all, and the feed third; every placement is deliberate.
+        // The order a shutdown has to have: take the icon down, refuse new deliveries,
+        // stop accepting events, end the live streams, stop answering, fold the
+        // counters into the file, close the log, then give the runtime file back. The
+        // delivery drain goes second and the feed fourth; every placement is
+        // deliberate.
+        //
+        // The tray goes first of all, and before the feed, and the two are the same
+        // decision (NT-FR-05): the icon reads this hub's pending set through the change
+        // feed's transitions, so a tray that outlived the feed or the log is an icon
+        // advertising a hub that no longer answers - and, on the way out, either a read
+        // failure or a redraw of a number nobody can act on any more. Taking it down
+        // first is what makes "present for as long as the hub runs" true at both ends
+        // rather than only at the start (APX-FR-02).
         //
         // Draining delivery is HC-FR-10's "stop accepting events" reaching the
         // notification path first: the policy refuses new attempts and waits out the
@@ -711,9 +775,14 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
         // feed throws, which is why the refusal steps have to come before this call.
         let firstError: unknown
         try {
-          await delivery?.close()
+          mountedTray()?.close()
         } catch (cause) {
           firstError = cause
+        }
+        try {
+          await delivery?.close()
+        } catch (cause) {
+          firstError ??= cause
         }
         try {
           await ingest?.close()
@@ -771,30 +840,76 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
           '(HC-FR-07)',
       )
     }
-    lifecycle.markRunning()
-
-    // 9. The desktop shell, last, so nothing is mounted over a hub that is not
-    //    yet serving.
+    // 9. The desktop shell and the tray, with the socket bound and the port
+    //    published but before the hub reports `running`.
+    //
+    //    That order is the requirement rather than a habit. PRD 10's `running` state
+    //    means "accepting events, with the tray present" (NT-FR-05), so a client that
+    //    trusted `running` and looked for the icon would be right. The hub is already
+    //    serving at this point, so nothing is mounted over a hub that cannot answer -
+    //    which is the other half of the rule step 9 used to state on its own.
     const desktop = options.desktop
-    if (desktop !== undefined) {
-      if (!desktop.isPrimaryInstance) {
-        // Defence in depth for an injected bridge. The Electron entry point quits
-        // before it gets here when the application lock is not granted, so this
-        // branch is for a caller that assembled the bridge itself: the desktop is
-        // not ours to own, so nothing is served and the claim is given back. It is
-        // deliberately not a HubAlreadyRunningError - that error carries a live
-        // instance's record, and the instance that holds the desktop lock is not
-        // this process, so there is no record here to hand it.
-        await hub.close()
-        throw new Error(
-          'this process is not the primary desktop instance, so it will not run the hub. The ' +
-            'instance that holds the application lock is the one serving; nothing was bound and no ' +
-            'runtime file was left behind.',
+    if (desktop !== undefined && !desktop.isPrimaryInstance) {
+      // Defence in depth for an injected bridge. The Electron entry point quits
+      // before it gets here when the application lock is not granted, so this
+      // branch is for a caller that assembled the bridge itself: the desktop is
+      // not ours to own, so nothing is served and the claim is given back. It is
+      // deliberately not a HubAlreadyRunningError - that error carries a live
+      // instance's record, and the instance that holds the desktop lock is not
+      // this process, so there is no record here to hand it.
+      await hub.close()
+      throw new Error(
+        'this process is not the primary desktop instance, so it will not run the hub. The ' +
+          'instance that holds the application lock is the one serving; nothing was bound and no ' +
+          'runtime file was left behind.',
+      )
+    }
+
+    if (desktop?.tray !== undefined) {
+      // The tray is this product's behaviour (src/hub/tray.ts) and the bridge is only
+      // the platform's five calls, so the composition root builds it here rather than
+      // asking the desktop to mount one: the badge's rule, the menu's two rows and the
+      // click's deep link are decisions no platform gets to make.
+      //
+      // A bridge that refuses leaves the hub serving with no icon and a line saying
+      // so. That is the honest answer rather than a stub that answers as though an
+      // icon were on a desktop, and rather than refusing to start a hub over a missing
+      // tray: the pending set, the log and the toasts are all still correct, and the
+      // badge is a signal rather than the record (APX-FR-02, ADR-010).
+      try {
+        tray = createHubTray({
+          bridge: desktop.tray,
+          // The same accessor `GET /api/pending` serves and the restart replay reads,
+          // so the icon, the route and the replay cannot disagree about what is
+          // outstanding (NT-FR-05).
+          readPending: (): readonly PendingItem[] => watching.readPending(),
+          // The feed, so the badge follows the pending set without polling: a
+          // transition the store applied is a redraw, and a heartbeat is not
+          // (src/hub/sse.ts).
+          subscribe: (subscriber): (() => void) => stream?.subscribe(subscriber) ?? ((): void => undefined),
+          // The live origin, read per click rather than captured: the bind above is
+          // what chose the port, and a link built from the preferred one would send a
+          // developer to whatever else on this machine answers there (HC-FR-01,
+          // NT-FR-07).
+          origin: (): string => server?.origin ?? '',
+          counters: localMetrics,
+          // The tray's quit is the hub's own ordered shutdown, so a quit from the menu
+          // and a `systemctl stop` are not two shutdown implementations (HC-FR-10).
+          quit: (): void => {
+            void lifecycle.shutdown('tray-quit')
+          },
+          onDiagnostic: diagnostic,
+        })
+      } catch (cause) {
+        diagnostic(
+          'agent-ping could not mount its tray icon, so this run has no icon and no badge. The ' +
+            `pending set, the log and the notifications are unaffected (NT-FR-05). ${cause instanceof Error ? cause.message : String(cause)}`,
         )
       }
-      desktop.onHubReady?.(hub)
-      desktop.mountTray?.(hub)
     }
+
+    lifecycle.markRunning()
+    desktop?.onHubReady?.(hub)
     return hub
   } catch (cause) {
     // Every failure path releases what it took, so a failed start never leaves a
@@ -804,6 +919,11 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
     // process that has just reported a failure must not be listening for a signal that
     // would run a shutdown against a hub that was never built.
     lifecycle.dispose()
+    try {
+      mountedTray()?.close()
+    } catch {
+      // The failure being reported is the one that caused this cleanup.
+    }
     try {
       await delivery?.close()
     } catch {
@@ -946,6 +1066,41 @@ interface ElectronAppLike {
 }
 
 /**
+ * The slice of Electron's tray and image API the bridge below uses.
+ *
+ * Structural for the same reason `ElectronAppLike` is, and no more so: the package is
+ * a runtime dependency of the packaged application rather than of the source tree, and
+ * an interface this small is checkable by reading. `createFromBitmap` is the reason
+ * the badge is drawn rather than loaded - it takes exactly the tightly packed BGRA
+ * bytes src/tray/badge.ts produces, so the number on the icon is rendered by this
+ * product's own pure code and not by a platform's idea of a badge (NT-FR-05, and the
+ * feature document's Open Question 3).
+ */
+interface ElectronTrayLike {
+  setImage(image: unknown): void
+  setToolTip(tooltip: string): void
+  setContextMenu(menu: unknown): void
+  popUpContextMenu(): void
+  on(event: string, listener: () => void): unknown
+  destroy(): void
+}
+
+interface ElectronNativeImageLike {
+  createFromBitmap(
+    bitmap: Buffer,
+    options: { width: number; height: number; scaleFactor?: number },
+  ): unknown
+}
+
+interface ElectronModuleLike {
+  readonly app?: ElectronAppLike
+  readonly Tray?: new (icon: unknown) => ElectronTrayLike
+  readonly Menu?: { buildFromTemplate(template: readonly unknown[]): unknown }
+  readonly BrowserWindow?: new (options: unknown) => { loadURL(url: string): Promise<void>; destroy(): void }
+  readonly nativeImage?: ElectronNativeImageLike
+}
+
+/**
  * Load the runtime `electron` module.
  *
  * Through a function parameter on purpose. A literal specifier would be resolved
@@ -960,6 +1115,127 @@ async function importModule(specifier: string): Promise<unknown> {
 }
 
 /**
+ * The Electron tray, as this product's five platform calls.
+ *
+ * Everything Electron-specific about a tray icon is here and nowhere else: the
+ * `Tray` object, the `Menu` built from the two rows the tray decides, the bitmap the
+ * badge module drew, and whether opening a link will produce a document request. The
+ * decisions - which session a click focuses, when the badge is redrawn, whether a
+ * click counted anything - are the tray's (src/hub/tray.ts) and this file cannot
+ * make them.
+ *
+ * The `openDashboard` answer is the load-bearing part. A `BrowserWindow` pointed at a
+ * loopback URL *does* request the document, so that path reports
+ * `dashboard-request-follows` and lets the hub's own dashboard route count the open -
+ * counting it here as well would report one pull twice (HC-6). Anything that cannot
+ * produce a request says so honestly rather than claiming an open that nobody made,
+ * and the tray then counts nothing and reports the fault (APX-FR-02).
+ *
+ * VERIFICATION STATE: NOT LIVE-VERIFIED HERE. This was written on a Linux machine
+ * with no Electron installed, so none of it has been run: not the `Tray`
+ * constructor, not `createFromBitmap`'s byte order, not whether a left click reaches
+ * `on('click')` on each of the three desktops. What *is* verified is everything above
+ * this function - the badge's rules, the menu's two rows, the click's deep link and
+ * the counting rule - through tests/hub/tray.test.ts against this interface. NT-4's
+ * and NT-5's human gates are where the platform half is observed, and the runbook
+ * says the same (APX-CON-06).
+ */
+function electronTrayBridge(electron: ElectronModuleLike): TrayBridge {
+  const Tray = electron.Tray
+  const Menu = electron.Menu
+  const nativeImage = electron.nativeImage
+  // Electron's own names are read off a module that may not have them - a headless
+  // build, a stripped runtime - and a missing one is a reported fault rather than a
+  // crash, so every platform object is fetched through here and nothing is assumed to
+  // exist before the first call that needs it.
+  const needed = <T,>(what: string, available: T | undefined): T => {
+    if (available === undefined) {
+      throw new Error(
+        `the Electron runtime did not provide \`${what}\`, so this build cannot put a tray icon on ` +
+          'the desktop. The hub is unaffected: the pending set, the log and the notifications are ' +
+          'unchanged and the badge is a signal rather than the record (NT-FR-05, APX-FR-02).',
+      )
+    }
+    return available
+  }
+  let tray: ElectronTrayLike | null = null
+  let activated: (() => void) | null = null
+
+  const present = (): ElectronTrayLike => {
+    if (tray === null) {
+      const image = needed('nativeImage', nativeImage).createFromBitmap(Buffer.alloc(0), {
+        width: 1,
+        height: 1,
+      })
+      tray = new (needed('Tray', Tray))(image)
+      // A left click is the activation NT-FR-07 promises. A right click opens the menu,
+      // which is the platform's own convention and the reason the menu is reachable
+      // without a keyboard.
+      tray.on('click', () => {
+        activated?.()
+      })
+      tray.on('right-click', () => {
+        tray?.popUpContextMenu()
+      })
+    }
+    return tray
+  }
+
+  return {
+    showIcon: (icon): void => {
+      const current = present()
+      const image = needed('nativeImage', nativeImage).createFromBitmap(Buffer.from(icon.pixels), {
+        width: icon.width,
+        height: icon.height,
+      })
+      current.setImage(image)
+      current.setToolTip(icon.tooltip)
+    },
+
+    showMenu: (view): void => {
+      const menu = needed('Menu', Menu)
+      present().setContextMenu(
+        menu.buildFromTemplate(
+          view.items.map((item) => ({
+            label: item.label,
+            // Electron hands the selection back through the row's own click, so the
+            // tray's table stays the only place a menu action is defined.
+            click: (): void => {
+              view.select(item.id)
+            },
+          })),
+        ),
+      )
+    },
+
+    onActivate: (listener): void => {
+      activated = listener
+      present()
+    },
+
+    openDashboard: (url): DeepLinkDispatch => {
+      // A window pointed at the URL is the request: Electron will fetch the dashboard
+      // document over the loopback socket, and the hub's own route counts the open and
+      // the deep link. Returning any other answer here would double count it (HC-6).
+      const window = new (needed('BrowserWindow', electron.BrowserWindow))({
+        show: true,
+        width: 1100,
+        height: 760,
+        title: 'agent-ping',
+      })
+      void window.loadURL(url)
+      return { kind: 'dashboard-request-follows' }
+    },
+
+    destroy: (): void => {
+      tray?.destroy()
+      tray = null
+      activated = null
+    },
+  }
+}
+
+/**
  * Start the hub as an Electron main process.
  *
  * The application lock is taken first, because Electron's is the one that knows
@@ -967,14 +1243,17 @@ async function importModule(specifier: string): Promise<unknown> {
  * adapters and the CLI read. Both or neither.
  *
  * No window is opened here. The dashboard is an on-demand surface (ADR-009), and
- * the tray that opens it belongs to NT-3, so the only thing this function does
- * with the desktop is keep the process alive until the hub is closed. The notifier
- * the hub is started with is the same one a plain `startHub` gets, because it is
- * resolved inside `startHub` (NT-1) rather than here: an Electron process and a
- * plain Node process on the same machine must notify the same way.
+ * the only thing this function opens is the window a tray click asks for - the tray
+ * is the persistent surface and the page is pulled up when it is used. The tray
+ * itself is mounted inside `startHub` (NT-3), over the bridge built here, so the
+ * mounted tray is the same object a plain `startHub` produces and there is one
+ * implementation of the badge, the menu and the click. The notifier the hub is
+ * started with is likewise the one a plain `startHub` gets, because it is resolved
+ * inside `startHub` (NT-1) rather than here: an Electron process and a plain Node
+ * process on the same machine must notify the same way.
  */
 export async function startElectronMain(): Promise<RunningHub | null> {
-  const electron = (await importModule('electron')) as { app?: ElectronAppLike }
+  const electron = (await importModule('electron')) as ElectronModuleLike
   const app = electron.app
   if (app === undefined) {
     throw new Error(
@@ -999,7 +1278,7 @@ export async function startElectronMain(): Promise<RunningHub | null> {
   // second `before-quit` is a no-op because `shutdown` is idempotent, which matters
   // because a quit can be requested twice (a tray click and a session logout, say).
   const hub = await startHub({
-    desktop: { isPrimaryInstance: true },
+    desktop: { isPrimaryInstance: true, tray: electronTrayBridge(electron) },
     lifecycle: { exit: (): void => app.quit() },
   })
 
