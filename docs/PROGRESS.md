@@ -4,7 +4,7 @@
 **Phase**: EVENT-MODEL-AND-DURABLE-LOG-2
 **Status**: In Progress
 **Validation Gaps**: 13 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-26T13:20:52.069Z
+**Last Updated**: 2026-09-26T13:40:10.288Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -24,12 +24,13 @@
   - Files: src/storage/retention.ts, src/storage/counters.ts, tests/storage/retention.test.ts, tests/storage/counters.test.ts, tests/storage/eventStore.test.ts
 - [x] Phase EVENT-MODEL-AND-DURABLE-LOG-2, Task EL-3: Define the envelope and the classification rules (@domain-engineer)
   - Files: src/domain/envelope.ts, src/domain/classify.ts, tests/domain/classify.test.ts
+- [x] Phase EVENT-MODEL-AND-DURABLE-LOG-2, Task EL-4: Implement the pending lifecycle state machine (@domain-engineer)
+  - Files: src/domain/pending.ts, tests/domain/pending.test.ts, src/storage/eventStore.ts, tests/domain/classify.test.ts, tests/storage/eventStore.test.ts
 
 ## Current Task
 - None currently running
 
 ## Remaining
-- [ ] Phase EVENT-MODEL-AND-DURABLE-LOG-2: Phase 2: Event model and pending lifecycle
 - [ ] Phase HUB-CORE-AND-DELIVERY-POLICY-1: Phase 1: Process, read surface and live stream
 - [ ] Phase HUB-CORE-AND-DELIVERY-POLICY-2: Phase 2: Write surface, security, delivery and metrics
 - [ ] Phase HUB-CORE-AND-DELIVERY-POLICY-3: Phase 3: Read-only and restart-safety gate

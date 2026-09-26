@@ -127,7 +127,11 @@ export type MutationOutcome =
   | 'applied'
   /** The row was already in this state. An explicit no-op, never a second count. */
   | 'unchanged'
-  /** The row is in a state this transition cannot apply to. */
+  /**
+   * The row is in a state this transition cannot apply to: already resolved, or
+   * not a needs-you row at all, because only a pending item may be resolved or
+   * acknowledged (APX-CON-08). Nothing is written.
+   */
   | 'conflict'
   /** No such event identifier. */
   | 'not-found'
@@ -297,14 +301,26 @@ export function openEventStore(options: OpenDatabaseOptions = {}): EventStore {
   )
   // A resolution is recorded independently of an acknowledgement, so it is
   // written whenever the block is unresolved, whoever cleared it.
+  //
+  // `class = 'needs-you'` is the pending guard, and it is in the statement rather
+  // than in the caller because this is the only place that can refuse the write:
+  // a resolution is a fact about a *block*, and a finished or fyi row has no block
+  // to resolve. APX-CON-08 allows exactly one mutating route and lets it mark a
+  // pending item acknowledged, so a non-block row must not be settable at all -
+  // otherwise a caller holding any event identifier could flip it, and
+  // src/domain/pending.ts (EL-4) could not report the attempt as a conflict that
+  // changed nothing.
   const applyResolved = db.prepare<[string]>(
-    `UPDATE events SET resolution_state = 'resolved' WHERE event_id = ? AND resolution_state = 'unresolved'`,
+    `UPDATE events SET resolution_state = 'resolved'
+      WHERE event_id = ? AND class = 'needs-you' AND resolution_state = 'unresolved'`,
   )
   // An acknowledgement is refused for an already resolved block: the developer
   // is acknowledging a decision the harness already took (HC-FR-05, EL-FR-08).
+  // The same class guard applies, for the same reason: only a pending item can be
+  // marked acknowledged, and "pending item" is precisely a needs-you row.
   const applyAcknowledged = db.prepare<[string]>(
     `UPDATE events SET ack_state = 'acknowledged'
-      WHERE event_id = ? AND ack_state = 'unacknowledged' AND resolution_state = 'unresolved'`,
+      WHERE event_id = ? AND class = 'needs-you' AND ack_state = 'unacknowledged' AND resolution_state = 'unresolved'`,
   )
 
   const insertEvent = db.transaction((event: NewEvent): InsertResult => {
@@ -357,7 +373,12 @@ export function openEventStore(options: OpenDatabaseOptions = {}): EventStore {
     const changes = applyResolved.run(eventId).changes
     const row = findById.get(eventId)
     if (row === undefined) return { outcome: 'not-found', event: null }
-    return { outcome: changes > 0 ? 'applied' : 'unchanged', event: toEventRecord(row) }
+    const record = toEventRecord(row)
+    // A row that is not a block cannot be resolved, and `unchanged` would be a lie
+    // about it: the fact was never recorded, so this is the same conflict the
+    // acknowledgement reports for the same reason (APX-CON-08).
+    if (record.class !== 'needs-you') return { outcome: 'conflict', event: record }
+    return { outcome: changes > 0 ? 'applied' : 'unchanged', event: record }
   })
 
   const markAcknowledgedTransaction = db.transaction((eventId: string): MutationResult => {
@@ -368,11 +389,17 @@ export function openEventStore(options: OpenDatabaseOptions = {}): EventStore {
     // Already acknowledged is the idempotent no-op, even when the harness has
     // resolved the block since: the acknowledgement already happened once, and
     // counting it twice is the double count EL-FR-08 forbids. Checked before the
-    // conflict case, and deliberately.
+    // conflict cases, and deliberately.
     if (record.ackState === 'acknowledged') {
       return { outcome: changes > 0 ? 'applied' : 'unchanged', event: record }
     }
     if (record.resolutionState === 'resolved') {
+      return { outcome: 'conflict', event: record }
+    }
+    // Only a pending item may be marked acknowledged (APX-CON-08), and this is the
+    // distinguishable answer for a caller that addressed a finished or fyi row: a
+    // conflict the ack route can report, with nothing written.
+    if (record.class !== 'needs-you') {
       return { outcome: 'conflict', event: record }
     }
     return { outcome: 'unchanged', event: record }

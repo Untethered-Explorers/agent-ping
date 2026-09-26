@@ -631,6 +631,32 @@ describe('resolution and acknowledgement (EL-FR-08, HC-FR-05)', () => {
     expect(store.markAcknowledged(inserted.event.eventId).outcome).toBe('unchanged')
   })
 
+  it('refuses both transitions on a row that is not a needs-you block, and writes nothing', () => {
+    // APX-CON-08: the ack route may only mark a pending item acknowledged, and a
+    // resolution is a fact about a block. A finished or fyi row is neither, so the
+    // class guard refuses the write at the statement and answers with the conflict
+    // outcome, which src/domain/pending.ts turns into a distinguishable rejection.
+    const store = openTemporaryStore()
+    const finished = store.insertEvent(finishedTurn())
+    const fyi = store.insertEvent(
+      finishedTurn({ sessionId: 'ses_finished_01', class: 'fyi', subtype: 'error', dedupeKey: 'opencode:ses_finished_01:err-1' }),
+    )
+    for (const row of [finished.event, fyi.event]) {
+      expect(store.markAcknowledged(row.eventId)).toEqual({
+        outcome: 'conflict',
+        event: { ...row, ackState: 'unacknowledged', resolutionState: 'unresolved' },
+      })
+      expect(store.markResolved(row.eventId)).toEqual({
+        outcome: 'conflict',
+        event: { ...row, ackState: 'unacknowledged', resolutionState: 'unresolved' },
+      })
+    }
+
+    // Nothing became pending, and the two facts are still unset on both rows.
+    expect(store.readPending()).toEqual([])
+    expect(store.readSessionSummaries().every((summary) => summary.pendingCount === 0)).toBe(true)
+  })
+
   it('answers not-found for an identifier that does not exist, without creating anything', () => {
     const store = openTemporaryStore()
     expect(store.markResolved('evt_missing')).toEqual({ outcome: 'not-found', event: null })

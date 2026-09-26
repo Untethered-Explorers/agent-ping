@@ -985,11 +985,15 @@ describe('the domain module opens nothing (EL-3 boundaries, APX-CON-12)', () => 
       ...[...source.matchAll(/^\s*import\s+'([^']+)'/gm)].map((match) => match[1] ?? ''),
     ].filter((specifier) => specifier.length > 0)
 
-  it('is only the two modules this task owns', () => {
-    expect(modules).toEqual(['classify.ts', 'envelope.ts'])
+  it('is only the three modules this feature owns', () => {
+    // envelope.ts and classify.ts are the pure vocabulary (EL-1 through EL-3);
+    // pending.ts is the lifecycle over the store (EL-4), which is a value consumer
+    // of the store and is why the import checks below are stated per module rather
+    // than as one blanket rule.
+    expect(modules).toEqual(['classify.ts', 'envelope.ts', 'pending.ts'])
   })
 
-  it.each(modules)('%s imports nothing that could open a socket, a process, a surface or a database', (name) => {
+  it.each(modules)('%s imports no driver, no server, no process and no renderer of its own', (name) => {
     const source = sourceOf(name)
     for (const specifier of specifiersOf(source)) {
       for (const forbidden of [
@@ -1011,17 +1015,29 @@ describe('the domain module opens nothing (EL-3 boundaries, APX-CON-12)', () => 
     }
   })
 
-  it('reaches the store through a type-only import, so nothing here loads a database driver', () => {
-    const envelopeSource = sourceOf('envelope.ts')
-    const storeStatements = [
-      ...envelopeSource.matchAll(/^\s*(?:import|export)[^\n]*storage\/eventStore[^\n]*$/gm),
-    ].map((match) => match[0])
-    expect(storeStatements.length).toBeGreaterThan(0)
-    for (const statement of storeStatements) {
-      expect(statement.trim().startsWith('import type') || statement.trim().startsWith('export type')).toBe(true)
+  it('reaches the store through a type-only import, so no domain module loads a database driver', () => {
+    // The two pure modules must not reach the store at all beyond its types, and
+    // the lifecycle must do the same: it is handed a store by the hub rather than
+    // opening one, so a plugin inside a harness that imports classify.js and
+    // envelope.js still pulls in no driver.
+    for (const name of ['envelope.ts', 'pending.ts']) {
+      const source = sourceOf(name)
+      const storeStatements = [
+        ...source.matchAll(/^\s*(?:import|export)[^\n]*storage\/eventStore[^\n]*$/gm),
+      ].map((match) => match[0])
+      expect(storeStatements.length, name).toBeGreaterThan(0)
+      for (const statement of storeStatements) {
+        expect(statement.trim().startsWith('import type') || statement.trim().startsWith('export type'), name).toBe(
+          true,
+        )
+      }
+      expect(
+        source.split('\n').filter((line) => /^\s*import\s+(?!type\b)/.test(line) && line.includes('storage/')),
+        name,
+      ).toEqual([])
     }
-    // No value import at all, so the erasure is total.
-    const valueImports = envelopeSource.split('\n').filter((line) => /^\s*import\s+(?!type\b)/.test(line))
+    // envelope.ts has no value import at all, so the erasure is total.
+    const valueImports = sourceOf('envelope.ts').split('\n').filter((line) => /^\s*import\s+(?!type\b)/.test(line))
     expect(valueImports).toEqual([])
     // classify.ts never mentions the store: the domain vocabulary flows one way.
     const classifySpecifiers = specifiersOf(sourceOf('classify.ts'))
