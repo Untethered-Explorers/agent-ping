@@ -10,6 +10,7 @@
   ![pixi](https://img.shields.io/badge/pixijs-8-e91e63?style=flat-square)
   ![platforms](https://img.shields.io/badge/platforms-linux%20%7C%20macos%20%7C%20windows-555?style=flat-square)
   ![loopback](https://img.shields.io/badge/network-loopback%20only-2ea44f?style=flat-square)
+  ![license](https://img.shields.io/badge/license-MIT-blue?style=flat-square)
 
   [Status](#status) • [How it works](#how-it-works) • [Notifications](#notifications) • [Getting started](#getting-started) • [HTTP API](#http-api) • [Configuration](#configuration) • [Documentation](#documentation)
 
