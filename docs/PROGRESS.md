@@ -1,10 +1,10 @@
 # Project Progress
 
 ## Current State
-**Phase**: HUB-CORE-AND-DELIVERY-POLICY-2
+**Phase**: HUB-CORE-AND-DELIVERY-POLICY-3
 **Status**: In Progress
 **Validation Gaps**: 32 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-26T17:01:48.139Z
+**Last Updated**: 2026-09-26T18:12:55.271Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -38,12 +38,13 @@
   - Files: src/hub/delivery.ts, src/hub/lifecycle.ts, tests/hub/delivery.test.ts, tests/hub/lifecycle.test.ts, src/hub/routes/read.ts, src/main/index.ts, tests/hub/security.test.ts, tests/hub/server.test.ts, tests/hub/fixtures/hub-process.ts, tests/hub/fixtures/signal-hub.mjs
 - [x] Phase HUB-CORE-AND-DELIVERY-POLICY-2, Task HC-6: Expose the local metrics surface (@hub-engineer)
   - Files: src/hub/metrics.ts, src/hub/routes/metrics.ts, tests/hub/metrics.test.ts, src/hub/delivery.ts, src/hub/routes/read.ts, src/hub/server.ts, src/main/index.ts
+- [x] Phase HUB-CORE-AND-DELIVERY-POLICY-3, Task HC-7: Review the hub read-only promise and restart safety
+  - Files: docs/reviews/hub-core.json
 
 ## Current Task
 - None currently running
 
 ## Remaining
-- [ ] Phase HUB-CORE-AND-DELIVERY-POLICY-3: Phase 3: Read-only and restart-safety gate
 - [ ] Phase NOTIFICATION-AND-TRAY-PRESENCE-1: Phase 1: Notifier and toast policy
 - [ ] Phase NOTIFICATION-AND-TRAY-PRESENCE-2: Phase 2: Tray presence
 - [ ] Phase NOTIFICATION-AND-TRAY-PRESENCE-3: Phase 3: Live notification gates

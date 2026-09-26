@@ -99,3 +99,9 @@
 {"timestamp":"2026-09-26T17:01:48.132Z","action":"task.attempt.finished","runId":"7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8","taskId":"HC-6","phaseId":"HUB-CORE-AND-DELIVERY-POLICY-2","attempt":1,"durationMs":1254405,"note":"All applicable completion gates passed","resultPath":"docs/artifacts/HC-6.2026-09-26T17-01-48-129Z.attempt-1.result.json"}
 {"timestamp":"2026-09-26T17:01:48.133Z","action":"artifact.created","runId":"7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8","taskId":"HC-6","artifactId":"work-hc-6-001","artifactType":"work.hc-6","inputArtifacts":["work-hc-1-001","work-el-2-001","work-hc-2-001","work-hc-3-001"]}
 {"timestamp":"2026-09-26T17:01:48.134Z","action":"task.complete","runId":"7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8","taskId":"HC-6","phaseId":"HUB-CORE-AND-DELIVERY-POLICY-2","outputFiles":["src/hub/metrics.ts","src/hub/routes/metrics.ts","tests/hub/metrics.test.ts","src/hub/delivery.ts","src/hub/routes/read.ts","src/hub/server.ts","src/main/index.ts"],"durationMs":1254405}
+{"timestamp":"2026-09-26T17:01:48.206Z","action":"task.committed","runId":"7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8","taskId":"HC-6","commitSha":"59c872c251331f0ea3af45e11cfcb5c403d3636b"}
+{"timestamp":"2026-09-26T17:01:48.207Z","action":"phase.started","runId":"7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8","phaseId":"HUB-CORE-AND-DELIVERY-POLICY-3"}
+{"timestamp":"2026-09-26T17:01:48.215Z","action":"run.paused","runId":"7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8","note":"Stop/pause requested (control file or signal)"}
+{"timestamp":"2026-09-26T18:12:50.709Z","action":"run.started","runId":"7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8","note":"harness=opencode"}
+{"timestamp":"2026-09-26T18:12:55.260Z","action":"phase.started","runId":"7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8","phaseId":"HUB-CORE-AND-DELIVERY-POLICY-3"}
+{"timestamp":"2026-09-26T18:12:55.268Z","action":"task.complete","runId":"7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8","taskId":"HC-7","note":"Human attestation: docs/reviews/hub-core.json"}

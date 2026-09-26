@@ -1,0 +1,13 @@
+{
+  "taskId": "HC-7",
+  "taskDigest": "0fc150be26db94629cab623ec31b4d36319f2796d247491b13cdc15908e11ea2",
+  "reviewer": "Doug McCusker",
+  "reviewedAt": "2026-09-26T18:12:47.002Z",
+  "decision": "approved",
+  "evidence": [
+    {
+      "path": "docs/reviews/HC-7-console-review.md",
+      "sha256": "2d827bfa0303097adf5e84376714295f91eab0a1cf13b139a5f3d0377e7d7599"
+    }
+  ]
+}
