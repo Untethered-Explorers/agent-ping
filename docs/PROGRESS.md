@@ -1,10 +1,10 @@
 # Project Progress
 
 ## Current State
-**Phase**: NOTIFICATION-AND-TRAY-PRESENCE-2
+**Phase**: OPENCODE-PLUGIN-ADAPTER-1
 **Status**: In Progress
-**Validation Gaps**: 54 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-26T20:33:12.815Z
+**Validation Gaps**: 58 unverified check(s) - see "Validation Gaps"
+**Last Updated**: 2026-09-26T21:39:59.059Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -50,13 +50,14 @@
   - Files: src/plugin/opencode/index.ts, src/plugin/opencode/translate.ts, src/plugin/opencode/work-signal.ts, tests/plugin/opencode-translate.test.ts, tests/plugin/opencode-work-signal.test.ts, docs/engine-config.json
 - [x] Phase OPENCODE-PLUGIN-ADAPTER-1, Task OA-2: Deliver events to the hub and leave a breadcrumb on failure (@connector-engineer)
   - Files: src/plugin/transport/http.ts, src/plugin/transport/breadcrumb.ts, tests/plugin/transport.test.ts
+- [x] Phase OPENCODE-PLUGIN-ADAPTER-1, Task OA-3: Install and remove the global plugin idempotently (@connector-engineer)
+  - Files: src/plugin/install/global-plugin.ts, tests/plugin/install.test.ts, assets/images/agent-ping-logo.png
 
 ## Current Task
 - None currently running
 
 ## Remaining
 - [ ] Phase NOTIFICATION-AND-TRAY-PRESENCE-3: Phase 3: Live notification gates
-- [ ] Phase OPENCODE-PLUGIN-ADAPTER-1: Phase 1: Event translation and delivery
 - [ ] Phase OPENCODE-PLUGIN-ADAPTER-2: Phase 2: Polling fallback and live verification
 - [ ] Phase OPENCODE-PLUGIN-ADAPTER-3: Phase 3: Live adapter gate
 - [ ] Phase LIVE-DASHBOARD-1: Phase 1: Live state on the approved layout
@@ -126,6 +127,10 @@
 - Task OA-2: The end-to-end test starts a real hub in this test process, not in a second OS process. The real ingest pipeline, the real SQLite log and the real runtime file and token are all involved, and a second store connection reads what was stored, but the process boundary itself is unproven here.
 - Task OA-2: The answer-cap and body-never-ends cases are driven against a bare http server rather than the hub, because the hub always answers completely; those two bounds are the client's own and have no hub-side counterpart to test against.
 - Task OA-2: One row of the failure table (a seam that rejects) uses the injected sender rather than a real socket. Every other row is a real loopback failure, and the injection exists so an unexpected fault in a caller-supplied seam is covered at all.
+- Task OA-3: The live opencode run never reached a hub, so this task's evidence stops at 'the installed file loads in the real harness, translates real events, and reports through client.app.log'. Ingest, classification and delivery are HC-3's and OA-5's evidence, not mine.
+- Task OA-3: The verification child process uses `node --experimental-strip-types`, which is not how opencode itself loads the file; the live probe is the evidence for that, and it is a single observed run rather than a repeated one.
+- Task OA-3: The scanner-based inliner is proven against this repository's eleven inlined modules and its own negative cases, not against arbitrary TypeScript; a future module using an export form it refuses will fail the install loudly with a named module rather than emit a wrong file.
+- Task OA-3: I did not re-verify the claim in the module header that a sibling package.json does not disturb plugin discovery; my own live probe had no package.json beside the plugin, so that specific claim rests on the inherited evidence.
 
 ## Notes
 - Workflow engine run 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
