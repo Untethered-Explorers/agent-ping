@@ -1,10 +1,10 @@
 # Project Progress
 
 ## Current State
-**Phase**: NOTIFICATION-AND-TRAY-PRESENCE-1
+**Phase**: OPENCODE-PLUGIN-ADAPTER-1
 **Status**: In Progress
-**Validation Gaps**: 44 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-26T19:37:59.511Z
+**Validation Gaps**: 49 unverified check(s) - see "Validation Gaps"
+**Last Updated**: 2026-09-26T19:53:15.249Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -46,6 +46,8 @@
   - Files: src/notify/macos.ts, src/notify/windows.ts, tests/notify/macos.test.ts, tests/notify/windows.test.ts, docs/runbooks/notify-platforms.md, src/main/index.ts, src/notify/linux.ts, src/notify/registry.ts, src/notify/types.ts, tests/notify/registry-selection.test.ts, src/notify/command.ts
 - [x] Phase OPENCODE-PLUGIN-ADAPTER-1, Task OA-1: Translate opencode events into the normalized envelope (@connector-engineer)
   - Files: src/plugin/opencode/index.ts, src/plugin/opencode/translate.ts, src/plugin/opencode/work-signal.ts, tests/plugin/opencode-translate.test.ts, tests/plugin/opencode-work-signal.test.ts, docs/engine-config.json
+- [x] Phase OPENCODE-PLUGIN-ADAPTER-1, Task OA-2: Deliver events to the hub and leave a breadcrumb on failure (@connector-engineer)
+  - Files: src/plugin/transport/http.ts, src/plugin/transport/breadcrumb.ts, tests/plugin/transport.test.ts
 
 ## Current Task
 - None currently running
@@ -113,6 +115,11 @@
 - Task OA-1: No live opencode session was run. The payload shapes are the 1.18.32 type declarations, not a capture from a running harness; proving the harness delivers them is OA-5's script and OA-6's gate, not this task.
 - Task OA-1: The one-envelope and block-lifecycle tests use the real ingest pipeline and the real SQLite log but drive it from fixtures rather than from a harness's event stream.
 - Task OA-1: The plugin was not loaded by opencode itself. Its structural plugin and client types mirror the 1.18.32 declarations rather than importing @opencode-ai/plugin, which is deliberate (the adapter must load with no dependency), so a signature change upstream would not be caught by a compile error here - the OA-3 install and OA-5 live run are where that surfaces.
+- Task OA-2: No live opencode session was run. The plugin hook path is driven from fixtures through the real AGENT_PING_PLUGIN, so what is proven is that a harness hook with this transport wired resolves and that a failure becomes a breadcrumb on the harness's own client - not that a running opencode delivers a signal. OA-5's script and OA-6's gate are where that is observed.
+- Task OA-2: The transport is not yet wired into an installed plugin artefact, so 'delivered from inside a harness process' is a property of the code path under test rather than of a process the engine started. OA-3 owns the single-file install that constructs the transport and passes it as `deliver`.
+- Task OA-2: The end-to-end test starts a real hub in this test process, not in a second OS process. The real ingest pipeline, the real SQLite log and the real runtime file and token are all involved, and a second store connection reads what was stored, but the process boundary itself is unproven here.
+- Task OA-2: The answer-cap and body-never-ends cases are driven against a bare http server rather than the hub, because the hub always answers completely; those two bounds are the client's own and have no hub-side counterpart to test against.
+- Task OA-2: One row of the failure table (a seam that rejects) uses the injected sender rather than a real socket. Every other row is a real loopback failure, and the injection exists so an unexpected fault in a caller-supplied seam is covered at all.
 
 ## Notes
 - Workflow engine run 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
