@@ -1,0 +1,35 @@
+{
+  // The one tsc build entry point (PRD 6.2: Electron main via tsc).
+  //
+  // Emits the Node-hosted concerns to dist/main. The dashboard is built by Vite
+  // and the plugin is loaded by opencode as directly loadable TypeScript, so
+  // neither is compiled here.
+  //
+  // NodeNext resolution means every relative import in these directories must
+  // carry an explicit .js extension, which is what Node ESM needs at runtime.
+  // The path alias is cleared on purpose: a Node-hosted file that imports "@/..."
+  // must fail to compile here rather than emit a specifier Node cannot resolve.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "types": ["node"],
+    "lib": ["ES2023"],
+    "noEmit": false,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "dist/main",
+    "rootDir": "src",
+    "paths": {}
+  },
+  "include": [
+    "src/main/**/*.ts",
+    "src/hub/**/*.ts",
+    "src/storage/**/*.ts",
+    "src/domain/**/*.ts",
+    "src/notify/**/*.ts",
+    "src/cli/**/*.ts"
+  ],
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+}

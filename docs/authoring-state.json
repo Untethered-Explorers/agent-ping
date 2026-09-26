@@ -31,9 +31,38 @@
       "completedAt": "2026-09-26T10:04:55.452Z"
     },
     "skills": {
-      "status": "pending",
+      "status": "complete",
       "inputFingerprint": "61d788665eb29f3e9cf547901eaebeaa9a9bc7db668c9d747afaec615371abc4",
-      "outputs": []
+      "outputs": [
+        ".opencode/skills/pixijs/SKILL.md",
+        ".opencode/skills/canvas-dom-mirror/SKILL.md",
+        ".opencode/skills/harness-signal-mapping/SKILL.md",
+        ".opencode/skills/content-free-schema-guard/SKILL.md",
+        ".opencode/skills/loopback-api-security/SKILL.md",
+        ".opencode/skills/live-verification-script/SKILL.md",
+        ".opencode/skills/create-project-documentation/SKILL.md"
+      ],
+      "outputFingerprint": "318c18e45a36c16807204421f950d683781322490400f662462e26c1c6ba4f0b",
+      "noSkillsRequired": false,
+      "completedAt": "2026-09-26T10:38:52.100Z",
+      "invocation": {
+        "runner": "opencode",
+        "requestedModel": "opencode/space-bunny-free",
+        "source": "project",
+        "effectiveModel": "opencode/space-bunny-free",
+        "inventoryVerifiedAt": "2026-09-26T08:58:24.379Z",
+        "runnerSource": "project",
+        "argv": [
+          "run",
+          "--auto",
+          "--dir",
+          "/home/mcfuzzysquirrel/Projects/agent-ping",
+          "--model",
+          "opencode/space-bunny-free",
+          "/forge-build-project-skills Consume docs/SKILL-CANDIDATES.json. Use .opencode/skills/ and .opencode/agents/. Create or extend only planned skills, reuse unchanged packages, honor omit decisions, and run structural and per-axis review gates. Do not regenerate the team, modify its ownership or handoff, compile a manifest, or start the build. Headless: proceed with authorized defaults."
+        ],
+        "skill": "forge-build-project-skills"
+      }
     }
   }
 }

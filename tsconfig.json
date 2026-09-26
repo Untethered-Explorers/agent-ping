@@ -1,0 +1,53 @@
+{
+  // Base configuration for every TypeScript surface in the repository:
+  // src/ (all seven concerns from PRD 6.2), tests/ and the Vite/Vitest config.
+  //
+  // This file type-checks only (noEmit). tsconfig.build.json extends it for the
+  // one build entry point that uses tsc (Electron main and the CLI).
+  //
+  // Module strategy: Bundler resolution, which is what the Vite-built dashboard
+  // and the directly-loaded plugin need. The Node-hosted tsc build overrides
+  // this to NodeNext in tsconfig.build.json, where relative imports must carry
+  // an explicit .js extension.
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "moduleDetection": "force",
+    "types": ["node"],
+    "jsx": "preserve",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    // Path alias for the dashboard and tests (PRD 6.2: the dashboard imports
+    // across src/dashboard/, tests import product modules). Mirrored as
+    // resolve.alias in vitest.config.ts, because Vite does not read tsconfig
+    // paths. Node-hosted code (src/main, src/hub, src/storage, src/domain,
+    // src/notify, src/cli) must use relative imports instead: tsconfig.build.json
+    // clears this map so an alias in Node-hosted code is a compile error rather
+    // than an unresolved specifier at runtime.
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.mts",
+    "tests/**/*.ts",
+    "tests/**/*.tsx",
+    "vitest.config.ts"
+  ],
+  "exclude": ["node_modules", "dist", "build", "test-results", "playwright-report"]
+}

@@ -21,6 +21,9 @@ playwright-report/
 blob-report/
 .playwright/
 
+# Scratch directory the runner-convention test creates for its nested run
+tests/tooling/runner-convention-probe/
+
 # Local runtime state (the state directory lives outside the repo; these guard
 # against a test or a manual run leaving a database or log inside it)
 *.db

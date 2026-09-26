@@ -2,7 +2,7 @@
   "harness": "opencode",
   "granularity": "",
   "concurrency": "",
-  "taskTimeoutMs": "",
+  "taskTimeoutMs": "2700000",
   "maxRetries": "",
   "viz": false,
   "vizPort": "",

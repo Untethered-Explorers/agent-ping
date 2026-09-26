@@ -1,0 +1,2728 @@
+{
+  "version": "1.0",
+  "generatedAt": "2026-09-26T10:43:03.665Z",
+  "granularity": "fine",
+  "sourceLayout": "features",
+  "repoRoot": "/home/mcfuzzysquirrel/Projects/agent-ping",
+  "harnessRoot": ".opencode",
+  "prdPath": "/home/mcfuzzysquirrel/Projects/agent-ping/docs/PRD.md",
+  "visionPath": "/home/mcfuzzysquirrel/Projects/agent-ping/docs/PRD.md",
+  "featureOrder": [
+    "Dashboard Design Prototype",
+    "Event Model and Durable Log",
+    "Hub Core and Delivery Policy",
+    "Notification and Tray Presence",
+    "opencode Plugin Adapter",
+    "Live Dashboard",
+    "Install, Autostart and Operations",
+    "Copilot CLI ACP Spike"
+  ],
+  "progressPath": "/home/mcfuzzysquirrel/Projects/agent-ping/docs/PROGRESS.md",
+  "auditPath": "/home/mcfuzzysquirrel/Projects/agent-ping/docs/EXECUTION-AUDIT.jsonl",
+  "validationCommands": [],
+  "approvalGates": {
+    "preflight": true,
+    "betweenPhases": true
+  },
+  "phases": [
+    {
+      "id": "DASHBOARD-DESIGN-PROTOTYPE-1",
+      "title": "Phase 1: Toolchain and static prototype",
+      "feature": "Dashboard Design Prototype",
+      "description": "```forge-task {   \"id\": \"DP-1\",",
+      "ownerAgents": [
+        "tooling-engineer",
+        "dashboard-engineer"
+      ],
+      "dependencies": [],
+      "approvalRequired": false,
+      "tasks": [
+        {
+          "id": "DP-1",
+          "title": "Establish toolchain and test-runner convention",
+          "description": "Create the single-package Node 22 and TypeScript project that every later feature builds on. Add npm scripts for build, test, typecheck and lint; configure Vitest so `npm test -- <path>` runs exactly that path and exits non-zero when the path selects zero test files; add a test that asserts this convention by running the runner against a temporary empty selection. Do not write any product code, dashboard or store in this task.",
+          "ownerAgent": "tooling-engineer",
+          "dependencies": [],
+          "expectedOutputs": [
+            "package.json",
+            "tsconfig.json",
+            "vitest.config.ts",
+            "eslint.config.js",
+            "tests/tooling/runner-convention.test.ts"
+          ],
+          "validationCommands": [
+            "npm test -- tests/tooling/runner-convention.test.ts",
+            "npm run typecheck"
+          ],
+          "contract": {
+            "version": 1,
+            "kind": "implementation",
+            "requirements": [
+              "DP-FR-07: The project provides one test command that runs a named test path and fails when that path selects zero tests, so an empty selection can never be reported as a pass.",
+              "DP-FR-08: The project provides working typecheck, lint and build scripts, and all three pass on the prototype sources."
+            ],
+            "acceptanceCriteria": [
+              "The runner-convention test proves a named-path run of a path with no tests exits non-zero rather than reporting success",
+              "npm run typecheck and npm run lint both succeed on an empty source set",
+              "Every script name later features rely on is present in package.json"
+            ],
+            "constraints": [
+              "Node.js 22 LTS or newer with TypeScript and npm only",
+              "APX-CON-05: One toolchain only: Node.js 22 LTS or newer with TypeScript and npm. No second implementation language and no runtime dependency the supported Node line does not satisfy."
+            ],
+            "references": [
+              "docs/PRD.md#6.1 Technology Stack",
+              "docs/PRD.md#6.2 Project Structure",
+              "docs/features/dashboard-design-prototype.md#3. Functional Requirements",
+              "docs/IDEA.md#Open Questions",
+              "docs/features/dashboard-design-prototype.md#DP-FR-07",
+              "docs/features/dashboard-design-prototype.md#DP-FR-08",
+              "docs/PRD.md#APX-CON-05"
+            ]
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.dp-1",
+          "inputs": [],
+          "timeoutMs": 2700000
+        },
+        {
+          "id": "DP-2",
+          "title": "Render the static mock dashboard page",
+          "description": "Build the PixiJS 8 prototype as a static page: one exported mount entry point that initialises the application asynchronously, sizes to its container, draws a repository group header with the short name and the full path on hover, and draws session rows carrying a state icon, a text label, an age and a one-line status. Consume the deterministic mock module for exactly three rows across two repositories, one blocked, one finished, one running. Wire the mount entry point into the page HTML as the composition root so a user can open the built page and see the rows. Make no network call and read no file. Exclude live data, acknowledgement and any hub interaction.",
+          "ownerAgent": "dashboard-engineer",
+          "dependencies": [
+            "DP-1"
+          ],
+          "expectedOutputs": [
+            "vite.config.ts",
+            "src/dashboard/prototype/index.html",
+            "src/dashboard/prototype/main.ts",
+            "src/dashboard/prototype/scene.ts",
+            "src/dashboard/prototype/mock-data.ts",
+            "tests/dashboard/prototype-scene.test.ts"
+          ],
+          "validationCommands": [
+            "npm test -- tests/dashboard/prototype-scene.test.ts",
+            "npm run typecheck"
+          ],
+          "contract": {
+            "version": 1,
+            "kind": "implementation",
+            "requirements": [
+              "DP-FR-01: The prototype is fully static: no hub, no plugin, no HTTP request, no filesystem read and no live data. It opens from a built page and renders three hardcoded mock rows.",
+              "DP-FR-02: The prototype initialises PixiJS 8 through its asynchronous application init, sizes to its container, and destroys the renderer and its event subscriptions on unload without leaking a ticker or a texture.",
+              "DP-FR-03: Rows are grouped under a repository short-name header with the full path available on hover or focus, and urgency is encoded by an icon plus a text label, never by colour alone.",
+              "DP-FR-06: Mock data lives in one deterministic module shared by the renderer and the tests, with fixed identifiers and timestamps so snapshots and assertions are stable."
+            ],
+            "acceptanceCriteria": [
+              "A test drives the exported mount entry point and asserts the three mock rows render under their repository headers with the expected state labels",
+              "A test asserts the mount entry point performs no network request and the prototype page contains no hub URL",
+              "A test asserts unload destroys the renderer and removes every registered subscription"
+            ],
+            "constraints": [
+              "APX-CON-09: Identity is the repository short name, which is the directory basename of the session. Sessions nest beneath it and the full path is available on hover or focus but is never the primary label.",
+              "APX-CON-11: Performance budgets: hub idle RSS at most 150 MB, local ingest p95 at most 50 ms, dashboard first paint at most 1 s from warm cache, live update visible within 250 ms of an accepted event."
+            ],
+            "references": [
+              "docs/PRD.md#6.1 Technology Stack",
+              "docs/features/dashboard-design-prototype.md#4. UI / Interaction Design",
+              "docs/IDEA.md#Open Questions",
+              "docs/features/dashboard-design-prototype.md#DP-FR-01",
+              "docs/features/dashboard-design-prototype.md#DP-FR-02",
+              "docs/features/dashboard-design-prototype.md#DP-FR-03",
+              "docs/features/dashboard-design-prototype.md#DP-FR-06",
+              "docs/PRD.md#APX-CON-09",
+              "docs/PRD.md#APX-CON-11"
+            ]
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.dp-2",
+          "inputs": [
+            "work.dp-1"
+          ],
+          "timeoutMs": 2700000
+        },
+        {
+          "id": "DP-3",
+          "title": "Add non-colour urgency encoding, keyboard order and the DOM mirror",
+          "description": "Extend the prototype so state is legible without colour, the page is operable by keyboard alone, and a visually hidden DOM mirror exposes the same information. Add a state encoder that maps each state to an icon and a text label, a focus-order controller that walks rows in visual order and reports activation, a motion module that reads the reduced-motion preference and disables non-essential movement, and a mirror builder that renders an off-screen focusable list of rows with accessible names, state and repository grouping. Mount the mirror and the keyboard controller from the prototype mount entry point and list that file as an output so the wiring is part of this task. Exclude live data and visual restyling beyond state encoding and contrast.",
+          "ownerAgent": "dashboard-engineer",
+          "dependencies": [
+            "DP-2"
+          ],
+          "expectedOutputs": [
+            "src/dashboard/prototype/main.ts",
+            "src/dashboard/a11y/dom-mirror.ts",
+            "src/dashboard/a11y/keyboard-nav.ts",
+            "src/dashboard/theme/motion.ts",
+            "tests/dashboard/dom-mirror.test.ts",
+            "tests/dashboard/keyboard-nav.test.ts"
+          ],
+          "validationCommands": [
+            "npm test -- tests/dashboard/dom-mirror.test.ts tests/dashboard/keyboard-nav.test.ts",
+            "npm run typecheck"
+          ],
+          "contract": {
+            "version": 1,
+            "kind": "implementation",
+            "requirements": [
+              "DP-FR-04: The prototype is fully operable by keyboard: rows are focusable in order, activation is observable, and a reduced-motion preference disables non-essential movement.",
+              "DP-FR-05: A visually hidden but focusable DOM mirror of every visible row exists alongside the canvas, exposing accessible names, state and repository grouping so the information is available to a screen reader.",
+              "DP-FR-03: Rows are grouped under a repository short-name header with the full path available on hover or focus, and urgency is encoded by an icon plus a text label, never by colour alone."
+            ],
+            "acceptanceCriteria": [
+              "A jsdom test mounts the prototype and asserts the hidden mirror contains one focusable entry per visible row with the same repository grouping and state text",
+              "A jsdom test asserts keyboard traversal visits rows in visual order and reports activation for the focused row",
+              "A test asserts the reduced-motion preference suppresses non-essential movement while leaving state changes visible",
+              "A test asserts every state renders an icon and a text label so no state is distinguished by colour alone"
+            ],
+            "constraints": [
+              "Canvas paired with a visually hidden focusable DOM mirror, reduced motion honoured, AA contrast",
+              "APX-CON-07: The PixiJS canvas is always paired with a visually hidden but focusable DOM mirror of every visible row, so the dashboard is operable by keyboard and legible to a screen reader. Reduced-motion preferences are honoured, urgency is never encoded by colour alone, and text meets WCAG 2.1 AA contrast against its background.",
+              "APX-CON-09: Identity is the repository short name, which is the directory basename of the session. Sessions nest beneath it and the full path is available on hover or focus but is never the primary label."
+            ],
+            "references": [
+              "docs/features/dashboard-design-prototype.md#4. UI / Interaction Design",
+              "docs/PRD.md#9. Accessibility",
+              "docs/IDEA.md#Where The Surface Lives",
+              "docs/features/dashboard-design-prototype.md#DP-FR-04",
+              "docs/features/dashboard-design-prototype.md#DP-FR-05",
+              "docs/features/dashboard-design-prototype.md#DP-FR-03",
+              "docs/PRD.md#APX-CON-07",
+              "docs/PRD.md#APX-CON-09"
+            ]
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.dp-3",
+          "inputs": [
+            "work.dp-2"
+          ],
+          "timeoutMs": 2700000
+        }
+      ]
+    },
+    {
+      "id": "DASHBOARD-DESIGN-PROTOTYPE-2",
+      "title": "Phase 2: Design review gate",
+      "feature": "Dashboard Design Prototype",
+      "description": "```forge-task {   \"id\": \"DP-4\",",
+      "ownerAgents": [],
+      "dependencies": [
+        "DASHBOARD-DESIGN-PROTOTYPE-1"
+      ],
+      "approvalRequired": true,
+      "tasks": [
+        {
+          "id": "DP-4",
+          "title": "Review the static prototype as a design artefact",
+          "description": "Human review of the built prototype. Build the dashboard, open the prototype page, and judge the design questions that discussion could not settle: layout, density, whether urgency is readable without colour, whether the keyboard path is usable, and whether the mock rows feel crowded. Complete the primary user journey against the running prototype: scan the three mock rows, identify which repository is blocked, and reach the blocked row using only the keyboard. Record the judgement, what was exercised, and any required change in the review file. Do not change code in this task; record the required change instead.",
+          "dependencies": [
+            "DP-2",
+            "DP-3"
+          ],
+          "expectedOutputs": [],
+          "validationCommands": [],
+          "contract": {
+            "version": 1,
+            "kind": "human-review",
+            "requirements": [
+              "DP-FR-01: The prototype is fully static: no hub, no plugin, no HTTP request, no filesystem read and no live data. It opens from a built page and renders three hardcoded mock rows.",
+              "DP-FR-03: Rows are grouped under a repository short-name header with the full path available on hover or focus, and urgency is encoded by an icon plus a text label, never by colour alone.",
+              "DP-FR-04: The prototype is fully operable by keyboard: rows are focusable in order, activation is observable, and a reduced-motion preference disables non-essential movement.",
+              "DP-FR-05: A visually hidden but focusable DOM mirror of every visible row exists alongside the canvas, exposing accessible names, state and repository grouping so the information is available to a screen reader."
+            ],
+            "acceptanceCriteria": [
+              "The reviewer built the prototype, opened the page and completed the primary journey, stating in the notes which rows were inspected and how the blocked repository was identified",
+              "The reviewer recorded a verdict on density, on urgency legibility without colour, and on keyboard usability",
+              "The reviewer recorded whether Live Dashboard may proceed on this design, and every required change as an explicit list"
+            ],
+            "constraints": [
+              "A subjective visual judgement never stands alone; the journey must have been performed on the running page",
+              "APX-CON-07: The PixiJS canvas is always paired with a visually hidden but focusable DOM mirror of every visible row, so the dashboard is operable by keyboard and legible to a screen reader. Reduced-motion preferences are honoured, urgency is never encoded by colour alone, and text meets WCAG 2.1 AA contrast against its background."
+            ],
+            "references": [
+              "docs/features/dashboard-design-prototype.md#4. UI / Interaction Design",
+              "docs/PRD.md#11. Analytics / Success Metrics",
+              "docs/IDEA.md#Open Questions",
+              "docs/features/dashboard-design-prototype.md#DP-FR-01",
+              "docs/features/dashboard-design-prototype.md#DP-FR-03",
+              "docs/features/dashboard-design-prototype.md#DP-FR-04",
+              "docs/features/dashboard-design-prototype.md#DP-FR-05",
+              "docs/PRD.md#APX-CON-07"
+            ],
+            "reviewFile": "docs/reviews/dashboard-design.json"
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.dp-4",
+          "inputs": [
+            "work.dp-2",
+            "work.dp-3",
+            "work.dp-1"
+          ],
+          "timeoutMs": 2700000
+        }
+      ]
+    },
+    {
+      "id": "EVENT-MODEL-AND-DURABLE-LOG-1",
+      "title": "Phase 1: Durable store",
+      "feature": "Event Model and Durable Log",
+      "description": "```forge-task {   \"id\": \"EL-1\",",
+      "ownerAgents": [
+        "domain-engineer"
+      ],
+      "dependencies": [],
+      "approvalRequired": true,
+      "tasks": [
+        {
+          "id": "EL-1",
+          "title": "Create the content-free schema and store API",
+          "description": "Define the durable schema as versioned SQL migrations and wrap it in a small store API. Create session summaries, events and counters with indexes on session and occurrence time and on class and acknowledgement state, and a schema version record. Resolve the database file from an overridable platform state directory so tests can redirect it to a temporary path, apply migrations idempotently on every open, and rebuild the database from migrations when the existing file cannot be read. Add a test that asserts the exact column set of every table so a content-bearing column fails the build. Expose only typed accessors: insert event, read pending, mark resolved, mark acknowledged, read session summaries. Exclude classification rules, HTTP and any dashboard code.",
+          "ownerAgent": "domain-engineer",
+          "dependencies": [
+            "DP-1"
+          ],
+          "expectedOutputs": [
+            "src/storage/schema.sql",
+            "src/storage/db.ts",
+            "src/storage/paths.ts",
+            "src/storage/eventStore.ts",
+            "tests/storage/schema.test.ts",
+            "tests/storage/eventStore.test.ts"
+          ],
+          "validationCommands": [
+            "npm test -- tests/storage/schema.test.ts tests/storage/eventStore.test.ts",
+            "npm run typecheck"
+          ],
+          "contract": {
+            "version": 1,
+            "kind": "implementation",
+            "requirements": [
+              "EL-FR-02: The durable schema has versioned migrations applied at startup and holds session summaries, events and counters, indexed by session and occurrence time and by class and acknowledgement state.",
+              "EL-FR-03: An automated test asserts the exact column set of every table, so adding a content-bearing column fails the build rather than silently violating the privacy boundary.",
+              "EL-FR-11: The store resolves its database file from a platform state directory that tests can redirect, applies migrations idempotently on every open, and recreates the database from migrations when the file is unreadable rather than refusing to start.",
+              "APX-FR-01: The system never stores or transmits conversation content: no prompt, response, tool output, file content or diff is written to the durable log, a log file or any outbound request. Only harness, repository short name and full path, session identifier, event class and subtype, timestamps and acknowledgement or resolution state are persisted."
+            ],
+            "acceptanceCriteria": [
+              "A test asserts the exact column list of every table and fails if any column name suggests stored content",
+              "A test opens a store twice against the same temporary path and asserts migrations are idempotent",
+              "A test corrupts the database file and asserts the store rebuilds from migrations rather than throwing",
+              "A round-trip test inserts an event and reads back the session summary and pending row"
+            ],
+            "constraints": [
+              "Never store or transmit conversation content",
+              "No telemetry leaves the machine",
+              "Node.js 22 LTS or newer with TypeScript and npm only",
+              "APX-CON-05: One toolchain only: Node.js 22 LTS or newer with TypeScript and npm. No second implementation language and no runtime dependency the supported Node line does not satisfy.",
+              "APX-CON-12: No telemetry leaves the machine. Counters, logs and the durable log are local files only, and no outbound network call exists other than to the loopback hub and the harnesses already running on this machine."
+            ],
+            "references": [
+              "docs/PRD.md#6.2 Project Structure",
+              "docs/features/event-model-and-durable-log.md#3. Functional Requirements",
+              "docs/IDEA.md#Boundaries",
+              "docs/features/event-model-and-durable-log.md#EL-FR-02",
+              "docs/features/event-model-and-durable-log.md#EL-FR-03",
+              "docs/features/event-model-and-durable-log.md#EL-FR-11",
+              "docs/PRD.md#APX-FR-01",
+              "docs/PRD.md#APX-CON-05",
+              "docs/PRD.md#APX-CON-12"
+            ]
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.el-1",
+          "inputs": [
+            "work.dp-1"
+          ],
+          "timeoutMs": 2700000
+        },
+        {
+          "id": "EL-2",
+          "title": "Add retention pruning and local counters",
+          "description": "Add retention and counters on top of the existing store API. Prune events older than thirty days while always keeping at least the most recent five hundred per session, and never pruning a row that is an unacknowledged pending item. Add one counter accessor for dashboard opens, toast deliveries, deep-link opens and pending-count snapshots, stored locally with no content. Cover the boundary cases with tests: exactly-thirty-day rows, the per-session floor, an old pending item that must survive, and counters that survive a reopen. Expose a single read-only accessor for counters rather than a query surface. Exclude delivery, HTTP and UI.",
+          "ownerAgent": "domain-engineer",
+          "dependencies": [
+            "EL-1"
+          ],
+          "expectedOutputs": [
+            "src/storage/retention.ts",
+            "src/storage/counters.ts",
+            "tests/storage/retention.test.ts",
+            "tests/storage/counters.test.ts"
+          ],
+          "validationCommands": [
+            "npm test -- tests/storage/retention.test.ts tests/storage/counters.test.ts",
+            "npm run typecheck"
+          ],
+          "contract": {
+            "version": 1,
+            "kind": "implementation",
+            "requirements": [
+              "EL-FR-09: Retention prunes events older than thirty days while keeping at least the most recent five hundred per session, and never prunes an unacknowledged pending item.",
+              "EL-FR-10: Local counters record dashboard opens, toast deliveries, deep-link opens and pending-count snapshots, hold no content, and are readable through one read-only accessor."
+            ],
+            "acceptanceCriteria": [
+              "A test asserts a row exactly at the retention boundary is pruned and one a day older is kept by the per-session floor",
+              "A test asserts an unacknowledged pending item survives pruning regardless of age",
+              "A test asserts each counter increments through the accessor and survives reopening the store"
+            ],
+            "constraints": [
+              "Never store or transmit conversation content",
+              "No telemetry leaves the machine",
+              "APX-CON-12: No telemetry leaves the machine. Counters, logs and the durable log are local files only, and no outbound network call exists other than to the loopback hub and the harnesses already running on this machine."
+            ],
+            "references": [
+              "docs/PRD.md#16. Open Questions",
+              "docs/features/event-model-and-durable-log.md#3. Functional Requirements",
+              "docs/features/event-model-and-durable-log.md#EL-FR-09",
+              "docs/features/event-model-and-durable-log.md#EL-FR-10",
+              "docs/PRD.md#APX-CON-12"
+            ]
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.el-2",
+          "inputs": [
+            "work.el-1"
+          ],
+          "timeoutMs": 2700000
+        }
+      ]
+    },
+    {
+      "id": "EVENT-MODEL-AND-DURABLE-LOG-2",
+      "title": "Phase 2: Event model and pending lifecycle",
+      "feature": "Event Model and Durable Log",
+      "description": "```forge-task {   \"id\": \"EL-3\",",
+      "ownerAgents": [
+        "domain-engineer"
+      ],
+      "dependencies": [
+        "EVENT-MODEL-AND-DURABLE-LOG-1"
+      ],
+      "approvalRequired": true,
+      "tasks": [
+        {
+          "id": "EL-3",
+          "title": "Define the envelope and the classification rules",
+          "description": "Define the normalized envelope and the pure classification rules that turn a harness event into exactly one class, an optional subtype and a dedupe key. Map permission asks and user-input blocks to needs-you, idle transitions to finished, and errors, retries, long tool calls, compaction and token burn to fyi with the matching subtype. Implement the idle gate: an idle transition whose turn recorded no tool call, no file edit and no todo update yields no event at all. Implement per-block deduplication so a repeated permission ask for the same session and block identifier yields the same dedupe key. Keep this task pure and synchronous with no database writes. Exclude pending lifecycle, delivery and notification.",
+          "ownerAgent": "domain-engineer",
+          "dependencies": [
+            "EL-1"
+          ],
+          "expectedOutputs": [
+            "src/domain/envelope.ts",
+            "src/domain/classify.ts",
+            "tests/domain/classify.test.ts"
+          ],
+          "validationCommands": [
+            "npm test -- tests/domain/classify.test.ts",
+            "npm run typecheck"
+          ],
+          "contract": {
+            "version": 1,
+            "kind": "implementation",
+            "requirements": [
+              "EL-FR-01: The normalized envelope carries harness, session identifier, repository short name and full path, raw event type, class, optional subtype, ISO 8601 UTC occurrence and receipt timestamps, and a dedupe key. It has no field capable of holding a prompt, response, tool output or file content.",
+              "EL-FR-04: Classification maps harness events to exactly one of three classes, needs-you, finished or fyi, with fyi carrying a subtype of error, retry, long-tool-call, compaction or token-burn.",
+              "EL-FR-05: A session that goes idle having performed no work in the turn, meaning no tool call, no file edit and no todo update, produces no event at all.",
+              "EL-FR-06: A session that goes idle after work produces exactly one finished event per idle transition, and stays silent until the session resumes.",
+              "EL-FR-07: A block produces one needs-you event per unresolved block, deduplicated by session and block identifier, and a second permission ask for the same block never produces a second event."
+            ],
+            "acceptanceCriteria": [
+              "A table-driven test asserts every documented harness event maps to its expected class and subtype, and that no event maps to two classes",
+              "A test asserts an idle transition after a turn with no tool call, file edit or todo update produces no event",
+              "A test asserts two idle transitions separated by a resume produce two finished events and a repeated permission ask for one block produces one dedupe key",
+              "A test asserts the envelope type has no field able to hold prompt, response or tool output text"
+            ],
+            "constraints": [
+              "Never store or transmit conversation content",
+              "APX-CON-12: No telemetry leaves the machine. Counters, logs and the durable log are local files only, and no outbound network call exists other than to the loopback hub and the harnesses already running on this machine."
+            ],
+            "references": [
+              "docs/PRD.md#5. Research Findings",
+              "docs/features/event-model-and-durable-log.md#3. Functional Requirements",
+              "docs/IDEA.md#What Earns An Interruption",
+              "docs/features/event-model-and-durable-log.md#EL-FR-01",
+              "docs/features/event-model-and-durable-log.md#EL-FR-04",
+              "docs/features/event-model-and-durable-log.md#EL-FR-05",
+              "docs/features/event-model-and-durable-log.md#EL-FR-06",
+              "docs/features/event-model-and-durable-log.md#EL-FR-07",
+              "docs/PRD.md#APX-CON-12"
+            ]
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.el-3",
+          "inputs": [
+            "work.el-1",
+            "work.el-2"
+          ],
+          "timeoutMs": 2700000
+        },
+        {
+          "id": "EL-4",
+          "title": "Implement the pending lifecycle state machine",
+          "description": "Implement the pending lifecycle on top of the classification and the store: a needs-you event creates a pending item, and it leaves pending only when the harness reports the block resolved or the developer acknowledges it. Make every transition idempotent so a duplicated resolution or acknowledgement cannot double-count, reject an acknowledgement of an already resolved item with a distinguishable result, and prove that reopening the database reports the same pending set. Expose the pending set as the single source of truth the tray badge and dashboard will later read. Exclude HTTP routes, notification delivery and any dashboard code.",
+          "ownerAgent": "domain-engineer",
+          "dependencies": [
+            "EL-2",
+            "EL-3"
+          ],
+          "expectedOutputs": [
+            "src/domain/pending.ts",
+            "tests/domain/pending.test.ts"
+          ],
+          "validationCommands": [
+            "npm test -- tests/domain/pending.test.ts",
+            "npm run typecheck"
+          ],
+          "contract": {
+            "version": 1,
+            "kind": "implementation",
+            "requirements": [
+              "EL-FR-08: A pending item stays pending until the harness reports the block resolved or the developer acknowledges it. No other transition clears it, and it survives hub restart unchanged."
+            ],
+            "acceptanceCriteria": [
+              "A test asserts a pending item survives closing and reopening the database with identical state",
+              "A test asserts a duplicated resolution and a duplicated acknowledgement are both idempotent and never double-count",
+              "A test asserts acknowledging an already resolved item returns a distinguishable rejected result and leaves state unchanged"
+            ],
+            "constraints": [
+              "APX-CON-08: Exactly one mutating route exists, the ack route, and it can only mark a pending item acknowledged. No route can spawn, steer, interrupt, prompt or approve anything inside a harness."
+            ],
+            "references": [
+              "docs/features/event-model-and-durable-log.md#3. Functional Requirements",
+              "docs/PRD.md#10. System States / Lifecycle",
+              "docs/features/event-model-and-durable-log.md#EL-FR-08",
+              "docs/PRD.md#APX-CON-08"
+            ]
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.el-4",
+          "inputs": [
+            "work.el-2",
+            "work.el-3",
+            "work.el-1"
+          ],
+          "timeoutMs": 2700000
+        }
+      ]
+    },
+    {
+      "id": "HUB-CORE-AND-DELIVERY-POLICY-1",
+      "title": "Phase 1: Process, read surface and live stream",
+      "feature": "Hub Core and Delivery Policy",
+      "description": "```forge-task {   \"id\": \"HC-1\",",
+      "ownerAgents": [
+        "hub-engineer"
+      ],
+      "dependencies": [
+        "EVENT-MODEL-AND-DURABLE-LOG-2"
+      ],
+      "approvalRequired": true,
+      "tasks": [
+        {
+          "id": "HC-1",
+          "title": "Stand up the hub process and its read routes",
+          "description": "Create the Electron main process as the composition root and give it a loopback HTTP server. The main entry point must enforce a single running instance, open the store, start the server, register the read routes and write the chosen port to a runtime file that adapters read, and it must serve the built dashboard from the same origin. Implement the read routes for session summaries, one session with recent events, the pending set, bounded history, counters and health, none of which may mutate state. Bind 127.0.0.1 only and fall back to the next free port when the default is taken, recording the live port in the runtime file. Add a test that boots the real main entry point against a temporary state directory and exercises the read routes over a real socket. Exclude ingest, the ack route, the tray and any notification.",
+          "ownerAgent": "hub-engineer",
+          "dependencies": [
+            "DP-1",
+            "EL-1"
+          ],
+          "expectedOutputs": [
+            "src/main/index.ts",
+            "src/hub/server.ts",
+            "src/hub/routes/read.ts",
+            "src/hub/runtime-file.ts",
+            "tests/hub/server.test.ts"
+          ],
+          "validationCommands": [
+            "npm test -- tests/hub/server.test.ts",
+            "npm run typecheck"
+          ],
+          "contract": {
+            "version": 1,
+            "kind": "implementation",
+            "requirements": [
+              "HC-FR-01: The Electron main process is the composition root: it enforces a single running instance, starts the store, binds the loopback server, registers every route and mounts the tray, and writes the live port to a runtime file the adapters read.",
+              "HC-FR-02: Read routes return session summaries, one session with its recent events, the pending set, bounded event history, counters and health, and none of them mutates state."
+            ],
+            "acceptanceCriteria": [
+              "A test boots the real main entry point, reads the port from the runtime file and gets a session summary, a pending set and a health payload over a real loopback socket",
+              "A test asserts a second instance refuses to start while the first holds the runtime file",
+              "A test asserts the default port being occupied results in the next free port being used and recorded",
+              "A test asserts no read route changes stored state, by comparing pending and event counts before and after every read request"
+            ],
+            "constraints": [
+              "The hub binds to 127.0.0.1 only and rejects any connection whose remote address is not loopback",
+              "agent-ping is a sidecar",
+              "Node.js 22 LTS or newer with TypeScript and npm only",
+              "APX-CON-01: The hub binds to 127.0.0.1 only and rejects any connection whose remote address is not loopback. The port is treated as security-relevant, not incidental.",
+              "APX-CON-03: agent-ping is a sidecar. It observes agent processes and never owns them: it must be killable and restartable at any moment without loss, and a repository that was never registered must keep working.",
+              "APX-CON-05: One toolchain only: Node.js 22 LTS or newer with TypeScript and npm. No second implementation language and no runtime dependency the supported Node line does not satisfy.",
+              "APX-CON-11: Performance budgets: hub idle RSS at most 150 MB, local ingest p95 at most 50 ms, dashboard first paint at most 1 s from warm cache, live update visible within 250 ms of an accepted event."
+            ],
+            "references": [
+              "docs/PRD.md#6.3 Key APIs / Interfaces",
+              "docs/features/hub-core-and-delivery-policy.md#3. Functional Requirements",
+              "docs/IDEA.md#How It Connects",
+              "docs/features/hub-core-and-delivery-policy.md#HC-FR-01",
+              "docs/features/hub-core-and-delivery-policy.md#HC-FR-02",
+              "docs/PRD.md#APX-CON-01",
+              "docs/PRD.md#APX-CON-03",
+              "docs/PRD.md#APX-CON-05",
+              "docs/PRD.md#APX-CON-11"
+            ]
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.hc-1",
+          "inputs": [
+            "work.dp-1",
+            "work.el-1",
+            "work.el-3",
+            "work.el-4"
+          ],
+          "timeoutMs": 2700000
+        },
+        {
+          "id": "HC-2",
+          "title": "Add the live state stream with heartbeat and cursor replay",
+          "description": "Add a server-sent event stream to the existing server so dashboards update without polling. Emit a change frame for every state transition the store reports, send a periodic heartbeat so idle connections are not dropped, and accept a cursor so a client that reconnects receives the changes it missed rather than only new ones. Bound the replay window and say so in the response when a cursor is too old to replay, so a client can fall back to a full refresh instead of showing stale state. Add a test with a real client that asserts heartbeat frames arrive, changes arrive in order, and a reconnect with a cursor replays exactly the missed changes. Exclude ingest, delivery policy and any dashboard code.",
+          "ownerAgent": "hub-engineer",
+          "dependencies": [
+            "HC-1"
+          ],
+          "expectedOutputs": [
+            "src/hub/sse.ts",
+            "src/hub/routes/stream.ts",
+            "tests/hub/stream.test.ts"
+          ],
+          "validationCommands": [
+            "npm test -- tests/hub/stream.test.ts",
+            "npm run typecheck"
+          ],
+          "contract": {
+            "version": 1,
+            "kind": "implementation",
+            "requirements": [
+              "HC-FR-03: A server-sent event stream pushes state changes to connected dashboards with a periodic heartbeat, and a client reconnecting with a cursor receives the changes it missed."
+            ],
+            "acceptanceCriteria": [
+              "A test with a real streaming client asserts a heartbeat frame arrives within the configured interval",
+              "A test asserts a change is delivered in order and a reconnect carrying the last cursor replays exactly the missed changes",
+              "A test asserts a cursor older than the replay window returns an explicit full-refresh signal rather than silent partial data"
+            ],
+            "constraints": [
+              "Performance budgets: hub idle RSS at most 150 MB, live update visible within 250 ms of an accepted event",
+              "APX-CON-11: Performance budgets: hub idle RSS at most 150 MB, local ingest p95 at most 50 ms, dashboard first paint at most 1 s from warm cache, live update visible within 250 ms of an accepted event."
+            ],
+            "references": [
+              "docs/PRD.md#6.3 Key APIs / Interfaces",
+              "docs/features/hub-core-and-delivery-policy.md#3. Functional Requirements",
+              "docs/features/hub-core-and-delivery-policy.md#HC-FR-03",
+              "docs/PRD.md#APX-CON-11"
+            ]
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.hc-2",
+          "inputs": [
+            "work.hc-1",
+            "work.el-3",
+            "work.el-4"
+          ],
+          "timeoutMs": 2700000
+        },
+        {
+          "id": "HC-3",
+          "title": "Build the ingest route and event pipeline",
+          "description": "Build the ingest route on the existing server. Validate the incoming envelope, reject a malformed payload or an unknown harness with a client error, deduplicate by dedupe key, classify the event with the domain classifier, open or resolve a pending item through the pending lifecycle, store it and answer 202 without waiting for any delivery. Make the whole path time-bounded so a slow store or a slow delivery can never hold a calling session, and record a dropped event when storage fails instead of pretending it was stored. Re-posting an already stored envelope must be a no-op that does not duplicate an event, change the pending count or trigger a second delivery. Add tests for the happy path, malformed input, unknown harness, duplicate delivery and a forced store failure. Exclude the ack route, the tray and any notification.",
+          "ownerAgent": "hub-engineer",
+          "dependencies": [
+            "HC-1",
+            "EL-3",
+            "EL-4"
+          ],
+          "expectedOutputs": [
+            "src/hub/routes/ingest.ts",
+            "src/hub/ingest-service.ts",
+            "tests/hub/ingest.test.ts"
+          ],
+          "validationCommands": [
+            "npm test -- tests/hub/ingest.test.ts",
+            "npm run typecheck"
+          ],
+          "contract": {
+            "version": 1,
+            "kind": "implementation",
+            "requirements": [
+              "HC-FR-04: The ingest route accepts one normalized envelope, rejects malformed payloads and unknown harnesses with a client error, deduplicates by dedupe key, stores the classified event and answers 202 without waiting for delivery.",
+              "HC-FR-08: Ingest is idempotent under replay, so re-posting an already stored envelope does not duplicate an event, change a pending count or fire a second delivery.",
+              "HC-FR-09: Ingest never blocks or fails a calling session: every store and delivery step is time-bounded, a failure is recorded as a dropped event, and the caller is released with a success or a fast error."
+            ],
+            "acceptanceCriteria": [
+              "A test posts a valid envelope and asserts one stored event, the expected class, and a 202 answer returned before any delivery work completes",
+              "A test posts the same envelope twice and asserts one stored event and an unchanged pending count",
+              "A test posts a malformed envelope and an unknown harness and asserts a client error with nothing stored",
+              "A test forces a store failure and asserts a dropped event is recorded and the caller is released within the configured bound"
+            ],
+            "constraints": [
+              "Harness delivery is fire-and-forget with a bounded timeout and no retry storm",
+              "Performance budgets: local ingest p95 at most 50 ms",
+              "APX-CON-10: Harness delivery is fire-and-forget with a bounded timeout and no retry storm, and when the hub is absent the adapter leaves a visible breadcrumb in the harness's own user interface instead of swallowing the event.",
+              "APX-CON-11: Performance budgets: hub idle RSS at most 150 MB, local ingest p95 at most 50 ms, dashboard first paint at most 1 s from warm cache, live update visible within 250 ms of an accepted event."
+            ],
+            "references": [
+              "docs/features/hub-core-and-delivery-policy.md#3. Functional Requirements",
+              "docs/PRD.md#6.3 Key APIs / Interfaces",
+              "docs/IDEA.md#Availability Contract",
+              "docs/features/hub-core-and-delivery-policy.md#HC-FR-04",
+              "docs/features/hub-core-and-delivery-policy.md#HC-FR-08",
+              "docs/features/hub-core-and-delivery-policy.md#HC-FR-09",
+              "docs/PRD.md#APX-CON-10",
+              "docs/PRD.md#APX-CON-11"
+            ]
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.hc-3",
+          "inputs": [
+            "work.hc-1",
+            "work.el-3",
+            "work.el-4"
+          ],
+          "timeoutMs": 2700000
+        }
+      ]
+    },
+    {
+      "id": "HUB-CORE-AND-DELIVERY-POLICY-2",
+      "title": "Phase 2: Write surface, security, delivery and metrics",
+      "feature": "Hub Core and Delivery Policy",
+      "description": "```forge-task {   \"id\": \"HC-4\",",
+      "ownerAgents": [
+        "hub-engineer"
+      ],
+      "dependencies": [
+        "HUB-CORE-AND-DELIVERY-POLICY-1"
+      ],
+      "approvalRequired": true,
+      "tasks": [
+        {
+          "id": "HC-4",
+          "title": "Add the ack-only write surface and its security boundary",
+          "description": "Add the single mutating route to the existing server and the security boundary around it. The ack route marks one pending item acknowledged through the pending lifecycle, answers not-found for an unknown identifier and conflict for an already resolved item, and must not be able to change anything else. Refuse every other mutating method or path with method-not-allowed or not-found, and assert by test that no route exists which can spawn, steer, interrupt, prompt or approve anything. Reject any request whose remote address is not loopback, require the per-install shared token on the write route only, send a strict content-security-policy with the dashboard, and send no permissive cross-origin header. Add tests that walk every registered route and record which are read-only, plus tests for the refused methods, the non-loopback rejection and the missing token. Exclude the tray and any notification.",
+          "ownerAgent": "hub-engineer",
+          "dependencies": [
+            "HC-3"
+          ],
+          "expectedOutputs": [
+            "src/hub/routes/ack.ts",
+            "src/hub/security.ts",
+            "tests/hub/ack.test.ts",
+            "tests/hub/security.test.ts"
+          ],
+          "validationCommands": [
+            "npm test -- tests/hub/ack.test.ts tests/hub/security.test.ts",
+            "npm run typecheck"
+          ],
+          "contract": {
+            "version": 1,
+            "kind": "implementation",
+            "requirements": [
+              "HC-FR-05: The ack route marks one pending item acknowledged, answers not-found for an unknown identifier and conflict for an already resolved item, and every other mutating method or path is refused with a method-not-allowed or not-found response.",
+              "HC-FR-06: The server binds 127.0.0.1 only, refuses any request whose remote address is not loopback, requires the per-install shared token on the write route, sends a strict content-security-policy with the dashboard, and sends no permissive cross-origin header."
+            ],
+            "acceptanceCriteria": [
+              "A test enumerates every registered route and asserts the ack route is the only one that changes stored state",
+              "A test asserts an unknown identifier answers not-found and an already resolved item answers conflict without changing state",
+              "A test asserts a write without the shared token and a request from a non-loopback address are both refused",
+              "A test asserts the dashboard response carries a strict content-security-policy and no permissive cross-origin header"
+            ],
+            "constraints": [
+              "Exactly one mutating route exists, the ack route",
+              "The hub binds to 127.0.0.1 only and rejects any connection whose remote address is not loopback",
+              "APX-CON-01: The hub binds to 127.0.0.1 only and rejects any connection whose remote address is not loopback. The port is treated as security-relevant, not incidental.",
+              "APX-CON-08: Exactly one mutating route exists, the ack route, and it can only mark a pending item acknowledged. No route can spawn, steer, interrupt, prompt or approve anything inside a harness."
+            ],
+            "references": [
+              "docs/PRD.md#8. Security and Privacy",
+              "docs/features/hub-core-and-delivery-policy.md#3. Functional Requirements",
+              "docs/IDEA.md#Boundaries",
+              "docs/features/hub-core-and-delivery-policy.md#HC-FR-05",
+              "docs/features/hub-core-and-delivery-policy.md#HC-FR-06",
+              "docs/PRD.md#APX-CON-01",
+              "docs/PRD.md#APX-CON-08"
+            ]
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.hc-4",
+          "inputs": [
+            "work.hc-3",
+            "work.hc-1",
+            "work.hc-2"
+          ],
+          "timeoutMs": 2700000
+        },
+        {
+          "id": "HC-5",
+          "title": "Implement delivery policy, restart replay and clean shutdown",
+          "description": "Implement the hub side of delivery and the availability contract on top of the existing routes. Decide from the classified event what must be delivered, exactly once per event, and hand it to the notifier boundary without implementing any platform notifier here. On start, replay unacknowledged pending items into that pipeline exactly once, so a hub that was killed while a block was pending delivers it again after restart. Track delivery outcomes per event for diagnostics, and extend the health route to report database, server and delivery status for the doctor command. Handle termination signals by refusing new events, flushing counters, closing the database, removing the runtime file and exiting with no orphaned listener. Add tests for single delivery, replay-once-after-restart and clean shutdown. Exclude platform notifiers, the tray and the dashboard.",
+          "ownerAgent": "hub-engineer",
+          "dependencies": [
+            "HC-3",
+            "HC-4",
+            "EL-4"
+          ],
+          "expectedOutputs": [
+            "src/hub/delivery.ts",
+            "src/hub/lifecycle.ts",
+            "tests/hub/delivery.test.ts",
+            "tests/hub/lifecycle.test.ts"
+          ],
+          "validationCommands": [
+            "npm test -- tests/hub/delivery.test.ts tests/hub/lifecycle.test.ts",
+            "npm run typecheck"
+          ],
+          "contract": {
+            "version": 1,
+            "kind": "implementation",
+            "requirements": [
+              "HC-FR-07: On start the hub replays unacknowledged pending items into the delivery pipeline exactly once, and its health route reports database, server and delivery status for the doctor command.",
+              "HC-FR-10: On a termination signal the hub stops accepting events, flushes counters, closes the database, removes the runtime file and exits, leaving no orphaned listener.",
+              "HC-FR-08: Ingest is idempotent under replay, so re-posting an already stored envelope does not duplicate an event, change a pending count or fire a second delivery."
+            ],
+            "acceptanceCriteria": [
+              "A test asserts one classified event produces exactly one delivery attempt",
+              "A test kills the hub with an unacknowledged pending item, restarts it, and asserts the item is replayed exactly once into the pipeline",
+              "A test asserts health reports database, server and delivery status, and that a forced notifier failure is visible there",
+              "A test asserts a termination signal closes the listener, flushes counters, closes the database and removes the runtime file"
+            ],
+            "constraints": [
+              "agent-ping is a sidecar",
+              "A delivery failure is never silent",
+              "APX-CON-03: agent-ping is a sidecar. It observes agent processes and never owns them: it must be killable and restartable at any moment without loss, and a repository that was never registered must keep working.",
+              "APX-CON-10: Harness delivery is fire-and-forget with a bounded timeout and no retry storm, and when the hub is absent the adapter leaves a visible breadcrumb in the harness's own user interface instead of swallowing the event."
+            ],
+            "references": [
+              "docs/PRD.md#10. System States / Lifecycle",
+              "docs/features/hub-core-and-delivery-policy.md#3. Functional Requirements",
+              "docs/IDEA.md#Availability Contract",
+              "docs/features/hub-core-and-delivery-policy.md#HC-FR-07",
+              "docs/features/hub-core-and-delivery-policy.md#HC-FR-10",
+              "docs/features/hub-core-and-delivery-policy.md#HC-FR-08",
+              "docs/PRD.md#APX-CON-03",
+              "docs/PRD.md#APX-CON-10"
+            ]
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.hc-5",
+          "inputs": [
+            "work.hc-3",
+            "work.hc-4",
+            "work.el-4",
+            "work.hc-1",
+            "work.hc-2"
+          ],
+          "timeoutMs": 2700000
+        },
+        {
+          "id": "HC-6",
+          "title": "Expose the local metrics surface",
+          "description": "Expose the counters the success bar needs on the existing server, and record them from the real request paths rather than from tests. Increment dashboard opens when a dashboard client connects, deep-link opens when a deep link is resolved, toast deliveries when the delivery pipeline reports an outcome, and record a pending-count snapshot whenever the pending set changes. Serve them from the existing metrics read route as counts and timestamps only, with no content and no per-request payload echo. Add a test asserting each counter increments through its real path and that the payload contains no field carrying event content. Exclude any external reporting, remote export or dashboard rendering.",
+          "ownerAgent": "hub-engineer",
+          "dependencies": [
+            "HC-1",
+            "EL-2"
+          ],
+          "expectedOutputs": [
+            "src/hub/metrics.ts",
+            "src/hub/routes/metrics.ts",
+            "tests/hub/metrics.test.ts"
+          ],
+          "validationCommands": [
+            "npm test -- tests/hub/metrics.test.ts",
+            "npm run typecheck"
+          ],
+          "contract": {
+            "version": 1,
+            "kind": "implementation",
+            "requirements": [
+              "HC-FR-02: Read routes return session summaries, one session with its recent events, the pending set, bounded event history, counters and health, and none of them mutates state."
+            ],
+            "acceptanceCriteria": [
+              "A test asserts dashboard opens, deep-link opens and toast deliveries each increment through their real request path",
+              "A test asserts the metrics payload contains counts and timestamps only and no field carrying event content"
+            ],
+            "constraints": [
+              "No telemetry leaves the machine",
+              "Never store or transmit conversation content",
+              "APX-CON-12: No telemetry leaves the machine. Counters, logs and the durable log are local files only, and no outbound network call exists other than to the loopback hub and the harnesses already running on this machine.",
+              "APX-CON-05: One toolchain only: Node.js 22 LTS or newer with TypeScript and npm. No second implementation language and no runtime dependency the supported Node line does not satisfy."
+            ],
+            "references": [
+              "docs/PRD.md#11. Analytics / Success Metrics",
+              "docs/features/event-model-and-durable-log.md#3. Functional Requirements",
+              "docs/features/hub-core-and-delivery-policy.md#HC-FR-02",
+              "docs/PRD.md#APX-CON-12",
+              "docs/PRD.md#APX-CON-05"
+            ]
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.hc-6",
+          "inputs": [
+            "work.hc-1",
+            "work.el-2",
+            "work.hc-2",
+            "work.hc-3"
+          ],
+          "timeoutMs": 2700000
+        }
+      ]
+    },
+    {
+      "id": "HUB-CORE-AND-DELIVERY-POLICY-3",
+      "title": "Phase 3: Read-only and restart-safety gate",
+      "feature": "Hub Core and Delivery Policy",
+      "description": "```forge-task {   \"id\": \"HC-7\",",
+      "ownerAgents": [],
+      "dependencies": [
+        "HUB-CORE-AND-DELIVERY-POLICY-2"
+      ],
+      "approvalRequired": true,
+      "tasks": [
+        {
+          "id": "HC-7",
+          "title": "Review the hub read-only promise and restart safety",
+          "description": "Human review of the running hub. Start the hub against a temporary state directory, exercise the read routes and the ack route, and attempt the operations the product promises not to offer: steering, interrupting, prompting or approving anything in a harness. Kill the hub while a block is pending, restart it, and confirm the pending item, its history row and the pending count are intact and were not duplicated. Read the metrics and health routes and confirm they carry no content. Record every attempt, the observed result and the verdict in the review file, including any route the reviewer found that should not exist. Do not change code in this task.",
+          "dependencies": [
+            "HC-5",
+            "HC-6"
+          ],
+          "expectedOutputs": [],
+          "validationCommands": [],
+          "contract": {
+            "version": 1,
+            "kind": "human-review",
+            "requirements": [
+              "HC-FR-05: The ack route marks one pending item acknowledged, answers not-found for an unknown identifier and conflict for an already resolved item, and every other mutating method or path is refused with a method-not-allowed or not-found response.",
+              "HC-FR-06: The server binds 127.0.0.1 only, refuses any request whose remote address is not loopback, requires the per-install shared token on the write route, sends a strict content-security-policy with the dashboard, and sends no permissive cross-origin header.",
+              "HC-FR-08: Ingest is idempotent under replay, so re-posting an already stored envelope does not duplicate an event, change a pending count or fire a second delivery.",
+              "HC-FR-10: On a termination signal the hub stops accepting events, flushes counters, closes the database, removes the runtime file and exits, leaving no orphaned listener."
+            ],
+            "acceptanceCriteria": [
+              "The reviewer ran the hub, completed the journey of reading state, acknowledging a pending item, killing and restarting the hub, and stated in the notes what was observed after restart",
+              "The reviewer attempted each forbidden operation and recorded the observed refusal for every one",
+              "The reviewer confirmed the metrics and health payloads carry no conversation content",
+              "The reviewer recorded a verdict on whether the read-only promise holds"
+            ],
+            "constraints": [
+              "A subjective judgement never stands alone; the journey must have been performed against the running hub",
+              "APX-CON-08: Exactly one mutating route exists, the ack route, and it can only mark a pending item acknowledged. No route can spawn, steer, interrupt, prompt or approve anything inside a harness.",
+              "APX-CON-03: agent-ping is a sidecar. It observes agent processes and never owns them: it must be killable and restartable at any moment without loss, and a repository that was never registered must keep working."
+            ],
+            "references": [
+              "docs/PRD.md#8. Security and Privacy",
+              "docs/PRD.md#10. System States / Lifecycle",
+              "docs/IDEA.md#Boundaries",
+              "docs/features/hub-core-and-delivery-policy.md#HC-FR-05",
+              "docs/features/hub-core-and-delivery-policy.md#HC-FR-06",
+              "docs/features/hub-core-and-delivery-policy.md#HC-FR-08",
+              "docs/features/hub-core-and-delivery-policy.md#HC-FR-10",
+              "docs/PRD.md#APX-CON-08",
+              "docs/PRD.md#APX-CON-03"
+            ],
+            "reviewFile": "docs/reviews/hub-core.json"
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.hc-7",
+          "inputs": [
+            "work.hc-5",
+            "work.hc-6",
+            "work.hc-4"
+          ],
+          "timeoutMs": 2700000
+        }
+      ]
+    },
+    {
+      "id": "NOTIFICATION-AND-TRAY-PRESENCE-1",
+      "title": "Phase 1: Notifier and toast policy",
+      "feature": "Notification and Tray Presence",
+      "description": "```forge-task {   \"id\": \"NT-1\",",
+      "ownerAgents": [
+        "notification-engineer"
+      ],
+      "dependencies": [
+        "HUB-CORE-AND-DELIVERY-POLICY-3"
+      ],
+      "approvalRequired": true,
+      "tasks": [
+        {
+          "id": "NT-1",
+          "title": "Define the notifier interface and the Linux notifier",
+          "description": "Define the notifier interface and implement the Linux notifier behind the delivery boundary the hub already calls. A delivery request carries class, title, body, urgency, deep link and persistence; the notifier returns an outcome recording success or failure with a reason. Implement the class policy as pure code: a needs-you request is delivered with a non-auto-dismissing resident notification, a finished request is delivered and allowed to expire, and an fyi request is refused because it never leaves the app. Build the notify-send invocation as an inspectable argument list rather than a shell string, construct the notifier for the current platform in the Electron main entry point and pass it to the delivery pipeline, and record every outcome. Add tests asserting the policy decisions, the exact argument list for each class, that the main entry point wires the platform notifier into delivery, and that a failing notify-send is reported as a failure with a reason. Exclude macOS, Windows and the tray.",
+          "ownerAgent": "notification-engineer",
+          "dependencies": [
+            "HC-5"
+          ],
+          "expectedOutputs": [
+            "src/notify/types.ts",
+            "src/notify/policy.ts",
+            "src/notify/linux.ts",
+            "src/notify/registry.ts",
+            "src/main/index.ts",
+            "tests/notify/policy.test.ts",
+            "tests/notify/linux.test.ts",
+            "tests/notify/registry-selection.test.ts"
+          ],
+          "validationCommands": [
+            "npm test -- tests/notify/policy.test.ts tests/notify/linux.test.ts tests/notify/registry-selection.test.ts",
+            "npm run typecheck"
+          ],
+          "contract": {
+            "version": 1,
+            "kind": "implementation",
+            "requirements": [
+              "NT-FR-01: A notifier interface takes a delivery request carrying class, title, body, urgency, deep link and persistence, and returns a delivery outcome that records success or failure with a reason.",
+              "NT-FR-02: On Linux a toast is delivered through notify-send and libnotify, a needs-you toast requests a non-auto-dismissing resident notification, a finished toast auto-expires, and an fyi request is refused because it never leaves the app.",
+              "NT-FR-08: No repeat timer exists: one needs-you toast is delivered per block, and the badge and history carry persistence instead of re-firing.",
+              "NT-FR-09: Every delivery outcome is recorded with its reason, and a failure is visible in the doctor output rather than only in a log line."
+            ],
+            "acceptanceCriteria": [
+              "A test asserts an fyi request is refused by policy and never reaches a platform notifier",
+              "A test asserts the needs-you request sets the resident, non-auto-dismissing flags and the finished request does not",
+              "A test asserts the notify-send argument list contains no shell interpolation of the title or body",
+              "A test asserts the main entry point constructs the platform notifier and the delivery pipeline uses it",
+              "A test asserts a non-zero exit from the notifier is recorded as a failure with a reason rather than swallowed"
+            ],
+            "constraints": [
+              "No sound in v1",
+              "No repeat timer exists: one needs-you toast per block",
+              "APX-CON-04: No sound in v1: no audio, no terminal bell, no notification sound on any platform."
+            ],
+            "references": [
+              "docs/PRD.md#16. Open Questions",
+              "docs/features/notification-and-tray-presence.md#3. Functional Requirements",
+              "docs/IDEA.md#What Earns An Interruption",
+              "docs/features/notification-and-tray-presence.md#NT-FR-01",
+              "docs/features/notification-and-tray-presence.md#NT-FR-02",
+              "docs/features/notification-and-tray-presence.md#NT-FR-08",
+              "docs/features/notification-and-tray-presence.md#NT-FR-09",
+              "docs/PRD.md#APX-CON-04"
+            ]
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.nt-1",
+          "inputs": [
+            "work.hc-5",
+            "work.hc-7"
+          ],
+          "timeoutMs": 2700000
+        },
+        {
+          "id": "NT-2",
+          "title": "Add the macOS and Windows notifiers",
+          "description": "Add the macOS and Windows notifier implementations behind the existing interface, applying the same three-class policy rather than a second policy. Build each platform invocation as an inspectable argument list, assert the exact arguments and payload shape in unit tests, and register both in the platform registry alongside Linux. Write a runbook that states, per platform, the exact command a developer can run to reproduce a toast by hand, which parts are covered by automated tests here, and which parts can only be confirmed on that platform. Be explicit in the runbook and in the code that these two paths are not live-verified on the authoring machine, so nothing downstream treats them as proven. Exclude the tray and any live run on those platforms.",
+          "ownerAgent": "notification-engineer",
+          "dependencies": [
+            "NT-1"
+          ],
+          "expectedOutputs": [
+            "src/notify/macos.ts",
+            "src/notify/windows.ts",
+            "tests/notify/macos.test.ts",
+            "tests/notify/windows.test.ts",
+            "docs/runbooks/notify-platforms.md"
+          ],
+          "validationCommands": [
+            "npm test -- tests/notify/macos.test.ts tests/notify/windows.test.ts",
+            "npm run typecheck"
+          ],
+          "contract": {
+            "version": 1,
+            "kind": "implementation",
+            "requirements": [
+              "NT-FR-03: On macOS a toast is delivered through a notification-centre call with the same three-class policy, and the implementation is explicit that it is not live-verified on the authoring machine.",
+              "NT-FR-04: On Windows a toast is delivered through a PowerShell notification with the same three-class policy, and the implementation is explicit that it is not live-verified on the authoring machine.",
+              "NT-FR-01: A notifier interface takes a delivery request carrying class, title, body, urgency, deep link and persistence, and returns a delivery outcome that records success or failure with a reason."
+            ],
+            "acceptanceCriteria": [
+              "A test asserts the macOS invocation argument list and payload shape for each class, including the refusal of fyi",
+              "A test asserts the Windows invocation argument list and payload shape for each class, including the refusal of fyi",
+              "A test asserts the platform registry resolves exactly one notifier per supported platform and reports an explicit unsupported result elsewhere",
+              "The runbook names the manual command per platform and states that these paths are not live-verified on the authoring machine"
+            ],
+            "constraints": [
+              "Platform support is Linux, macOS and Windows in v1",
+              "No sound in v1",
+              "APX-CON-06: Platform support is Linux, macOS and Windows in v1. Linux is the only live-verified path on the authoring machine; the macOS and Windows implementations ship with scripted checks and documented manual steps, and their human review gate can only be completed on those platforms.",
+              "APX-CON-04: No sound in v1: no audio, no terminal bell, no notification sound on any platform."
+            ],
+            "references": [
+              "docs/PRD.md#16. Open Questions",
+              "docs/features/notification-and-tray-presence.md#8. Open Questions",
+              "docs/IDEA.md#Where The Surface Lives",
+              "docs/features/notification-and-tray-presence.md#NT-FR-03",
+              "docs/features/notification-and-tray-presence.md#NT-FR-04",
+              "docs/features/notification-and-tray-presence.md#NT-FR-01",
+              "docs/PRD.md#APX-CON-06",
+              "docs/PRD.md#APX-CON-04"
+            ]
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.nt-2",
+          "inputs": [
+            "work.nt-1",
+            "work.hc-7"
+          ],
+          "timeoutMs": 2700000
+        }
+      ]
+    },
+    {
+      "id": "NOTIFICATION-AND-TRAY-PRESENCE-2",
+      "title": "Phase 2: Tray presence",
+      "feature": "Notification and Tray Presence",
+      "description": "```forge-task {   \"id\": \"NT-3\",",
+      "ownerAgents": [
+        "notification-engineer"
+      ],
+      "dependencies": [
+        "NOTIFICATION-AND-TRAY-PRESENCE-1"
+      ],
+      "approvalRequired": true,
+      "tasks": [
+        {
+          "id": "NT-3",
+          "title": "Add the tray icon with its pending-count badge",
+          "description": "Add persistent tray or menu-bar presence to the running hub. The icon exists for as long as the hub runs, its badge shows the number of unacknowledged pending items read from the hub's own pending route, nothing is drawn at zero, and counts above ninety-nine render a capped marker. Keep the badge a pure function of the pending set so it can be tested without a desktop. Offer exactly two menu actions, open the dashboard and quit, and deliberately provide no mute, snooze or dismiss control. Clicking the icon or the menu action resolves the dashboard deep link, which focuses that session and counts as a dashboard open. Mount the tray from the Electron main entry point and list that file as an output so the wiring is part of this task, with a test that drives the badge and the click handler through it. Exclude dashboard rendering.",
+          "ownerAgent": "notification-engineer",
+          "dependencies": [
+            "NT-1",
+            "HC-1",
+            "HC-6"
+          ],
+          "expectedOutputs": [
+            "src/hub/tray.ts",
+            "src/tray/badge.ts",
+            "src/main/index.ts",
+            "tests/hub/tray.test.ts",
+            "tests/tray/badge.test.ts"
+          ],
+          "validationCommands": [
+            "npm test -- tests/hub/tray.test.ts tests/tray/badge.test.ts",
+            "npm run typecheck"
+          ],
+          "contract": {
+            "version": 1,
+            "kind": "implementation",
+            "requirements": [
+              "NT-FR-05: A tray or menu-bar icon is present for as long as the hub runs, and its badge shows the number of unacknowledged pending items, with no badge shown at zero and a capped marker above ninety-nine.",
+              "NT-FR-06: The tray icon offers exactly two menu actions, open the dashboard and quit, and no mute, snooze or dismiss control that could let a pending block be forgotten silently.",
+              "NT-FR-07: Every toast carries a deep link to its session, and opening that link focuses the session in the dashboard and counts as a dashboard open."
+            ],
+            "acceptanceCriteria": [
+              "A test asserts the badge renders zero pending items as no badge, a small count as that count, and a count above ninety-nine as the capped marker",
+              "A test asserts the tray menu exposes exactly open-dashboard and quit and no suppression control",
+              "A test asserts clicking the icon resolves a deep link that focuses the session and increments the deep-link counter",
+              "A test drives the tray through the main entry point and asserts the badge follows the pending set returned by the hub"
+            ],
+            "constraints": [
+              "No sound in v1",
+              "No telemetry leaves the machine",
+              "APX-CON-04: No sound in v1: no audio, no terminal bell, no notification sound on any platform.",
+              "APX-CON-12: No telemetry leaves the machine. Counters, logs and the durable log are local files only, and no outbound network call exists other than to the loopback hub and the harnesses already running on this machine."
+            ],
+            "references": [
+              "docs/features/notification-and-tray-presence.md#4. UI / Interaction Design",
+              "docs/PRD.md#16. Open Questions",
+              "docs/IDEA.md#Where The Surface Lives",
+              "docs/features/notification-and-tray-presence.md#NT-FR-05",
+              "docs/features/notification-and-tray-presence.md#NT-FR-06",
+              "docs/features/notification-and-tray-presence.md#NT-FR-07",
+              "docs/PRD.md#APX-CON-04",
+              "docs/PRD.md#APX-CON-12"
+            ]
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.nt-3",
+          "inputs": [
+            "work.nt-1",
+            "work.hc-1",
+            "work.hc-6",
+            "work.nt-2"
+          ],
+          "timeoutMs": 2700000
+        }
+      ]
+    },
+    {
+      "id": "NOTIFICATION-AND-TRAY-PRESENCE-3",
+      "title": "Phase 3: Live notification gates",
+      "feature": "Notification and Tray Presence",
+      "description": "```forge-task {   \"id\": \"NT-4\",",
+      "ownerAgents": [],
+      "dependencies": [
+        "NOTIFICATION-AND-TRAY-PRESENCE-2"
+      ],
+      "approvalRequired": true,
+      "tasks": [
+        {
+          "id": "NT-4",
+          "title": "Verify real toasts and the badge on Linux",
+          "description": "Human review of the real notification behaviour on Linux. With the hub running and the notifier wired, drive a real needs-you event and a real finished event and confirm on screen that the needs-you toast does not auto-dismiss and the finished toast expires on its own. Use the manual commands recorded in docs/runbooks/notify-platforms.md to reproduce each toast by hand as well. Confirm the badge increments when a block appears, decrements when the block is resolved in the harness, and decrements when the item is acknowledged from the dashboard. Confirm clicking the tray icon opens the dashboard focused on that session, and confirm nothing occupied screen space before the first event. Record every observation, including timings and any platform hint that had to be adjusted, in the review file. Do not change code in this task; record required changes instead.",
+          "dependencies": [
+            "NT-1",
+            "NT-3"
+          ],
+          "expectedOutputs": [],
+          "validationCommands": [],
+          "contract": {
+            "version": 1,
+            "kind": "human-review",
+            "requirements": [
+              "NT-FR-02: On Linux a toast is delivered through notify-send and libnotify, a needs-you toast requests a non-auto-dismissing resident notification, a finished toast auto-expires, and an fyi request is refused because it never leaves the app.",
+              "NT-FR-05: A tray or menu-bar icon is present for as long as the hub runs, and its badge shows the number of unacknowledged pending items, with no badge shown at zero and a capped marker above ninety-nine.",
+              "NT-FR-07: Every toast carries a deep link to its session, and opening that link focuses the session in the dashboard and counts as a dashboard open.",
+              "NT-FR-08: No repeat timer exists: one needs-you toast is delivered per block, and the badge and history carry persistence instead of re-firing."
+            ],
+            "acceptanceCriteria": [
+              "The reviewer observed a real needs-you toast stay on screen and a real finished toast expire, and stated how each was produced",
+              "The reviewer observed the badge increment, then decrement on harness resolution, and separately decrement on acknowledgement",
+              "The reviewer clicked the tray icon and confirmed the dashboard opened focused on that session",
+              "The reviewer recorded which libnotify hints were required for the resident behaviour on this desktop"
+            ],
+            "constraints": [
+              "A subjective visual judgement never stands alone; the journey must have been performed on the running system",
+              "APX-CON-06: Platform support is Linux, macOS and Windows in v1. Linux is the only live-verified path on the authoring machine; the macOS and Windows implementations ship with scripted checks and documented manual steps, and their human review gate can only be completed on those platforms."
+            ],
+            "references": [
+              "docs/features/notification-and-tray-presence.md#3. Functional Requirements",
+              "docs/features/notification-and-tray-presence.md#4. UI / Interaction Design",
+              "docs/PRD.md#11. Analytics / Success Metrics",
+              "docs/features/notification-and-tray-presence.md#NT-FR-02",
+              "docs/features/notification-and-tray-presence.md#NT-FR-05",
+              "docs/features/notification-and-tray-presence.md#NT-FR-07",
+              "docs/features/notification-and-tray-presence.md#NT-FR-08",
+              "docs/PRD.md#APX-CON-06"
+            ],
+            "reviewFile": "docs/reviews/notification-linux.json"
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.nt-4",
+          "inputs": [
+            "work.nt-1",
+            "work.nt-3"
+          ],
+          "timeoutMs": 2700000
+        },
+        {
+          "id": "NT-5",
+          "title": "Verify real toasts and the badge on macOS and Windows",
+          "description": "Human review of the same notification behaviour on macOS and on Windows, performed on those machines. Install the package, drive a real needs-you event and a real finished event using the manual commands in docs/runbooks/notify-platforms.md, and confirm the same three-class policy holds: the needs-you toast persists until dealt with, the finished toast expires, and nothing appears for an fyi event. Confirm the tray or menu-bar badge increments and decrements with the pending set, and that the two menu actions are the only ones present. Record per platform the exact command used, the observed behaviour, and any platform-specific mechanism that had to replace the assumed one. This gate cannot be completed from a Linux machine and must be run where those platforms exist; record it as outstanding rather than approximating it. Do not change code in this task.",
+          "dependencies": [
+            "NT-2",
+            "NT-3"
+          ],
+          "expectedOutputs": [],
+          "validationCommands": [],
+          "contract": {
+            "version": 1,
+            "kind": "human-review",
+            "requirements": [
+              "NT-FR-03: On macOS a toast is delivered through a notification-centre call with the same three-class policy, and the implementation is explicit that it is not live-verified on the authoring machine.",
+              "NT-FR-04: On Windows a toast is delivered through a PowerShell notification with the same three-class policy, and the implementation is explicit that it is not live-verified on the authoring machine.",
+              "NT-FR-05: A tray or menu-bar icon is present for as long as the hub runs, and its badge shows the number of unacknowledged pending items, with no badge shown at zero and a capped marker above ninety-nine."
+            ],
+            "acceptanceCriteria": [
+              "For each of macOS and Windows the reviewer recorded the command used, the observed toast persistence per class, and the badge behaviour",
+              "For each platform the reviewer recorded whether the assumed notification mechanism worked or had to be replaced",
+              "Where a platform was unavailable the review records the gate as outstanding with the reason, rather than reporting a pass"
+            ],
+            "constraints": [
+              "Platform support is Linux, macOS and Windows in v1",
+              "A subjective visual judgement never stands alone; the journey must have been performed on the running system",
+              "APX-CON-06: Platform support is Linux, macOS and Windows in v1. Linux is the only live-verified path on the authoring machine; the macOS and Windows implementations ship with scripted checks and documented manual steps, and their human review gate can only be completed on those platforms."
+            ],
+            "references": [
+              "docs/features/notification-and-tray-presence.md#3. Functional Requirements",
+              "docs/PRD.md#16. Open Questions",
+              "docs/features/notification-and-tray-presence.md#8. Open Questions",
+              "docs/features/notification-and-tray-presence.md#NT-FR-03",
+              "docs/features/notification-and-tray-presence.md#NT-FR-04",
+              "docs/features/notification-and-tray-presence.md#NT-FR-05",
+              "docs/PRD.md#APX-CON-06"
+            ],
+            "reviewFile": "docs/reviews/notification-macos-windows.json"
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.nt-5",
+          "inputs": [
+            "work.nt-2",
+            "work.nt-3"
+          ],
+          "timeoutMs": 2700000
+        }
+      ]
+    },
+    {
+      "id": "OPENCODE-PLUGIN-ADAPTER-1",
+      "title": "Phase 1: Event translation and delivery",
+      "feature": "opencode Plugin Adapter",
+      "description": "```forge-task {   \"id\": \"OA-1\",",
+      "ownerAgents": [
+        "connector-engineer"
+      ],
+      "dependencies": [
+        "HUB-CORE-AND-DELIVERY-POLICY-3"
+      ],
+      "approvalRequired": true,
+      "tasks": [
+        {
+          "id": "OA-1",
+          "title": "Translate opencode events into the normalized envelope",
+          "description": "Implement the opencode plugin as a single module that subscribes through the generic event hook and translates harness events into the normalized envelope the hub already accepts. Cover session status and the deprecated idle event as the same transition, permission asked and replied as a block and its resolution, and session error, compaction, message update, tool execution boundary and todo update as fyi with the matching subtype. Track per-turn work signals so an idle transition reports whether the turn made at least one tool call, file edit or todo update, which is what lets the hub suppress a greeting-and-close turn. Derive repository identity from the session directory basename and carry the full path alongside it. Log through the harness structured logging client with this product's service name, never the console. Add a table-driven test covering every documented event name and a test for the work-signal accumulator across a turn boundary. Exclude delivery to the hub, installation and polling.",
+          "ownerAgent": "connector-engineer",
+          "dependencies": [
+            "HC-3",
+            "EL-3"
+          ],
+          "expectedOutputs": [
+            "src/plugin/opencode/index.ts",
+            "src/plugin/opencode/translate.ts",
+            "src/plugin/opencode/work-signal.ts",
+            "tests/plugin/opencode-translate.test.ts",
+            "tests/plugin/opencode-work-signal.test.ts"
+          ],
+          "validationCommands": [
+            "npm test -- tests/plugin/opencode-translate.test.ts tests/plugin/opencode-work-signal.test.ts",
+            "npm run typecheck"
+          ],
+          "contract": {
+            "version": 1,
+            "kind": "implementation",
+            "requirements": [
+              "OA-FR-02: The adapter subscribes through the generic event hook and maps session status and idle transitions, permission asked and replied, session errors, compaction, message updates, tool execution boundaries and todo updates onto the normalized envelope, because the dedicated permission hook is documented as not firing.",
+              "OA-FR-03: The adapter tracks whether the current turn performed real work, meaning at least one tool call, file edit or todo update, and reports that signal with each idle transition so the hub can suppress a greeting-and-close turn.",
+              "OA-FR-06: Repository identity is the directory basename of the session, and the full path travels with every event without ever being used as the primary label.",
+              "OA-FR-09: The adapter works identically for interactive, non-interactive and attached sessions, and adds no per-repository setup that a developer could forget."
+            ],
+            "acceptanceCriteria": [
+              "A table-driven test asserts every documented opencode event name maps to the expected class, subtype and dedupe key",
+              "A test asserts the deprecated idle event and the status transition produce one envelope rather than two",
+              "A test asserts a turn with a tool call, a file edit or a todo update reports work, and a turn with none reports no work",
+              "A test asserts the work signal resets at a turn boundary so a later empty turn is not credited with earlier work",
+              "A test asserts logging goes through the harness logging client with the product's service name and never writes to the console"
+            ],
+            "constraints": [
+              "The connector interface is specified in Agent Client Protocol terms",
+              "Never store or transmit conversation content",
+              "Identity is the repository short name",
+              "APX-CON-13: The connector interface is specified in Agent Client Protocol terms: a harness adapter translates its own events into the normalized envelope and delivers it to the hub, so a third harness is additive work rather than a rewrite of the hub, the store or the dashboard.",
+              "APX-CON-09: Identity is the repository short name, which is the directory basename of the session. Sessions nest beneath it and the full path is available on hover or focus but is never the primary label.",
+              "APX-CON-12: No telemetry leaves the machine. Counters, logs and the durable log are local files only, and no outbound network call exists other than to the loopback hub and the harnesses already running on this machine."
+            ],
+            "references": [
+              "docs/PRD.md#5. Research Findings",
+              "docs/features/opencode-plugin-adapter.md#3. Functional Requirements",
+              "docs/IDEA.md#Scope",
+              "docs/features/opencode-plugin-adapter.md#OA-FR-02",
+              "docs/features/opencode-plugin-adapter.md#OA-FR-03",
+              "docs/features/opencode-plugin-adapter.md#OA-FR-06",
+              "docs/features/opencode-plugin-adapter.md#OA-FR-09",
+              "docs/PRD.md#APX-CON-13",
+              "docs/PRD.md#APX-CON-09",
+              "docs/PRD.md#APX-CON-12"
+            ]
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.oa-1",
+          "inputs": [
+            "work.hc-3",
+            "work.el-3",
+            "work.hc-7"
+          ],
+          "timeoutMs": 2700000
+        },
+        {
+          "id": "OA-2",
+          "title": "Deliver events to the hub and leave a breadcrumb on failure",
+          "description": "Deliver translated envelopes to the loopback hub from inside the harness process. Read the live port from the hub runtime file rather than assuming the default, attach the per-install shared token, and post each envelope with a short bounded timeout and no retry loop, so a busy or wedged hub can never slow a session. Never throw back into the harness: catch every failure, and when the hub is unreachable write a breadcrumb through the harness structured logging client naming the service, the session and the event type, so the developer sees the reason in the harness's own interface. Add tests asserting a single request per event, a bounded timeout on a hung server, no retry storm, and a breadcrumb written with the expected fields when the hub refuses the connection. Exclude installation and the polling fallback.",
+          "ownerAgent": "connector-engineer",
+          "dependencies": [
+            "OA-1",
+            "HC-4"
+          ],
+          "expectedOutputs": [
+            "src/plugin/transport/http.ts",
+            "src/plugin/transport/breadcrumb.ts",
+            "tests/plugin/transport.test.ts"
+          ],
+          "validationCommands": [
+            "npm test -- tests/plugin/transport.test.ts",
+            "npm run typecheck"
+          ],
+          "contract": {
+            "version": 1,
+            "kind": "implementation",
+            "requirements": [
+              "OA-FR-04: Each event is delivered to the hub fire-and-forget with a short bounded timeout and no retry storm, and a delivery failure never throws back into the harness.",
+              "OA-FR-05: When the hub is unreachable the adapter writes a breadcrumb through the harness structured logging client, naming the service, the session and the event type, so the failure is visible in the harness's own interface rather than swallowed.",
+              "APX-FR-02: A delivery failure is never silent: when the hub is unreachable or an event cannot be stored, the failure is surfaced where the developer will see it, and the durable log records that an event was dropped rather than pretending it was delivered."
+            ],
+            "acceptanceCriteria": [
+              "A test asserts exactly one request is made per event and no retry follows a refused connection",
+              "A test asserts a hung server is abandoned at the configured timeout rather than blocking the caller",
+              "A test asserts a breadcrumb is written with the service, session and event type when the hub is unreachable",
+              "A test asserts no transport failure propagates an exception out of the plugin hook"
+            ],
+            "constraints": [
+              "Harness delivery is fire-and-forget with a bounded timeout and no retry storm",
+              "A delivery failure is never silent",
+              "APX-CON-10: Harness delivery is fire-and-forget with a bounded timeout and no retry storm, and when the hub is absent the adapter leaves a visible breadcrumb in the harness's own user interface instead of swallowing the event.",
+              "APX-CON-03: agent-ping is a sidecar. It observes agent processes and never owns them: it must be killable and restartable at any moment without loss, and a repository that was never registered must keep working."
+            ],
+            "references": [
+              "docs/PRD.md#6.3 Key APIs / Interfaces",
+              "docs/features/opencode-plugin-adapter.md#3. Functional Requirements",
+              "docs/IDEA.md#Availability Contract",
+              "docs/features/opencode-plugin-adapter.md#OA-FR-04",
+              "docs/features/opencode-plugin-adapter.md#OA-FR-05",
+              "docs/PRD.md#APX-FR-02",
+              "docs/PRD.md#APX-CON-10",
+              "docs/PRD.md#APX-CON-03"
+            ]
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.oa-2",
+          "inputs": [
+            "work.oa-1",
+            "work.hc-4",
+            "work.hc-7"
+          ],
+          "timeoutMs": 2700000
+        },
+        {
+          "id": "OA-3",
+          "title": "Install and remove the global plugin idempotently",
+          "description": "Implement the installer for the global opencode plugin as a reusable module the CLI will call later. Write exactly one plugin file plus the package metadata the global plugin directory needs into the opencode global plugin directory, replacing an existing copy of the same version without duplicating it, and refuse to overwrite a different version without saying so. Implement removal that deletes the installed file and leaves no orphan, and is safe to run when nothing is installed. Resolve the global directory from the platform configuration path rather than a hard-coded string, and verify the written file loads as a plugin module. Add tests for fresh install, repeat install, version mismatch and uninstall against a temporary home directory. Exclude the agent-ping command-line entry points and any autostart work.",
+          "ownerAgent": "connector-engineer",
+          "dependencies": [
+            "OA-1"
+          ],
+          "expectedOutputs": [
+            "src/plugin/install/global-plugin.ts",
+            "tests/plugin/install.test.ts"
+          ],
+          "validationCommands": [
+            "npm test -- tests/plugin/install.test.ts",
+            "npm run typecheck"
+          ],
+          "contract": {
+            "version": 1,
+            "kind": "implementation",
+            "requirements": [
+              "OA-FR-01: The adapter is a single global plugin file installed into the opencode global plugin directory, loaded by opencode 1.18.32 for every session without any per-repository configuration file.",
+              "OA-FR-08: Installing the plugin is idempotent, and uninstalling removes the installed file and leaves no orphan, verified by a test against a temporary home directory."
+            ],
+            "acceptanceCriteria": [
+              "A test installs into a temporary home and asserts exactly one plugin file and its metadata exist afterwards",
+              "A test installs twice and asserts no duplicate file and no error",
+              "A test asserts a different installed version is reported rather than silently overwritten",
+              "A test uninstalls and asserts the file is gone and a second uninstall is a safe no-op"
+            ],
+            "constraints": [
+              "agent-ping is a sidecar",
+              "APX-CON-03: agent-ping is a sidecar. It observes agent processes and never owns them: it must be killable and restartable at any moment without loss, and a repository that was never registered must keep working."
+            ],
+            "references": [
+              "docs/PRD.md#5. Research Findings",
+              "docs/features/opencode-plugin-adapter.md#3. Functional Requirements",
+              "docs/IDEA.md#How It Connects",
+              "docs/features/opencode-plugin-adapter.md#OA-FR-01",
+              "docs/features/opencode-plugin-adapter.md#OA-FR-08",
+              "docs/PRD.md#APX-CON-03"
+            ]
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.oa-3",
+          "inputs": [
+            "work.oa-1",
+            "work.hc-7"
+          ],
+          "timeoutMs": 2700000
+        }
+      ]
+    },
+    {
+      "id": "OPENCODE-PLUGIN-ADAPTER-2",
+      "title": "Phase 2: Polling fallback and live verification",
+      "feature": "opencode Plugin Adapter",
+      "description": "```forge-task {   \"id\": \"OA-4\",",
+      "ownerAgents": [
+        "connector-engineer",
+        "qa-engineer"
+      ],
+      "dependencies": [
+        "OPENCODE-PLUGIN-ADAPTER-1"
+      ],
+      "approvalRequired": true,
+      "tasks": [
+        {
+          "id": "OA-4",
+          "title": "Add the polling fallback for non-pushing sessions",
+          "description": "Add the fallback path for anything that cannot push. Poll the local opencode HTTP API for active sessions, wait for a session to reach idle, and list pending permission requests, using bounded exponential backoff and a hard cap on consecutive failures so a stopped server is not hammered. Start the fallback from the plugin entry point when push delivery is unavailable, so it is actually running rather than merely present. Deduplicate everything discovered against envelopes already pushed, using the same dedupe keys, so a session that both pushes and is polled never produces two events. Treat an unexpected response shape as a failure that is reported, not as an empty result that hides a contract change. Add tests for backoff, the failure cap, dedupe against pushed events and the unexpected-shape failure. Exclude the CLI entry points and any live harness run.",
+          "ownerAgent": "connector-engineer",
+          "dependencies": [
+            "OA-1",
+            "HC-3"
+          ],
+          "expectedOutputs": [
+            "src/plugin/opencode/poll-fallback.ts",
+            "src/plugin/opencode/index.ts",
+            "tests/plugin/poll-fallback.test.ts"
+          ],
+          "validationCommands": [
+            "npm test -- tests/plugin/poll-fallback.test.ts",
+            "npm run typecheck"
+          ],
+          "contract": {
+            "version": 1,
+            "kind": "implementation",
+            "requirements": [
+              "OA-FR-07: A polling fallback reads the local opencode HTTP API for active sessions, idle waits and pending permission requests with bounded backoff, and deduplicates what it finds against events already pushed."
+            ],
+            "acceptanceCriteria": [
+              "A test asserts backoff grows between failures and stops at the configured cap",
+              "A test asserts a state already delivered by push is not delivered again by polling",
+              "A test asserts an unexpected response shape is reported as a failure rather than an empty result",
+              "A test asserts the fallback never blocks the harness loop it runs in"
+            ],
+            "constraints": [
+              "Harness delivery is fire-and-forget with a bounded timeout and no retry storm",
+              "A delivery failure is never silent",
+              "APX-CON-10: Harness delivery is fire-and-forget with a bounded timeout and no retry storm, and when the hub is absent the adapter leaves a visible breadcrumb in the harness's own user interface instead of swallowing the event."
+            ],
+            "references": [
+              "docs/PRD.md#16. Open Questions",
+              "docs/features/opencode-plugin-adapter.md#3. Functional Requirements",
+              "docs/IDEA.md#How It Connects",
+              "docs/features/opencode-plugin-adapter.md#OA-FR-07",
+              "docs/PRD.md#APX-CON-10"
+            ]
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.oa-4",
+          "inputs": [
+            "work.oa-1",
+            "work.hc-3",
+            "work.oa-2",
+            "work.oa-3"
+          ],
+          "timeoutMs": 2700000
+        },
+        {
+          "id": "OA-5",
+          "title": "Write the live opencode verification script",
+          "description": "Write one repository script that proves the adapter against the real harness rather than a mock. It installs the plugin into a temporary configuration directory, starts the hub against a temporary state directory, launches a real opencode session that reaches a permission decision and then goes idle, and asserts the hub received a needs-you envelope, a resolution and one finished envelope with the correct repository short name. It must also assert the reverse: a session that opens, greets and closes produces no finished envelope, and a hub that is not running produces a breadcrumb rather than a silent drop. Print a machine-readable summary of what was observed and exit non-zero on any failed assertion, with no path that reports success when nothing ran. Cover the script's own logic with a test that drives it against a stub harness. Exclude human judgement and any code change to the product.",
+          "ownerAgent": "qa-engineer",
+          "dependencies": [
+            "OA-2",
+            "OA-3",
+            "OA-4",
+            "NT-1"
+          ],
+          "expectedOutputs": [
+            "scripts/verify-opencode-live.mjs",
+            "tests/scripts/verify-opencode-live.test.ts"
+          ],
+          "validationCommands": [
+            "npm test -- tests/scripts/verify-opencode-live.test.ts",
+            "npm run typecheck"
+          ],
+          "contract": {
+            "version": 1,
+            "kind": "implementation",
+            "requirements": [
+              "OA-FR-01: The adapter is a single global plugin file installed into the opencode global plugin directory, loaded by opencode 1.18.32 for every session without any per-repository configuration file.",
+              "OA-FR-09: The adapter works identically for interactive, non-interactive and attached sessions, and adds no per-repository setup that a developer could forget.",
+              "OA-FR-05: When the hub is unreachable the adapter writes a breadcrumb through the harness structured logging client, naming the service, the session and the event type, so the failure is visible in the harness's own interface rather than swallowed."
+            ],
+            "acceptanceCriteria": [
+              "A test drives the script against a stub harness and asserts it fails when the expected envelopes are missing",
+              "A test asserts the script exits non-zero when the hub is absent and records the breadcrumb instead of reporting success",
+              "The script asserts a permission-then-idle session produces a needs-you envelope, a resolution and exactly one finished envelope",
+              "The script asserts an open-greet-close session produces no finished envelope"
+            ],
+            "constraints": [
+              "Never invent passing results, tool availability, deployed resources, human review or compliance",
+              "APX-CON-03: agent-ping is a sidecar. It observes agent processes and never owns them: it must be killable and restartable at any moment without loss, and a repository that was never registered must keep working."
+            ],
+            "references": [
+              "docs/PRD.md#5. Research Findings",
+              "docs/features/opencode-plugin-adapter.md#6. Testing Strategy",
+              "docs/IDEA.md#Availability Contract",
+              "docs/features/opencode-plugin-adapter.md#OA-FR-01",
+              "docs/features/opencode-plugin-adapter.md#OA-FR-09",
+              "docs/features/opencode-plugin-adapter.md#OA-FR-05",
+              "docs/PRD.md#APX-CON-03"
+            ]
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.oa-5",
+          "inputs": [
+            "work.oa-2",
+            "work.oa-3",
+            "work.oa-4",
+            "work.nt-1",
+            "work.oa-1"
+          ],
+          "timeoutMs": 2700000
+        }
+      ]
+    },
+    {
+      "id": "OPENCODE-PLUGIN-ADAPTER-3",
+      "title": "Phase 3: Live adapter gate",
+      "feature": "opencode Plugin Adapter",
+      "description": "```forge-task {   \"id\": \"OA-6\",",
+      "ownerAgents": [],
+      "dependencies": [
+        "OPENCODE-PLUGIN-ADAPTER-2"
+      ],
+      "approvalRequired": true,
+      "tasks": [
+        {
+          "id": "OA-6",
+          "title": "Confirm a real opencode session is caught end to end",
+          "description": "Human review of the adapter against the real harness on a real repository. Install the plugin globally, start the hub, and run an ordinary opencode session that asks for a permission decision. Confirm from the harness's own interface and from the dashboard that exactly one toast appeared for the block, that the tray badge went to one, and that answering the permission cleared it without a second toast. Then run a session that does real work and confirm exactly one finished toast, and run a session that opens and closes without work and confirm nothing appeared at all. Finally stop the hub and confirm a blocked session leaves a visible breadcrumb rather than failing silently, and confirm the plugin does not measurably slow the session. Record every observation, the commands used and the verdict in the review file. Do not change code in this task.",
+          "dependencies": [
+            "OA-5",
+            "NT-4"
+          ],
+          "expectedOutputs": [],
+          "validationCommands": [],
+          "contract": {
+            "version": 1,
+            "kind": "human-review",
+            "requirements": [
+              "OA-FR-01: The adapter is a single global plugin file installed into the opencode global plugin directory, loaded by opencode 1.18.32 for every session without any per-repository configuration file.",
+              "OA-FR-02: The adapter subscribes through the generic event hook and maps session status and idle transitions, permission asked and replied, session errors, compaction, message updates, tool execution boundaries and todo updates onto the normalized envelope, because the dedicated permission hook is documented as not firing.",
+              "OA-FR-05: When the hub is unreachable the adapter writes a breadcrumb through the harness structured logging client, naming the service, the session and the event type, so the failure is visible in the harness's own interface rather than swallowed.",
+              "OA-FR-09: The adapter works identically for interactive, non-interactive and attached sessions, and adds no per-repository setup that a developer could forget."
+            ],
+            "acceptanceCriteria": [
+              "The reviewer ran a real session that asked for a permission decision and stated what appeared, how many times, and how the badge behaved",
+              "The reviewer ran a session that did real work and an open-greet-close session and stated the observed difference",
+              "The reviewer stopped the hub, blocked a session, and confirmed a visible breadcrumb rather than a silent drop",
+              "The reviewer recorded the commands used and a verdict, including any event the adapter failed to report"
+            ],
+            "constraints": [
+              "A subjective judgement never stands alone; the journey must have been performed against the running system",
+              "APX-CON-10: Harness delivery is fire-and-forget with a bounded timeout and no retry storm, and when the hub is absent the adapter leaves a visible breadcrumb in the harness's own user interface instead of swallowing the event."
+            ],
+            "references": [
+              "docs/PRD.md#11. Analytics / Success Metrics",
+              "docs/features/opencode-plugin-adapter.md#3. Functional Requirements",
+              "docs/IDEA.md#Success",
+              "docs/features/opencode-plugin-adapter.md#OA-FR-01",
+              "docs/features/opencode-plugin-adapter.md#OA-FR-02",
+              "docs/features/opencode-plugin-adapter.md#OA-FR-05",
+              "docs/features/opencode-plugin-adapter.md#OA-FR-09",
+              "docs/PRD.md#APX-CON-10"
+            ],
+            "reviewFile": "docs/reviews/opencode-adapter.json"
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.oa-6",
+          "inputs": [
+            "work.oa-5",
+            "work.nt-4",
+            "work.oa-4"
+          ],
+          "timeoutMs": 2700000
+        }
+      ]
+    },
+    {
+      "id": "LIVE-DASHBOARD-1",
+      "title": "Phase 1: Live state on the approved layout",
+      "feature": "Live Dashboard",
+      "description": "```forge-task {   \"id\": \"LD-1\",",
+      "ownerAgents": [
+        "dashboard-engineer"
+      ],
+      "dependencies": [
+        "DASHBOARD-DESIGN-PROTOTYPE-2",
+        "HUB-CORE-AND-DELIVERY-POLICY-3",
+        "NOTIFICATION-AND-TRAY-PRESENCE-3"
+      ],
+      "approvalRequired": true,
+      "tasks": [
+        {
+          "id": "LD-1",
+          "title": "Wire the dashboard to live hub state",
+          "description": "Replace the prototype's mock source with the real hub feed while keeping the approved layout. Implement a stream client that subscribes to the hub state stream, applies incoming changes, reconnects with the last cursor, and falls back to a full refresh when the cursor is too old. Implement the session list that groups sessions under their repository short-name header, nests each session beneath it, reveals the full path on hover or focus, orders blocked sessions first within a group, and renders the four states with an icon and a text label. Show the pending count in the page header and an explicit stale or disconnected state, never silent old data. Mount everything from the dashboard entry point, which is also the page the hub serves, and list that entry point as an output so the wiring belongs to this task. Add tests driving the entry point against a stubbed hub for the initial render, a live update, a reconnect and a disconnect. Exclude acknowledgement, deep links, handoff and history.",
+          "ownerAgent": "dashboard-engineer",
+          "dependencies": [
+            "DP-2",
+            "HC-1",
+            "HC-2"
+          ],
+          "expectedOutputs": [
+            "src/dashboard/index.html",
+            "src/dashboard/main.ts",
+            "src/dashboard/live/stream-client.ts",
+            "src/dashboard/live/session-list.ts",
+            "tests/dashboard/session-list.test.ts",
+            "tests/dashboard/stream-client.test.ts"
+          ],
+          "validationCommands": [
+            "npm test -- tests/dashboard/session-list.test.ts tests/dashboard/stream-client.test.ts",
+            "npm run typecheck"
+          ],
+          "contract": {
+            "version": 1,
+            "kind": "implementation",
+            "requirements": [
+              "LD-FR-01: The dashboard groups sessions under a repository short-name header, nests each session beneath it, and reveals the full path on hover or focus without using it as the primary label.",
+              "LD-FR-02: Each row states its condition as blocked, finished, running or information-only using an icon and a text label, never colour alone, and the visual treatment is stable across all four states.",
+              "LD-FR-03: The dashboard subscribes to the hub state stream, updates on change, reconnects with a cursor, and shows an explicit stale or disconnected state rather than presenting old data as current.",
+              "LD-FR-04: The pending count is displayed on the page and always equals the tray badge for the same hub state.",
+              "LD-FR-10: The same build is served over the loopback origin and loaded in the application window, and both render identical state for identical hub data."
+            ],
+            "acceptanceCriteria": [
+              "A test drives the entry point against a stubbed hub and asserts sessions render under repository short-name headers with blocked rows first",
+              "A test asserts a state change updates the affected row without a full reload and a disconnect shows an explicit stale state",
+              "A test asserts a reconnect with a cursor resumes updates and a too-old cursor triggers a full refresh",
+              "A test asserts the displayed pending count equals the pending set returned by the hub"
+            ],
+            "constraints": [
+              "Canvas paired with a visually hidden focusable DOM mirror, reduced motion honoured, AA contrast",
+              "Identity is the repository short name",
+              "Performance budgets: dashboard first paint at most 1 s from warm cache, live update visible within 250 ms of an accepted event",
+              "APX-CON-07: The PixiJS canvas is always paired with a visually hidden but focusable DOM mirror of every visible row, so the dashboard is operable by keyboard and legible to a screen reader. Reduced-motion preferences are honoured, urgency is never encoded by colour alone, and text meets WCAG 2.1 AA contrast against its background.",
+              "APX-CON-09: Identity is the repository short name, which is the directory basename of the session. Sessions nest beneath it and the full path is available on hover or focus but is never the primary label.",
+              "APX-CON-11: Performance budgets: hub idle RSS at most 150 MB, local ingest p95 at most 50 ms, dashboard first paint at most 1 s from warm cache, live update visible within 250 ms of an accepted event."
+            ],
+            "references": [
+              "docs/features/live-dashboard.md#4. UI / Interaction Design",
+              "docs/features/dashboard-design-prototype.md#4. UI / Interaction Design",
+              "docs/features/dashboard-design-prototype.md#8. Open Questions",
+              "docs/features/live-dashboard.md#LD-FR-01",
+              "docs/features/live-dashboard.md#LD-FR-02",
+              "docs/features/live-dashboard.md#LD-FR-03",
+              "docs/features/live-dashboard.md#LD-FR-04",
+              "docs/features/live-dashboard.md#LD-FR-10",
+              "docs/PRD.md#APX-CON-07",
+              "docs/PRD.md#APX-CON-09",
+              "docs/PRD.md#APX-CON-11"
+            ]
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.ld-1",
+          "inputs": [
+            "work.dp-2",
+            "work.hc-1",
+            "work.hc-2",
+            "work.dp-4",
+            "work.hc-7",
+            "work.nt-4",
+            "work.nt-5"
+          ],
+          "timeoutMs": 2700000
+        },
+        {
+          "id": "LD-2",
+          "title": "Carry the accessibility pattern onto live data",
+          "description": "Apply the prototype's accessibility pattern to the live dashboard. Build a visually hidden but focusable DOM mirror that contains one entry per visible row with its accessible name, state, repository grouping and pending state, and keep the mirror in the same order as the canvas. Make the whole page keyboard operable: rows are focusable in visual order, activation is observable, and the focused row survives a live update arriving underneath it. Honour the reduced-motion preference for every transition the live feed can trigger, including a newly arrived blocked row, and assert the text contrast tokens used by the live theme meet AA against their actual backgrounds. Mount the mirror and the keyboard controller from the live entry point and list that file as an output. Add jsdom tests against live-shaped data covering mirror contents and ordering, keyboard traversal, focus retention across an update, and the reduced-motion path. Exclude visual restyling beyond state encoding and contrast.",
+          "ownerAgent": "dashboard-engineer",
+          "dependencies": [
+            "LD-1",
+            "DP-3"
+          ],
+          "expectedOutputs": [
+            "src/dashboard/main.ts",
+            "src/dashboard/a11y/dom-mirror.ts",
+            "src/dashboard/a11y/keyboard-nav.ts",
+            "tests/dashboard/live-dom-mirror.test.ts"
+          ],
+          "validationCommands": [
+            "npm test -- tests/dashboard/live-dom-mirror.test.ts",
+            "npm run typecheck"
+          ],
+          "contract": {
+            "version": 1,
+            "kind": "implementation",
+            "requirements": [
+              "LD-FR-09: A visually hidden focusable DOM mirror of every visible row carries accessible names, state and grouping; the page is fully keyboard operable; the reduced-motion preference is honoured; and text meets AA contrast.",
+              "LD-FR-02: Each row states its condition as blocked, finished, running or information-only using an icon and a text label, never colour alone, and the visual treatment is stable across all four states."
+            ],
+            "acceptanceCriteria": [
+              "A jsdom test mounts the live entry point with live-shaped data and asserts one focusable mirror entry per visible row in canvas order",
+              "A jsdom test asserts each mirror entry exposes an accessible name, its state text and its repository grouping",
+              "A jsdom test asserts the focused row keeps focus when a live update arrives for a different row",
+              "A test asserts a newly arrived blocked row produces no movement when reduced motion is requested"
+            ],
+            "constraints": [
+              "Canvas paired with a visually hidden focusable DOM mirror, reduced motion honoured, AA contrast",
+              "APX-CON-07: The PixiJS canvas is always paired with a visually hidden but focusable DOM mirror of every visible row, so the dashboard is operable by keyboard and legible to a screen reader. Reduced-motion preferences are honoured, urgency is never encoded by colour alone, and text meets WCAG 2.1 AA contrast against its background."
+            ],
+            "references": [
+              "docs/features/live-dashboard.md#4. UI / Interaction Design",
+              "docs/PRD.md#9. Accessibility",
+              "docs/features/dashboard-design-prototype.md#3. Functional Requirements",
+              "docs/features/live-dashboard.md#LD-FR-09",
+              "docs/features/live-dashboard.md#LD-FR-02",
+              "docs/PRD.md#APX-CON-07"
+            ]
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.ld-2",
+          "inputs": [
+            "work.ld-1",
+            "work.dp-3",
+            "work.dp-4",
+            "work.hc-7",
+            "work.nt-4",
+            "work.nt-5"
+          ],
+          "timeoutMs": 2700000
+        }
+      ]
+    },
+    {
+      "id": "LIVE-DASHBOARD-2",
+      "title": "Phase 2: Interactions against the real API",
+      "feature": "Live Dashboard",
+      "description": "```forge-task {   \"id\": \"LD-3\",",
+      "ownerAgents": [
+        "dashboard-engineer"
+      ],
+      "dependencies": [
+        "LIVE-DASHBOARD-1"
+      ],
+      "approvalRequired": true,
+      "tasks": [
+        {
+          "id": "LD-3",
+          "title": "Add acknowledgement, deep-link focus, handoff and history",
+          "description": "Add the page's interactions against the real hub API. Acknowledgement posts to the single write route, updates the row optimistically, and reverts to the server's state when the acknowledgement is refused, with the refusal visible rather than swallowed. Deep links resolve to a specific session, focus and highlight it, and the focus survives later live updates. Handoff reveals the attach command for a session as text to copy, and the page must contain no control that sends a prompt, interrupts a session or approves anything. The history panel lists past events with class, repository, session, timestamp and acknowledgement or resolution state, and never renders conversation content. Mount all four from the live entry point and list it as an output. Add tests for a successful ack, a refused ack, deep-link focus, the absence of any agent-control control, and a history payload containing no content fields. Exclude the tray and the notifier.",
+          "ownerAgent": "dashboard-engineer",
+          "dependencies": [
+            "LD-1",
+            "HC-4"
+          ],
+          "expectedOutputs": [
+            "src/dashboard/live/ack.ts",
+            "src/dashboard/live/deeplink.ts",
+            "src/dashboard/live/handoff.ts",
+            "src/dashboard/live/history.ts",
+            "src/dashboard/main.ts",
+            "tests/dashboard/live-interactions.test.ts"
+          ],
+          "validationCommands": [
+            "npm test -- tests/dashboard/live-interactions.test.ts",
+            "npm run typecheck"
+          ],
+          "contract": {
+            "version": 1,
+            "kind": "implementation",
+            "requirements": [
+              "LD-FR-05: Acknowledging from the dashboard is the only write the page performs, it updates optimistically, and it corrects itself to the server's answer when the acknowledgement is refused.",
+              "LD-FR-06: Opening a toast deep link focuses and highlights that specific session, and the focus survives a later live update.",
+              "LD-FR-07: Each row offers a handoff that reveals the attach command for the session so the developer can open it in their own terminal, and the page contains no control that sends, interrupts or approves anything in a harness.",
+              "LD-FR-08: A history view lists past events with class, repository, session, timestamp and acknowledgement or resolution state, and shows no conversation content.",
+              "LD-FR-11: Information-only events appear inside the dashboard and never as a toast or a badge change."
+            ],
+            "acceptanceCriteria": [
+              "A test asserts a successful acknowledgement removes the pending marker and updates the pending count",
+              "A test asserts a refused acknowledgement restores the prior state and shows the refusal",
+              "A test asserts a deep link focuses and highlights its session and the focus survives a later update",
+              "A test asserts the rendered controls contain no send, interrupt or approve action and that handoff exposes the command as text",
+              "A test asserts the history panel renders class, repository, session, timestamp and state and no content field"
+            ],
+            "constraints": [
+              "Exactly one mutating route exists, the ack route",
+              "Information-only events appear inside the dashboard and never as a toast or a badge change",
+              "APX-CON-08: Exactly one mutating route exists, the ack route, and it can only mark a pending item acknowledged. No route can spawn, steer, interrupt, prompt or approve anything inside a harness."
+            ],
+            "references": [
+              "docs/features/live-dashboard.md#4. UI / Interaction Design",
+              "docs/PRD.md#6.3 Key APIs / Interfaces",
+              "docs/IDEA.md#Boundaries",
+              "docs/features/live-dashboard.md#LD-FR-05",
+              "docs/features/live-dashboard.md#LD-FR-06",
+              "docs/features/live-dashboard.md#LD-FR-07",
+              "docs/features/live-dashboard.md#LD-FR-08",
+              "docs/features/live-dashboard.md#LD-FR-11",
+              "docs/PRD.md#APX-CON-08"
+            ]
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.ld-3",
+          "inputs": [
+            "work.ld-1",
+            "work.hc-4",
+            "work.ld-2"
+          ],
+          "timeoutMs": 2700000
+        }
+      ]
+    },
+    {
+      "id": "LIVE-DASHBOARD-3",
+      "title": "Phase 3: End-to-end journey and review",
+      "feature": "Live Dashboard",
+      "description": "```forge-task {   \"id\": \"LD-4\",",
+      "ownerAgents": [
+        "qa-engineer"
+      ],
+      "dependencies": [
+        "LIVE-DASHBOARD-2"
+      ],
+      "approvalRequired": true,
+      "tasks": [
+        {
+          "id": "LD-4",
+          "title": "Prove the dashboard journey in a real browser",
+          "description": "Add a browser-driven end-to-end suite that runs against the real hub rather than a mock server. Start the hub against a temporary state directory, serve the built dashboard, drive one needs-you event through the ingest route, and assert the new blocked row appears, the pending count increments, a keyboard-only path can reach and activate the row, the acknowledgement clears it, and the history panel then shows it. Assert the page reports a stale state when the stream is interrupted, and that a deep link opens the dashboard focused on the expected session. Fail on zero executed tests and print which journeys ran, so a green result cannot mean nothing was exercised. Add a repository script that installs the browser if needed and runs the suite, failing loudly when the browser cannot be obtained rather than skipping. Exclude human judgement.",
+          "ownerAgent": "qa-engineer",
+          "dependencies": [
+            "LD-2",
+            "LD-3",
+            "HC-1"
+          ],
+          "expectedOutputs": [
+            "playwright.config.ts",
+            "tests/e2e/dashboard.spec.ts",
+            "scripts/verify-dashboard-e2e.mjs"
+          ],
+          "validationCommands": [
+            "npm test -- tests/e2e/dashboard.spec.ts",
+            "npm run typecheck"
+          ],
+          "contract": {
+            "version": 1,
+            "kind": "implementation",
+            "requirements": [
+              "LD-FR-03: The dashboard subscribes to the hub state stream, updates on change, reconnects with a cursor, and shows an explicit stale or disconnected state rather than presenting old data as current.",
+              "LD-FR-05: Acknowledging from the dashboard is the only write the page performs, it updates optimistically, and it corrects itself to the server's answer when the acknowledgement is refused.",
+              "LD-FR-09: A visually hidden focusable DOM mirror of every visible row carries accessible names, state and grouping; the page is fully keyboard operable; the reduced-motion preference is honoured; and text meets AA contrast.",
+              "LD-FR-10: The same build is served over the loopback origin and loaded in the application window, and both render identical state for identical hub data."
+            ],
+            "acceptanceCriteria": [
+              "The suite fails when no test executes and prints the journeys it ran",
+              "A journey asserts a real ingested needs-you event produces a blocked row, an incremented pending count and a keyboard-reachable row",
+              "A journey asserts acknowledgement clears the row and the history panel then lists it",
+              "A journey asserts an interrupted stream produces a visible stale state rather than stale data presented as current"
+            ],
+            "constraints": [
+              "Never invent passing results, tool availability, deployed resources, human review or compliance",
+              "APX-CON-11: Performance budgets: hub idle RSS at most 150 MB, local ingest p95 at most 50 ms, dashboard first paint at most 1 s from warm cache, live update visible within 250 ms of an accepted event."
+            ],
+            "references": [
+              "docs/PRD.md#16. Open Questions",
+              "docs/features/live-dashboard.md#6. Testing Strategy",
+              "docs/IDEA.md#Where The Surface Lives",
+              "docs/features/live-dashboard.md#LD-FR-03",
+              "docs/features/live-dashboard.md#LD-FR-05",
+              "docs/features/live-dashboard.md#LD-FR-09",
+              "docs/features/live-dashboard.md#LD-FR-10",
+              "docs/PRD.md#APX-CON-11"
+            ]
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.ld-4",
+          "inputs": [
+            "work.ld-2",
+            "work.ld-3",
+            "work.hc-1"
+          ],
+          "timeoutMs": 2700000
+        },
+        {
+          "id": "LD-5",
+          "title": "Review the primary dashboard journey",
+          "description": "Human review of the live dashboard as the surface the developer actually lands on. Complete the primary journey end to end against the running system with a real pending block: notice the badge or toast, open the dashboard from the tray, identify which repository is asking, read the blocked row, acknowledge it, and hand the session off to a terminal. Then repeat the journey with the keyboard only, and once more with a screen reader if available, and record what each pass could and could not reach. Judge whether the approved design survived contact with real data, including repositories with many sessions and a long history. Record every observation and the verdict in the review file, listing any required change rather than making it. Do not change code in this task.",
+          "dependencies": [
+            "LD-4",
+            "NT-4",
+            "DP-4"
+          ],
+          "expectedOutputs": [],
+          "validationCommands": [],
+          "contract": {
+            "version": 1,
+            "kind": "human-review",
+            "requirements": [
+              "LD-FR-01: The dashboard groups sessions under a repository short-name header, nests each session beneath it, and reveals the full path on hover or focus without using it as the primary label.",
+              "LD-FR-05: Acknowledging from the dashboard is the only write the page performs, it updates optimistically, and it corrects itself to the server's answer when the acknowledgement is refused.",
+              "LD-FR-09: A visually hidden focusable DOM mirror of every visible row carries accessible names, state and grouping; the page is fully keyboard operable; the reduced-motion preference is honoured; and text meets AA contrast.",
+              "LD-FR-10: The same build is served over the loopback origin and loaded in the application window, and both render identical state for identical hub data."
+            ],
+            "acceptanceCriteria": [
+              "The reviewer performed the mouse journey, the keyboard-only journey and, where available, a screen-reader pass, and stated in the notes what each could reach",
+              "The reviewer confirmed the dashboard opened from the tray focused on the right session and that the pending count matched the badge throughout",
+              "The reviewer exercised a repository with several sessions and a long history and recorded whether density still holds",
+              "The reviewer recorded a verdict and every required change as an explicit list"
+            ],
+            "constraints": [
+              "A subjective visual judgement never stands alone; the journey must have been performed against the running system",
+              "APX-CON-07: The PixiJS canvas is always paired with a visually hidden but focusable DOM mirror of every visible row, so the dashboard is operable by keyboard and legible to a screen reader. Reduced-motion preferences are honoured, urgency is never encoded by colour alone, and text meets WCAG 2.1 AA contrast against its background."
+            ],
+            "references": [
+              "docs/features/live-dashboard.md#4. UI / Interaction Design",
+              "docs/PRD.md#11. Analytics / Success Metrics",
+              "docs/IDEA.md#Success",
+              "docs/features/live-dashboard.md#LD-FR-01",
+              "docs/features/live-dashboard.md#LD-FR-05",
+              "docs/features/live-dashboard.md#LD-FR-09",
+              "docs/features/live-dashboard.md#LD-FR-10",
+              "docs/PRD.md#APX-CON-07"
+            ],
+            "reviewFile": "docs/reviews/live-dashboard.json"
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.ld-5",
+          "inputs": [
+            "work.ld-4",
+            "work.nt-4",
+            "work.dp-4",
+            "work.ld-3"
+          ],
+          "timeoutMs": 2700000
+        }
+      ]
+    },
+    {
+      "id": "INSTALL-AUTOSTART-AND-OPERATIONS-1",
+      "title": "Phase 1: Package and command line",
+      "feature": "Install, Autostart and Operations",
+      "description": "```forge-task {   \"id\": \"IO-1\",",
+      "ownerAgents": [
+        "packaging-engineer"
+      ],
+      "dependencies": [
+        "NOTIFICATION-AND-TRAY-PRESENCE-3",
+        "OPENCODE-PLUGIN-ADAPTER-3"
+      ],
+      "approvalRequired": true,
+      "tasks": [
+        {
+          "id": "IO-1",
+          "title": "Publish the package and guard its build artefacts",
+          "description": "Turn the project into an installable global npm package. Declare the agent-ping binary, a files allowlist that includes only what must ship, and the packaging metadata for each platform dependency, extending the existing package manifest without removing the scripts established earlier. Add a prepack check that fails when any required build artefact is missing, so a package can never be published or installed in a broken state, and make it verify the Electron main bundle, the dashboard build and the plugin file that the installer writes. Add a test that runs the check against a deliberately incomplete tree and asserts it fails, and against a complete tree and asserts it passes. Exclude the command implementations and autostart.",
+          "ownerAgent": "packaging-engineer",
+          "dependencies": [
+            "DP-1",
+            "HC-1"
+          ],
+          "expectedOutputs": [
+            "package.json",
+            "scripts/prepack-check.mjs",
+            "tests/packaging/package.test.ts"
+          ],
+          "validationCommands": [
+            "npm test -- tests/packaging/package.test.ts",
+            "npm run typecheck"
+          ],
+          "contract": {
+            "version": 1,
+            "kind": "implementation",
+            "requirements": [
+              "IO-FR-01: The project publishes as an npm global package exposing an agent-ping binary, with a files allowlist and a prepack check that fails when any required build artefact is missing."
+            ],
+            "acceptanceCriteria": [
+              "A test asserts the prepack check fails when a required build artefact is absent and passes when all are present",
+              "A test asserts the files allowlist excludes source maps, tests and development-only configuration",
+              "A test asserts the declared binary name matches the command the installer documentation uses"
+            ],
+            "constraints": [
+              "Node.js 22 LTS or newer with TypeScript and npm only",
+              "No telemetry leaves the machine",
+              "APX-CON-05: One toolchain only: Node.js 22 LTS or newer with TypeScript and npm. No second implementation language and no runtime dependency the supported Node line does not satisfy.",
+              "APX-CON-12: No telemetry leaves the machine. Counters, logs and the durable log are local files only, and no outbound network call exists other than to the loopback hub and the harnesses already running on this machine."
+            ],
+            "references": [
+              "docs/PRD.md#6.1 Technology Stack",
+              "docs/PRD.md#6.2 Project Structure",
+              "docs/features/install-autostart-and-operations.md#3. Functional Requirements",
+              "docs/features/install-autostart-and-operations.md#IO-FR-01",
+              "docs/PRD.md#APX-CON-05",
+              "docs/PRD.md#APX-CON-12"
+            ]
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.io-1",
+          "inputs": [
+            "work.dp-1",
+            "work.hc-1",
+            "work.nt-4",
+            "work.nt-5",
+            "work.oa-6"
+          ],
+          "timeoutMs": 2700000
+        },
+        {
+          "id": "IO-2",
+          "title": "Implement the install, uninstall, status and doctor commands",
+          "description": "Implement the agent-ping command line on top of the existing installer, tray and autostart interfaces. Install writes the global plugin, enables platform autostart, starts the hub if needed, verifies health, and prints exactly what it changed; running it again must be safe, report that nothing changed, and detect a plugin version mismatch. Uninstall removes the plugin, disables autostart, and keeps the database unless a purge flag is given. Status reports pending count, most recent event time, hub uptime and active session count, and says plainly when the hub is not running. Doctor checks the runtime version, database path and writability, port availability, plugin presence and version, autostart state, notifier availability and tray availability, printing one actionable remedy per failure and exiting non-zero when any check fails. Resolve every path through the overridable platform state directory created with owner-only permissions, and write the bounded structured local log with no content. Add tests that invoke the command dispatcher in the command entry point for each subcommand, including the failure exits. Exclude the autostart unit implementations.",
+          "ownerAgent": "packaging-engineer",
+          "dependencies": [
+            "IO-1",
+            "OA-3",
+            "NT-3"
+          ],
+          "expectedOutputs": [
+            "src/cli/index.ts",
+            "src/cli/install.ts",
+            "src/cli/doctor.ts",
+            "src/cli/status.ts",
+            "tests/cli/install.test.ts",
+            "tests/cli/doctor.test.ts"
+          ],
+          "validationCommands": [
+            "npm test -- tests/cli/install.test.ts tests/cli/doctor.test.ts",
+            "npm run typecheck"
+          ],
+          "contract": {
+            "version": 1,
+            "kind": "implementation",
+            "requirements": [
+              "IO-FR-02: The install command writes the global plugin, enables autostart for the current platform, verifies hub health, and prints exactly what it changed.",
+              "IO-FR-03: The uninstall command removes the global plugin, disables autostart and leaves the database in place unless a purge flag is passed.",
+              "IO-FR-04: The doctor command checks the runtime version, database path and writability, port availability, plugin presence and version, autostart state, notifier availability and tray availability, prints an actionable remedy for each failure, and exits non-zero when any check fails.",
+              "IO-FR-05: The status command reports the pending count, the time of the most recent event, hub uptime and the number of active sessions, and says so plainly when the hub is not running.",
+              "IO-FR-07: State resolves to a platform directory that an environment variable can override, and every path the product writes is created with owner-only permissions.",
+              "IO-FR-08: Running install again is safe, reports that nothing changed, and detects a version mismatch between the installed plugin and the package.",
+              "IO-FR-09: The product writes a structured local log with bounded size that contains no conversation content, and a verbose flag mirrors it to standard output."
+            ],
+            "acceptanceCriteria": [
+              "A test asserts install writes the plugin, enables autostart, verifies health and lists what it changed",
+              "A test asserts a second install reports no changes and a plugin version mismatch is reported rather than silently accepted",
+              "A test asserts uninstall keeps the database by default and removes it only with the purge flag",
+              "A test asserts doctor exits non-zero when any single check fails and prints a remedy naming that check",
+              "A test asserts status reports pending count, last event time, uptime and active sessions, and says the hub is not running when it is down",
+              "Each test invokes the subcommand through the command entry point rather than calling an internal function directly"
+            ],
+            "constraints": [
+              "No telemetry leaves the machine",
+              "A delivery failure is never silent",
+              "APX-CON-12: No telemetry leaves the machine. Counters, logs and the durable log are local files only, and no outbound network call exists other than to the loopback hub and the harnesses already running on this machine.",
+              "APX-CON-10: Harness delivery is fire-and-forget with a bounded timeout and no retry storm, and when the hub is absent the adapter leaves a visible breadcrumb in the harness's own user interface instead of swallowing the event."
+            ],
+            "references": [
+              "docs/features/install-autostart-and-operations.md#4. UI / Interaction Design",
+              "docs/features/opencode-plugin-adapter.md#3. Functional Requirements",
+              "docs/IDEA.md#Availability Contract",
+              "docs/features/install-autostart-and-operations.md#IO-FR-02",
+              "docs/features/install-autostart-and-operations.md#IO-FR-03",
+              "docs/features/install-autostart-and-operations.md#IO-FR-04",
+              "docs/features/install-autostart-and-operations.md#IO-FR-05",
+              "docs/features/install-autostart-and-operations.md#IO-FR-07",
+              "docs/features/install-autostart-and-operations.md#IO-FR-08",
+              "docs/features/install-autostart-and-operations.md#IO-FR-09",
+              "docs/PRD.md#APX-CON-12",
+              "docs/PRD.md#APX-CON-10"
+            ]
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.io-2",
+          "inputs": [
+            "work.io-1",
+            "work.oa-3",
+            "work.nt-3",
+            "work.nt-4",
+            "work.nt-5",
+            "work.oa-6"
+          ],
+          "timeoutMs": 2700000
+        }
+      ]
+    },
+    {
+      "id": "INSTALL-AUTOSTART-AND-OPERATIONS-2",
+      "title": "Phase 2: Autostart",
+      "feature": "Install, Autostart and Operations",
+      "description": "```forge-task {   \"id\": \"IO-3\",",
+      "ownerAgents": [
+        "packaging-engineer"
+      ],
+      "dependencies": [
+        "INSTALL-AUTOSTART-AND-OPERATIONS-1"
+      ],
+      "approvalRequired": true,
+      "tasks": [
+        {
+          "id": "IO-3",
+          "title": "Install and remove per-platform autostart units",
+          "description": "Implement autostart for all three supported platforms behind one interface: a systemd user unit on Linux, a launchd agent on macOS, and a per-user startup entry on Windows. Each implementation must create its unit with owner-only permissions, require no root, be idempotent across repeated enable and disable calls, and remove every trace on disable so a disabled install leaves nothing behind. Resolve the unit location from the platform convention rather than a hard-coded path, and use the packaged binary as the executable. Add tests for enable, double enable, disable, double disable and a foreign unit that must be left alone, all against a temporary home directory, plus tests asserting the generated unit content names the correct binary and requires no elevated privilege. Exclude any live system service manipulation.",
+          "ownerAgent": "packaging-engineer",
+          "dependencies": [
+            "IO-2"
+          ],
+          "expectedOutputs": [
+            "src/cli/autostart/index.ts",
+            "src/cli/autostart/linux.ts",
+            "src/cli/autostart/macos.ts",
+            "src/cli/autostart/windows.ts",
+            "tests/cli/autostart.test.ts"
+          ],
+          "validationCommands": [
+            "npm test -- tests/cli/autostart.test.ts",
+            "npm run typecheck"
+          ],
+          "contract": {
+            "version": 1,
+            "kind": "implementation",
+            "requirements": [
+              "IO-FR-06: Autostart is a user-level unit on each platform, needs no root, and can be enabled and disabled repeatedly with no error and no duplicate entries.",
+              "IO-FR-07: State resolves to a platform directory that an environment variable can override, and every path the product writes is created with owner-only permissions."
+            ],
+            "acceptanceCriteria": [
+              "A test asserts enabling twice produces one unit and disabling twice is a safe no-op for each platform implementation",
+              "A test asserts disabling removes the unit and leaves no agent-ping entry behind",
+              "A test asserts each generated unit names the packaged binary, runs as the current user and requests no elevated privilege",
+              "A test asserts a pre-existing unrelated unit in the same location is left untouched"
+            ],
+            "constraints": [
+              "Platform support is Linux, macOS and Windows in v1",
+              "No telemetry leaves the machine",
+              "APX-CON-06: Platform support is Linux, macOS and Windows in v1. Linux is the only live-verified path on the authoring machine; the macOS and Windows implementations ship with scripted checks and documented manual steps, and their human review gate can only be completed on those platforms.",
+              "APX-CON-12: No telemetry leaves the machine. Counters, logs and the durable log are local files only, and no outbound network call exists other than to the loopback hub and the harnesses already running on this machine."
+            ],
+            "references": [
+              "docs/PRD.md#16. Open Questions",
+              "docs/features/install-autostart-and-operations.md#8. Open Questions",
+              "docs/IDEA.md#Availability Contract",
+              "docs/features/install-autostart-and-operations.md#IO-FR-06",
+              "docs/features/install-autostart-and-operations.md#IO-FR-07",
+              "docs/PRD.md#APX-CON-06",
+              "docs/PRD.md#APX-CON-12"
+            ]
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.io-3",
+          "inputs": [
+            "work.io-2",
+            "work.io-1"
+          ],
+          "timeoutMs": 2700000
+        }
+      ]
+    },
+    {
+      "id": "INSTALL-AUTOSTART-AND-OPERATIONS-3",
+      "title": "Phase 3: Live operations verification and gate",
+      "feature": "Install, Autostart and Operations",
+      "description": "```forge-task {   \"id\": \"IO-4\",",
+      "ownerAgents": [
+        "qa-engineer"
+      ],
+      "dependencies": [
+        "INSTALL-AUTOSTART-AND-OPERATIONS-2"
+      ],
+      "approvalRequired": true,
+      "tasks": [
+        {
+          "id": "IO-4",
+          "title": "Write the live autostart and restart verification script",
+          "description": "Write one repository script that proves the operational contract on the real machine. Install into a temporary state directory with the real user service manager, start the hub, assert health, create a pending item, stop the hub, start it again through the service manager, and assert the pending item, its history row and the pending count survived unchanged and were not duplicated. Then disable autostart and assert the unit is gone, and assert the plugin file is removed by uninstall while the database survives. Print what was observed and exit non-zero on any failed assertion, with no path that reports success when nothing ran. Cover the script's own decision logic with a test driving it against injected command results, and record in the runbook that macOS and Windows need the same script run on those machines. Exclude human judgement.",
+          "ownerAgent": "qa-engineer",
+          "dependencies": [
+            "IO-2",
+            "IO-3",
+            "OA-5"
+          ],
+          "expectedOutputs": [
+            "scripts/verify-autostart-linux.mjs",
+            "tests/scripts/verify-autostart-linux.test.ts"
+          ],
+          "validationCommands": [
+            "npm test -- tests/scripts/verify-autostart-linux.test.ts",
+            "npm run typecheck"
+          ],
+          "contract": {
+            "version": 1,
+            "kind": "implementation",
+            "requirements": [
+              "IO-FR-06: Autostart is a user-level unit on each platform, needs no root, and can be enabled and disabled repeatedly with no error and no duplicate entries.",
+              "IO-FR-08: Running install again is safe, reports that nothing changed, and detects a version mismatch between the installed plugin and the package."
+            ],
+            "acceptanceCriteria": [
+              "A test drives the script against injected command results and asserts it fails when the pending item does not survive a restart",
+              "A test asserts the script exits non-zero when the service manager is unavailable rather than reporting success",
+              "The script asserts disable removes the unit and uninstall removes the plugin while keeping the database",
+              "The runbook states that the same script must be run on macOS and Windows for those platforms to be claimed"
+            ],
+            "constraints": [
+              "Never invent passing results, tool availability, deployed resources, human review or compliance",
+              "APX-CON-06: Platform support is Linux, macOS and Windows in v1. Linux is the only live-verified path on the authoring machine; the macOS and Windows implementations ship with scripted checks and documented manual steps, and their human review gate can only be completed on those platforms."
+            ],
+            "references": [
+              "docs/PRD.md#12. Dependencies and Risks",
+              "docs/features/install-autostart-and-operations.md#6. Testing Strategy",
+              "docs/IDEA.md#Availability Contract",
+              "docs/features/install-autostart-and-operations.md#IO-FR-06",
+              "docs/features/install-autostart-and-operations.md#IO-FR-08",
+              "docs/PRD.md#APX-CON-06"
+            ]
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.io-4",
+          "inputs": [
+            "work.io-2",
+            "work.io-3",
+            "work.oa-5"
+          ],
+          "timeoutMs": 2700000
+        },
+        {
+          "id": "IO-5",
+          "title": "Review the install and diagnostic experience",
+          "description": "Human review of operations on this machine. From a clean state, install the package globally, start an ordinary opencode session, and confirm the hub is running without any manual step after the next login or restart of the session environment. Then break things on purpose one at a time: stop the hub, occupy the port, remove the plugin file, disable the notifier, using the manual commands in docs/runbooks/notify-platforms.md where the failure is notification-related, and after each run the doctor command and record what it printed, whether the remedy was actionable, and whether the exit code was non-zero. Finish with uninstall and confirm nothing of the product remains except the database. Record the platform each observation was made on, and record explicitly that the macOS and Windows equivalents are outstanding if those machines were not available. Do not change code in this task.",
+          "dependencies": [
+            "IO-4",
+            "NT-4",
+            "NT-5"
+          ],
+          "expectedOutputs": [],
+          "validationCommands": [],
+          "contract": {
+            "version": 1,
+            "kind": "human-review",
+            "requirements": [
+              "IO-FR-02: The install command writes the global plugin, enables autostart for the current platform, verifies hub health, and prints exactly what it changed.",
+              "IO-FR-03: The uninstall command removes the global plugin, disables autostart and leaves the database in place unless a purge flag is passed.",
+              "IO-FR-04: The doctor command checks the runtime version, database path and writability, port availability, plugin presence and version, autostart state, notifier availability and tray availability, prints an actionable remedy for each failure, and exits non-zero when any check fails.",
+              "IO-FR-06: Autostart is a user-level unit on each platform, needs no root, and can be enabled and disabled repeatedly with no error and no duplicate entries."
+            ],
+            "acceptanceCriteria": [
+              "The reviewer installed from a clean state and confirmed the hub runs with no manual step, stating the platform used",
+              "For each deliberate breakage the reviewer recorded what doctor printed, whether the remedy was actionable, and the exit code",
+              "The reviewer uninstalled and confirmed nothing remained except the database",
+              "The reviewer recorded the macOS and Windows gates as outstanding when those machines were unavailable, rather than reporting a pass"
+            ],
+            "constraints": [
+              "Platform support is Linux, macOS and Windows in v1",
+              "A subjective judgement never stands alone; the journey must have been performed against the running system",
+              "APX-CON-06: Platform support is Linux, macOS and Windows in v1. Linux is the only live-verified path on the authoring machine; the macOS and Windows implementations ship with scripted checks and documented manual steps, and their human review gate can only be completed on those platforms."
+            ],
+            "references": [
+              "docs/features/notification-and-tray-presence.md#8. Open Questions",
+              "docs/features/install-autostart-and-operations.md#4. UI / Interaction Design",
+              "docs/PRD.md#16. Open Questions",
+              "docs/features/install-autostart-and-operations.md#IO-FR-02",
+              "docs/features/install-autostart-and-operations.md#IO-FR-03",
+              "docs/features/install-autostart-and-operations.md#IO-FR-04",
+              "docs/features/install-autostart-and-operations.md#IO-FR-06",
+              "docs/PRD.md#APX-CON-06"
+            ],
+            "reviewFile": "docs/reviews/operations.json"
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.io-5",
+          "inputs": [
+            "work.io-4",
+            "work.nt-4",
+            "work.nt-5",
+            "work.io-3"
+          ],
+          "timeoutMs": 2700000
+        }
+      ]
+    },
+    {
+      "id": "COPILOT-CLI-ACP-SPIKE-1",
+      "title": "Phase 1: Probes",
+      "feature": "Copilot CLI ACP Spike",
+      "description": "```forge-task {   \"id\": \"CP-1\",",
+      "ownerAgents": [
+        "connector-engineer"
+      ],
+      "dependencies": [
+        "HUB-CORE-AND-DELIVERY-POLICY-3"
+      ],
+      "approvalRequired": true,
+      "tasks": [
+        {
+          "id": "CP-1",
+          "title": "Probe the real Copilot ACP surface",
+          "description": "Write a probe that exercises the real Copilot CLI rather than a stub. Launch it in ACP mode over standard input and output, perform the initialize handshake, record the negotiated protocol version, the advertised agent capabilities and the authentication methods, subscribe to notifications, drive one short session that asks for a tool, and record every notification type and field actually observed, verbatim. Probe the permission path specifically and record whether a permission request is emitted at all, since that is the open question the whole feature exists to answer. Record the exact CLI version and the timestamps. Write the captured evidence to the report artifact and fail loudly, with a non-zero exit, when the binary is missing or the handshake does not complete, so absence of evidence is never reported as a negative finding. Cover the probe's own parsing and recording logic with a test over a captured transcript. Exclude any adapter code.",
+          "ownerAgent": "connector-engineer",
+          "dependencies": [
+            "DP-1"
+          ],
+          "expectedOutputs": [
+            "scripts/probe-copilot-acp.mjs",
+            "tests/scripts/probe-copilot-acp.test.ts"
+          ],
+          "validationCommands": [
+            "npm test -- tests/scripts/probe-copilot-acp.test.ts",
+            "npm run typecheck"
+          ],
+          "contract": {
+            "version": 1,
+            "kind": "implementation",
+            "requirements": [
+              "CP-FR-01: A probe launches the real Copilot CLI in ACP mode, performs the initialize handshake, subscribes to notifications and records the negotiated protocol version, the agent capabilities, the authentication methods and every notification type actually observed.",
+              "CP-FR-03: Both probes write one report artifact containing the verbatim captured evidence, timestamps and the exact CLI version, so a later reader can re-check the conclusion rather than trust it."
+            ],
+            "acceptanceCriteria": [
+              "A test asserts the probe records the negotiated protocol version, capabilities and auth methods from a captured transcript",
+              "A test asserts a missing binary or a failed handshake exits non-zero rather than writing an empty report",
+              "A test asserts permission-related notifications are recorded distinctly from ordinary session updates",
+              "The probe writes the exact CLI version and timestamps into the report artifact"
+            ],
+            "constraints": [
+              "Never fabricate external API contracts",
+              "Never invent passing results, tool availability, deployed resources, human review or compliance",
+              "APX-CON-13: The connector interface is specified in Agent Client Protocol terms: a harness adapter translates its own events into the normalized envelope and delivers it to the hub, so a third harness is additive work rather than a rewrite of the hub, the store or the dashboard."
+            ],
+            "references": [
+              "docs/PRD.md#5. Research Findings",
+              "docs/features/copilot-cli-acp-spike.md#6. Testing Strategy",
+              "docs/PRD.md#16. Open Questions",
+              "docs/features/copilot-cli-acp-spike.md#CP-FR-01",
+              "docs/features/copilot-cli-acp-spike.md#CP-FR-03",
+              "docs/PRD.md#APX-CON-13"
+            ]
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.cp-1",
+          "inputs": [
+            "work.dp-1",
+            "work.hc-7"
+          ],
+          "timeoutMs": 2700000
+        },
+        {
+          "id": "CP-2",
+          "title": "Probe the Copilot hook surface and write the report",
+          "description": "Write the second probe covering the hook surface, and consolidate both probes into one report artifact. Enumerate the documented Copilot CLI hook triggers, run a real session with each relevant hook enabled, capture their real payloads, and record explicitly whether any idle or permission equivalent exists and what values a session-end reason can take. Write a single report under the research directory containing the verbatim captured evidence from both probes, the timestamps and the exact CLI version, with an explicit statement of what was not observed. Make the report honest about the difference between a signal that is absent, a signal that was not triggered during the probe, and a signal whose meaning is unclear. Add a test asserting the report contains the required sections and that a missing capture is reported as not observed rather than omitted. Exclude any adapter code and any decision.",
+          "ownerAgent": "connector-engineer",
+          "dependencies": [
+            "CP-1"
+          ],
+          "expectedOutputs": [
+            "scripts/probe-copilot-hooks.mjs",
+            "docs/research/copilot-acp-probe.md"
+          ],
+          "validationCommands": [
+            "npm run typecheck"
+          ],
+          "contract": {
+            "version": 1,
+            "kind": "implementation",
+            "requirements": [
+              "CP-FR-02: A second probe enumerates the documented Copilot CLI hook triggers and captures their real payloads, and records explicitly whether any idle or permission equivalent exists and what a session-end reason can express.",
+              "CP-FR-03: Both probes write one report artifact containing the verbatim captured evidence, timestamps and the exact CLI version, so a later reader can re-check the conclusion rather than trust it."
+            ],
+            "acceptanceCriteria": [
+              "The report states the documented hook triggers, the captured payloads, and explicitly whether an idle or permission equivalent exists",
+              "The report distinguishes a signal that is absent from one that was not triggered and from one whose meaning is unclear",
+              "The report records the exact CLI version and the timestamps of both probe runs"
+            ],
+            "constraints": [
+              "Never fabricate external API contracts",
+              "APX-CON-13: The connector interface is specified in Agent Client Protocol terms: a harness adapter translates its own events into the normalized envelope and delivers it to the hub, so a third harness is additive work rather than a rewrite of the hub, the store or the dashboard."
+            ],
+            "references": [
+              "docs/PRD.md#5. Research Findings",
+              "docs/features/copilot-cli-acp-spike.md#3. Functional Requirements",
+              "docs/PRD.md#16. Open Questions",
+              "docs/features/copilot-cli-acp-spike.md#CP-FR-02",
+              "docs/features/copilot-cli-acp-spike.md#CP-FR-03",
+              "docs/PRD.md#APX-CON-13"
+            ]
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.cp-2",
+          "inputs": [
+            "work.cp-1",
+            "work.hc-7"
+          ],
+          "timeoutMs": 2700000
+        }
+      ]
+    },
+    {
+      "id": "COPILOT-CLI-ACP-SPIKE-2",
+      "title": "Phase 2: Gate decision and authorised outcome",
+      "feature": "Copilot CLI ACP Spike",
+      "description": "```forge-task {   \"id\": \"CP-3\",",
+      "ownerAgents": [
+        "connector-engineer"
+      ],
+      "dependencies": [
+        "COPILOT-CLI-ACP-SPIKE-1"
+      ],
+      "approvalRequired": true,
+      "tasks": [
+        {
+          "id": "CP-3",
+          "title": "Decide whether a Copilot adapter is authorised",
+          "description": "Human gate on the spike evidence. Read the probe report at docs/research/copilot-acp-probe.md and decide one of three outcomes, citing the specific captured evidence for each claim: authorise a full adapter, authorise a documented heuristic for the needs-you class only, or defer Copilot to a later version. State exactly which observed signal maps to which class, what happens when the expected signal does not arrive, and how a missed block would be reported rather than hidden. If the decision is deferral, state plainly that v1 ships opencode only and what would have to change to revisit it. Record the decision, the evidence and the residual risk in the review file, and do not change code in this task.",
+          "dependencies": [
+            "CP-1",
+            "CP-2"
+          ],
+          "expectedOutputs": [],
+          "validationCommands": [],
+          "contract": {
+            "version": 1,
+            "kind": "human-review",
+            "requirements": [
+              "CP-FR-04: A recorded gate decision states whether a Copilot adapter is authorised, and if so exactly which signals map to which classes and how a missed signal is reported; if not, it states that v1 ships opencode only.",
+              "CP-FR-03: Both probes write one report artifact containing the verbatim captured evidence, timestamps and the exact CLI version, so a later reader can re-check the conclusion rather than trust it."
+            ],
+            "acceptanceCriteria": [
+              "The reviewer recorded exactly one of full adapter, heuristic-only or deferral, citing captured evidence for each claim",
+              "The reviewer stated which signal maps to which class and what is reported when the expected signal does not arrive",
+              "The reviewer recorded the residual risk of the chosen option, including what a user would miss",
+              "The reviewer confirmed the decision was made against the captured report and not against documentation alone"
+            ],
+            "constraints": [
+              "A subjective judgement never stands alone; it must rest on the captured evidence in the report",
+              "APX-CON-13: The connector interface is specified in Agent Client Protocol terms: a harness adapter translates its own events into the normalized envelope and delivers it to the hub, so a third harness is additive work rather than a rewrite of the hub, the store or the dashboard."
+            ],
+            "references": [
+              "docs/features/copilot-cli-acp-spike.md#3. Functional Requirements",
+              "docs/PRD.md#16. Open Questions",
+              "docs/features/copilot-cli-acp-spike.md#CP-FR-04",
+              "docs/features/copilot-cli-acp-spike.md#CP-FR-03",
+              "docs/PRD.md#APX-CON-13"
+            ],
+            "reviewFile": "docs/reviews/copilot-gate.json"
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.cp-3",
+          "inputs": [
+            "work.cp-1",
+            "work.cp-2"
+          ],
+          "timeoutMs": 2700000
+        },
+        {
+          "id": "CP-4",
+          "title": "Build the authorised Copilot adapter or record the deferral",
+          "description": "Implement exactly what the gate decision authorised, and nothing more. Read the decision recorded in docs/reviews/copilot-gate.json and the evidence in docs/research/copilot-acp-probe.md before writing any code. If the decision was full adapter or heuristic-only, translate the ACP notifications and hook payloads named in the decision into the same normalized envelope the opencode adapter produces, using the same dedupe keys, and deliver it to the hub through the existing transport so classification, pending state and delivery stay in one place. Implement the documented degradation for a signal that does not arrive, so a Copilot block that cannot be detected is reported rather than silently absent, and cover it with a test that exercises the missing-signal path. If the decision was deferral, produce the deferral record instead: a runbook stating that Copilot is not supported in v1, which signals were missing, and what would have to change, with no adapter code. Exclude any change to the hub's rules, the notifier or the dashboard.",
+          "ownerAgent": "connector-engineer",
+          "dependencies": [
+            "CP-3"
+          ],
+          "expectedOutputs": [
+            "src/plugin/copilot/index.ts",
+            "src/plugin/copilot/translate.ts",
+            "tests/plugin/copilot-translate.test.ts",
+            "docs/runbooks/copilot-support.md"
+          ],
+          "validationCommands": [
+            "npm test -- tests/plugin/copilot-translate.test.ts",
+            "npm run typecheck"
+          ],
+          "contract": {
+            "version": 1,
+            "kind": "implementation",
+            "requirements": [
+              "CP-FR-05: If authorised, the adapter maps ACP notifications and hooks onto the same normalized envelope as the opencode adapter, deduplicates against polled state, and degrades to the documented heuristic rather than failing silently.",
+              "CP-FR-06: No harness-specific path may bypass the hub's classification, pending and delivery rules; a Copilot event is stored and classified exactly like an opencode event."
+            ],
+            "acceptanceCriteria": [
+              "A table-driven test asserts each signal named in the gate decision maps to the class the decision assigned, and no other mapping exists",
+              "A test asserts the missing-signal path produces the documented degradation rather than silence",
+              "A test asserts a Copilot envelope is stored and classified by the same hub path as an opencode envelope, with no harness-specific branch",
+              "The runbook states the supported Copilot surface, or states the deferral with the missing signals and what would change it"
+            ],
+            "constraints": [
+              "No harness-specific path may bypass the hub's classification, pending and delivery rules",
+              "Identity is the repository short name",
+              "APX-CON-13: The connector interface is specified in Agent Client Protocol terms: a harness adapter translates its own events into the normalized envelope and delivers it to the hub, so a third harness is additive work rather than a rewrite of the hub, the store or the dashboard.",
+              "APX-CON-09: Identity is the repository short name, which is the directory basename of the session. Sessions nest beneath it and the full path is available on hover or focus but is never the primary label."
+            ],
+            "references": [
+              "docs/features/copilot-cli-acp-spike.md#3. Functional Requirements",
+              "docs/features/copilot-cli-acp-spike.md#8. Open Questions",
+              "docs/features/copilot-cli-acp-spike.md#CP-FR-05",
+              "docs/features/copilot-cli-acp-spike.md#CP-FR-06",
+              "docs/PRD.md#APX-CON-13",
+              "docs/PRD.md#APX-CON-09"
+            ]
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.cp-4",
+          "inputs": [
+            "work.cp-3",
+            "work.cp-1",
+            "work.cp-2"
+          ],
+          "timeoutMs": 2700000
+        }
+      ]
+    }
+  ],
+  "warnings": [
+    "Team validation: file 'package.json' is owned by multiple agents (tooling-engineer, packaging-engineer).",
+    "Team validation: file 'src/main/index.ts' is owned by multiple agents (hub-engineer, notification-engineer)."
+  ],
+  "responsibilityMatrixPath": "/home/mcfuzzysquirrel/Projects/agent-ping/docs/agent-responsibility-matrix.md"
+}

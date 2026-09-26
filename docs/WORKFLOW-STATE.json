@@ -1,0 +1,324 @@
+{
+  "runId": "7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8",
+  "startedAt": "2026-09-26T10:43:05.421Z",
+  "lastUpdatedAt": "2026-09-26T11:07:25.388Z",
+  "manifestPath": "/home/mcfuzzysquirrel/Projects/agent-ping/docs/EXECUTION-MANIFEST.json",
+  "manifestVersion": "1.0",
+  "harness": "opencode",
+  "status": "running",
+  "currentPhase": "DASHBOARD-DESIGN-PROTOTYPE-1",
+  "tasks": {
+    "DP-1": {
+      "taskId": "DP-1",
+      "status": "complete",
+      "ownerAgent": "tooling-engineer",
+      "attempt": 3,
+      "outputFiles": [
+        "package.json",
+        "tsconfig.json",
+        "vitest.config.ts",
+        "eslint.config.js",
+        "tests/tooling/runner-convention.test.ts",
+        ".gitignore",
+        "package-lock.json",
+        "scripts/build.mjs",
+        "scripts/run-tests.mjs",
+        "tsconfig.build.json"
+      ],
+      "attemptHistory": [
+        {
+          "attempt": 1,
+          "outcome": "failed",
+          "reason": "timed out after 600000ms",
+          "resultPath": "docs/artifacts/DP-1.2026-09-26T10-53-09-475Z.attempt-1.result.json"
+        },
+        {
+          "attempt": 2,
+          "outcome": "failed",
+          "reason": "validation command failed (exit 1): npm test -- tests/tooling/runner-convention.test.ts\n\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\u001b[1m\u001b[41m Failed Tests 1 \u001b[49m\u001b[22m\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[43m node \u001b[49m\u001b[39m tests/tooling/runner-convention.test.ts\u001b[2m > \u001b[22mtest runner convention\u001b[2m > \u001b[22mruns exactly the named path and nothing else\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected '\\n> agent-ping@0.1.0 test\\n> node scr…' to match /Test Files\\s+1 passed/\u001b[39m\n\n\u001b[32m- Expected:\u001b[39m\n/Test Files\\s+1 passed/\n\n\u001b[31m+ Received:\u001b[39m\n\"\n> agent-ping@0.1.0 test\n> node scripts/run-tests.mjs tests/tooling/runner-convention-probe/selected.test.ts\n\n\n[test] vitest (tests/tooling/runner-convention-probe/selected.test.ts): vitest run tests/tooling/runner-convention-probe/selected.test.ts\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv5.0.2 \u001b[39m\u001b[90m/home/mcfuzzysquirrel/Projects/agent-ping\u001b[39m\n\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[43m node \u001b[49m\u001b[39m tests/tooling/runner-convention-probe/selected.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m   Start at \u001b[22m 13:04:01\n\u001b[2m   Duration \u001b[22m 197ms\u001b[2m (transform 59%, import 23%, worker 11%, tests 6%)\u001b[22m\n\n\"\n\n\u001b[36m \u001b[2m❯\u001b[22m tests/tooling/runner-convention.test.ts:\u001b[2m98:20\u001b[22m\u001b[39m\n    \u001b[90m 96|\u001b[39m     // runner that widened the selection to the directory would run it…\n    \u001b[90m 97|\u001b[39m     expect(existsSync(siblingMarker)).toBe(false)\n    \u001b[90m 98|\u001b[39m     expect(output).toMatch(/Test Files\\s+1 passed/)\n    \u001b[90m   |\u001b[39m                    \u001b[31m^\u001b[39m\n    \u001b[90m 99|\u001b[39m   })\n    \u001b[90m100|\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\u001b[22m\u001b[39m\n\n\n[test] failed for tests/tooling/runner-convention.test.ts (exit 1)",
+          "resultPath": "docs/artifacts/DP-1.2026-09-26T11-04-02-633Z.attempt-2.result.json"
+        },
+        {
+          "attempt": 3,
+          "outcome": "passed",
+          "resultPath": "docs/artifacts/DP-1.2026-09-26T11-07-25-386Z.attempt-3.result.json"
+        }
+      ],
+      "startedAt": "2026-09-26T11:04:07.639Z",
+      "completedAt": "2026-09-26T11:07:25.388Z",
+      "agentOutput": "I'll start by reading the execution file.\nRoot cause reproduced. The nested run inherits colour, so ANSI codes sit between `Test Files ` and `1 passed`, and the assertion — plus the two `not.toMatch` guards, which were silently passing for the wrong reason — never sees plain text. Fixing it properly: strip ANSI from captured output *and* force the nested run colour-free.\nThe literal escape bytes got lost in that regex. Replacing it with explicit `\\u001B` escapes:\nMy `stripAnsi` had no `g` flag, so it only removed the first escape. That's a real bug in the fix — correcting it:\nStripping works. Now let me prove the assertions would still hold if colour *did* leak into the nested run, then run the full validation matrix.\nThe probe dir is created by the test itself and removed in `afterAll`, so my manual run had nothing to run. Recreating it first:\nStripping is proven against real TTY colour output. Now the full validation matrix.\nAll four environments pass, including the exact one that rejected the previous attempt. Now the other three scripts:\nEvery exit status is correct and the probe cleans up. Now confirming every script name downstream feature contracts reference actually resolves:\nEvery manifest command uses only `npm test -- <paths>` and `npm run typecheck` — both present. Let me verify the two contract behaviours the dashboard/QA engineers depend on: jsdom routing and the e2e dispatch failing loudly.\n## What was wrong and what I changed\n\nThe prior attempt's toolchain was functionally correct — the rejection was a defect in my own test, not in the runner. `tests/tooling/runner-convention.test.ts` asserted against the nested run's **raw** stdout/stderr. The engine runs validation on a TTY with colour, so Vitest emitted `Test Files \\e[22m \\e[1m\\e[32m1 passed` and `/Test Files\\s+1 passed/` never matched.\n\nThat was worse than a flake. The two `expect(output).not.toMatch(/Test Files\\s+\\d+ passed/)` guards were passing for the wrong reason: colour codes also broke *those* matches, so they'd have reported \"no summary printed\" even when a summary *was* printed — two hollow assertions guarding the hollow-selection criterion.\n\nFix, in `tests/tooling/runner-convention.test.ts` only:\n- `stripAnsi` removes CSI and OSC sequences from captured output before any matching. My first version had no `g` flag and silently removed only the first escape; caught it with a direct Node check and fixed it.\n- The child env now sets `FORCE_COLOR: '0'` / `NO_COLOR: '1'`, so an inherited colour setting can't change what the test asserts. Stripping is the belt to that pair of braces.\n\nI verified the stripping is load-bearing rather than assuming it: a real `script -qec` PTY run with `FORCE_COLOR=1`, piped through the same pattern, matches `/Test Files\\s+1 passed/`.\n\nNo other file needed changing. `package.json`, `tsconfig.json`, `tsconfig.build.json`, `vitest.config.ts`, `eslint.config.js`, `scripts/run-tests.mjs` and `scripts/build.mjs` are carried over from the prior attempt unchanged.\n\n## Verified exit statuses (all run in this repository)\n\n| Command | Exit |\n|---|---|\n| `npm test -- tests/tooling/runner-convention.test.ts` (**required**) | **0** — 1 file, 6 tests passed |\n| `npm run typecheck` (**required**) | **0** |\n| `npm run lint` | 0 |\n| `npm run build` | 0 (2 steps skipped, nothing to build yet) |\n| `npm test` (whole suite) | 0 |\n| `npm test -- tests/tooling/empty-probe` (dir, no tests) | **1** |\n| `npm test -- tests/tooling/no-such-file.test.ts` | **1** |\n| `npm test -- tests/e2e/dashboard.spec.ts` | **1**, loud, naming the missing config |\n\nThe required command was run four ways — pipe, `FORCE_COLOR=1`, real PTY, and PTY + `FORCE_COLOR=1 CI=true` — all exit 0. The exact environment that rejected the previous attempt now passes.\n\nEvery `validationCommands` string in `docs/EXECUTION-MANIFEST.json` uses only `npm test -- <paths>` and `npm run typecheck`; both resolve. `passWithNoTests: false` is the only occurrence of that flag. I did not create `playwright.config.ts` — it belongs to qa-engineer under LD-4, and the dispatch fails loudly rather than skipping. `docs/artifacts/` untouched.\n\n## One escalation for the record\n\nPRD 6.1 pins TypeScript **7.0.2**, and the package pins **5.9.3**. That is a deliberate, PRD-sanctioned deviation, not a drift: `typescript-eslint@8.70.1` declares `peer: typescript \">=4.8.4 <6.1.0\"`, so 7.0.2 is outside its supported range, and 5.9.3 is the newest release inside it. This is the PRD §12 risk-row remedy (\"pin the exact verified version and record the fallback in Open Questions\") applied to `typescript-eslint`, whose version 6.1.0 upper bound is the binding constraint. Switching to 7.0.2 needs a `typescript-eslint` release that accepts it, or a recorded decision to drop `typescript-eslint` — not a version bump I should make unilaterally.\n\n## Files created or changed\n\n- `tests/tooling/runner-convention.test.ts` — **changed** (ANSI fix)\n- `package.json`, `tsconfig.json`, `tsconfig.build.json`, `vitest.config.ts`, `eslint.config.js`, `scripts/run-tests.mjs`, `scripts/build.mjs`, `tests/` — carried over from attempt 2, unchanged by me\n- `.gitignore` — modified before this attempt (probe scratch dir)\n- `package-lock.json` — generated by `npm install`\n\n```forge-result\n{\"summary\":\"Fixed the ANSI-sensitive assertions in tests/tooling/runner-convention.test.ts that caused attempt 2 to fail: the nested-run output is now ANSI-stripped before matching, and the child env forces colour off, which also repairs the two not.toMatch guards that had been passing for the wrong reason. Verified npm test -- tests/tooling/runner-convention.test.ts exits 0 (6 tests) in four environments including the TTY+FORCE_COLOR one that rejected the prior attempt; npm run typecheck, npm run lint and npm run build all exit 0 on the empty source set; a named path with no tests exits 1 and a real path exits 0; every validationCommands string in the manifest resolves. Escalation: TypeScript stays pinned at 5.9.3 rather than the PRD's 7.0.2 because typescript-eslint@8.70.1 declares peer >=4.8.4 <6.1.0, applying the PRD section 12 risk-row remedy; moving to 7.0.2 needs a typescript-eslint release that accepts it.\",\"unresolved\":[],\"decisions\":[\"Carried over the prior attempt's package.json, tsconfig.json, tsconfig.build.json, vitest.config.ts, eslint.config.js and scripts/*.mjs unchanged; only the runner-convention test needed repair.\",\"Fixed the test with two independent measures (ANSI stripping in the assertion path plus FORCE_COLOR=0/NO_COLOR=1 on the child) so neither a TTY nor an inherited colour setting can change the result.\"],\"tests\":[\"npm test -- tests/tooling/runner-convention.test.ts -> exit 0 (1 file, 6 tests)\",\"npm run typecheck -> exit 0\",\"npm run lint -> exit 0\",\"npm run build -> exit 0 (2 steps skipped, nothing to build)\",\"npm test (whole suite) -> exit 0\",\"npm test -- tests/tooling/empty-probe (directory with no tests) -> exit 1\",\"npm test -- tests/tooling/no-such-file.test.ts -> exit 1\",\"npm test -- tests/e2e/dashboard.spec.ts -> exit 1, loud, names the missing Playwright config\",\"tests/dashboard/*.test.ts routes to the jsdom project and runs once, not twice\"],\"warnings\":[\"TypeScript is pinned at 5.9.3, not the PRD 6.1 value of 7.0.2. typescript-eslint@8.70.1 declares peer typescript >=4.8.4 <6.1.0, so 7.0.2 is outside its supported range and 5.9.3 is the newest release inside it. Adopting 7.0.2 needs a typescript-eslint that accepts it, or a recorded decision to drop typescript-eslint; it is not a version bump the tooling owner can make unilaterally.\"],\"validationLimitations\":[\"No product, dashboard, store, hub or CLI source exists yet, so npm run build reports its tsc and Vite steps as skipped rather than compiling anything; the build wiring itself is exercised only as far as the empty source set allows.\",\"The Playwright e2e project is not created or exercised here: playwright.config.ts is owned by qa-engineer under LD-4. Only the dispatch behaviour is verified, and it fails loudly as required.\"]}\n```\n",
+      "validationLimitations": [
+        "No product, dashboard, store, hub or CLI source exists yet, so npm run build reports its tsc and Vite steps as skipped rather than compiling anything; the build wiring itself is exercised only as far as the empty source set allows.",
+        "The Playwright e2e project is not created or exercised here: playwright.config.ts is owned by qa-engineer under LD-4. Only the dispatch behaviour is verified, and it fails loudly as required."
+      ],
+      "artifactId": "work-dp-1-001"
+    },
+    "DP-2": {
+      "taskId": "DP-2",
+      "status": "pending",
+      "ownerAgent": "dashboard-engineer",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "DP-3": {
+      "taskId": "DP-3",
+      "status": "pending",
+      "ownerAgent": "dashboard-engineer",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "DP-4": {
+      "taskId": "DP-4",
+      "status": "pending",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "EL-1": {
+      "taskId": "EL-1",
+      "status": "pending",
+      "ownerAgent": "domain-engineer",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "EL-2": {
+      "taskId": "EL-2",
+      "status": "pending",
+      "ownerAgent": "domain-engineer",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "EL-3": {
+      "taskId": "EL-3",
+      "status": "pending",
+      "ownerAgent": "domain-engineer",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "EL-4": {
+      "taskId": "EL-4",
+      "status": "pending",
+      "ownerAgent": "domain-engineer",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "HC-1": {
+      "taskId": "HC-1",
+      "status": "pending",
+      "ownerAgent": "hub-engineer",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "HC-2": {
+      "taskId": "HC-2",
+      "status": "pending",
+      "ownerAgent": "hub-engineer",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "HC-3": {
+      "taskId": "HC-3",
+      "status": "pending",
+      "ownerAgent": "hub-engineer",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "HC-4": {
+      "taskId": "HC-4",
+      "status": "pending",
+      "ownerAgent": "hub-engineer",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "HC-5": {
+      "taskId": "HC-5",
+      "status": "pending",
+      "ownerAgent": "hub-engineer",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "HC-6": {
+      "taskId": "HC-6",
+      "status": "pending",
+      "ownerAgent": "hub-engineer",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "HC-7": {
+      "taskId": "HC-7",
+      "status": "pending",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "NT-1": {
+      "taskId": "NT-1",
+      "status": "pending",
+      "ownerAgent": "notification-engineer",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "NT-2": {
+      "taskId": "NT-2",
+      "status": "pending",
+      "ownerAgent": "notification-engineer",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "NT-3": {
+      "taskId": "NT-3",
+      "status": "pending",
+      "ownerAgent": "notification-engineer",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "NT-4": {
+      "taskId": "NT-4",
+      "status": "pending",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "NT-5": {
+      "taskId": "NT-5",
+      "status": "pending",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "OA-1": {
+      "taskId": "OA-1",
+      "status": "pending",
+      "ownerAgent": "connector-engineer",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "OA-2": {
+      "taskId": "OA-2",
+      "status": "pending",
+      "ownerAgent": "connector-engineer",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "OA-3": {
+      "taskId": "OA-3",
+      "status": "pending",
+      "ownerAgent": "connector-engineer",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "OA-4": {
+      "taskId": "OA-4",
+      "status": "pending",
+      "ownerAgent": "connector-engineer",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "OA-5": {
+      "taskId": "OA-5",
+      "status": "pending",
+      "ownerAgent": "qa-engineer",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "OA-6": {
+      "taskId": "OA-6",
+      "status": "pending",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "LD-1": {
+      "taskId": "LD-1",
+      "status": "pending",
+      "ownerAgent": "dashboard-engineer",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "LD-2": {
+      "taskId": "LD-2",
+      "status": "pending",
+      "ownerAgent": "dashboard-engineer",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "LD-3": {
+      "taskId": "LD-3",
+      "status": "pending",
+      "ownerAgent": "dashboard-engineer",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "LD-4": {
+      "taskId": "LD-4",
+      "status": "pending",
+      "ownerAgent": "qa-engineer",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "LD-5": {
+      "taskId": "LD-5",
+      "status": "pending",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "IO-1": {
+      "taskId": "IO-1",
+      "status": "pending",
+      "ownerAgent": "packaging-engineer",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "IO-2": {
+      "taskId": "IO-2",
+      "status": "pending",
+      "ownerAgent": "packaging-engineer",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "IO-3": {
+      "taskId": "IO-3",
+      "status": "pending",
+      "ownerAgent": "packaging-engineer",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "IO-4": {
+      "taskId": "IO-4",
+      "status": "pending",
+      "ownerAgent": "qa-engineer",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "IO-5": {
+      "taskId": "IO-5",
+      "status": "pending",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "CP-1": {
+      "taskId": "CP-1",
+      "status": "pending",
+      "ownerAgent": "connector-engineer",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "CP-2": {
+      "taskId": "CP-2",
+      "status": "pending",
+      "ownerAgent": "connector-engineer",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "CP-3": {
+      "taskId": "CP-3",
+      "status": "pending",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "CP-4": {
+      "taskId": "CP-4",
+      "status": "pending",
+      "ownerAgent": "connector-engineer",
+      "attempt": 0,
+      "outputFiles": []
+    }
+  },
+  "blockers": [],
+  "auditLog": []
+}
