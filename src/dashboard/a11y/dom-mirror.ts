@@ -266,6 +266,26 @@ export interface DomMirrorOptions {
   readonly label?: string
   /** Defaults to the document the parent belongs to. */
   readonly document?: Document
+  /**
+   * Whether to inject this module's own `<style>` element. Defaults to true.
+   *
+   * An inline `<style>` element is exactly what the hub's content-security-policy
+   * refuses: `style-src 'self'` with no `unsafe-inline` (DASHBOARD_CSP in
+   * src/hub/security.ts) makes a browser drop the sheet and log a policy
+   * violation for it. A page served by the hub therefore sets this to false and
+   * carries the same rules in its own linked stylesheet - which the browser
+   * accepts, because that is what `style-src 'self'` is for. jsdom has no policy
+   * and the prototype page is opened from a file, so both keep the default and
+   * the mirror stays hidden with no stylesheet of its own depending on anything
+   * a caller remembered to set.
+   *
+   * The obligation this creates is on the caller, so it is stated here rather
+   * than left implied: a caller that passes false must already carry
+   * `mirrorStyleSheet()`'s rules in a sheet the policy allows. The live page's
+   * suite asserts both halves - the rules are present, and no `<style>` element
+   * is injected.
+   */
+  readonly injectStyleSheet?: boolean
 }
 
 let instanceCount = 0
@@ -274,7 +294,8 @@ export function createDomMirror(options: DomMirrorOptions): DomMirror {
   const doc = options.document ?? options.parent.ownerDocument
   instanceCount += 1
   const instanceId = `dashboard-mirror-${instanceCount}`
-  installStyleSheet(doc)
+  const ownsStyleSheet = options.injectStyleSheet !== false
+  if (ownsStyleSheet) installStyleSheet(doc)
 
   const root = doc.createElement('ul')
   root.setAttribute(MIRROR_ROOT_ATTRIBUTE, '')
@@ -490,7 +511,7 @@ export function createDomMirror(options: DomMirrorOptions): DomMirror {
       signature = ''
       rebuilt = () => {}
       root.remove()
-      releaseStyleSheet()
+      if (ownsStyleSheet) releaseStyleSheet()
     },
   }
 }

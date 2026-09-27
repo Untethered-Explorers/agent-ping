@@ -17,7 +17,11 @@
 // test can supply a host and a scene target that record what was asked of them,
 // which is how a headless jsdom run asserts the composition the browser paints.
 
-import { Application, Container } from 'pixi.js'
+import type { Container } from 'pixi.js'
+import type { MockRepository } from './mock-data'
+import { PROTOTYPE_NOW, PROTOTYPE_REPOSITORIES } from './mock-data'
+import type { RenderedRow, ScenePlan, SceneTarget, SceneTargetOptions } from './scene'
+import { buildScene, createPixiSceneTarget, paintScene } from './scene'
 import { createDomMirror, type DomMirror } from '../a11y/dom-mirror'
 import { createKeyboardNavigator, type KeyboardNavigator } from '../a11y/keyboard-nav'
 import {
@@ -25,162 +29,33 @@ import {
   type MotionController,
   type MotionControllerOptions,
 } from '../theme/motion'
-import type { MockRepository } from './mock-data'
-import { PROTOTYPE_NOW, PROTOTYPE_REPOSITORIES } from './mock-data'
-import type { RenderedRow, ScenePlan, SceneTarget, SceneTargetOptions } from './scene'
 import {
-  PROTOTYPE_COLORS,
-  buildScene,
-  createPixiSceneTarget,
-  paintScene,
-} from './scene'
+  DASHBOARD_ROOT_ATTRIBUTE,
+  FALLBACK_SIZE,
+  RENDERER_DESTROY_OPTIONS,
+  STAGE_DESTROY_OPTIONS,
+  SubscriptionBag,
+  createPixiDashboardHost,
+  measureContainer,
+  type DashboardHost,
+  type PixiHostOptions,
+  type Size,
+} from '../host'
 
-/** The attribute the page HTML puts on the element the dashboard mounts into. */
-export const DASHBOARD_ROOT_ATTRIBUTE = 'data-dashboard-root'
-
-export interface Size {
-  readonly width: number
-  readonly height: number
+// The renderer plumbing is shared with the live page (LD-1) and re-exported here
+// rather than kept, so this module's public surface is the one DP-2 and DP-3 pinned
+// and the live page can mount the same host without importing a module that mounts
+// the prototype the moment it is loaded.
+export {
+  DASHBOARD_ROOT_ATTRIBUTE,
+  FALLBACK_SIZE,
+  RENDERER_DESTROY_OPTIONS,
+  STAGE_DESTROY_OPTIONS,
+  SubscriptionBag,
+  createPixiDashboardHost,
+  measureContainer,
 }
-
-/**
- * Used when the container reports no layout, which happens in a hidden window
- * and in jsdom. A zero-sized surface would render nothing at all, which reads
- * as a layout bug rather than as "not laid out yet".
- */
-export const FALLBACK_SIZE: Size = Object.freeze({ width: 960, height: 540 })
-
-export function measureContainer(container: HTMLElement): Size {
-  const width = Math.round(container.clientWidth)
-  const height = Math.round(container.clientHeight)
-  return {
-    width: width > 0 ? width : FALLBACK_SIZE.width,
-    height: height > 0 ? height : FALLBACK_SIZE.height,
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Teardown
-// ---------------------------------------------------------------------------
-
-/**
- * The arguments the renderer is destroyed with. Named constants rather than
- * inline literals so the test can assert the exact object the real host passes
- * to `Application.destroy`, including the texture options that stop a destroyed
- * dashboard from leaving canvas textures behind.
- */
-export const RENDERER_DESTROY_OPTIONS = Object.freeze({ removeView: true, releaseGlobalResources: true })
-export const STAGE_DESTROY_OPTIONS = Object.freeze({ children: true, texture: true, textureSource: true })
-
-/**
- * Every teardown hook the mount registered, in one place, so unload can prove it
- * removed all of them. A leaked listener or an un-disconnected observer is the
- * failure this type exists to make visible.
- */
-export class SubscriptionBag {
-  private readonly removers: (() => void)[] = []
-
-  add(remove: () => void): void {
-    this.removers.push(remove)
-  }
-
-  get size(): number {
-    return this.removers.length
-  }
-
-  removeAll(): void {
-    while (this.removers.length > 0) {
-      const remove = this.removers.pop()
-      if (remove !== undefined) remove()
-    }
-  }
-}
-
-// ---------------------------------------------------------------------------
-// The renderer seam
-// ---------------------------------------------------------------------------
-
-export interface DashboardHost {
-  /** The canvas the renderer created, already in the container's subtree. */
-  readonly canvas: HTMLCanvasElement
-  /** Root of the scene graph the painter draws into. */
-  readonly root: Container
-  getSize(): Size
-  setSize(size: Size): void
-  /** Stops the render loop before teardown, so no frame runs against a dead renderer. */
-  stopRendering(): void
-  readonly isTornDown: boolean
-  teardown(): void
-}
-
-export interface PixiHostOptions {
-  readonly container: HTMLElement
-  readonly size: Size
-  /** Overridden by tests; production constructs a real `Application`. */
-  readonly createApplication?: () => Application
-}
-
-/**
- * The real PixiJS 8 host.
- *
- * `new Application()` allocates nothing on its own and `app.init()` is async:
- * `app.canvas`, `app.stage` and `app.screen` only exist once it resolves. Passing
- * options to the constructor instead is the v7 shape and produces a blank page
- * that looks like a layout bug.
- *
- * Sizing is owned here rather than handed to PixiJS's `resizeTo`, because
- * `resizeTo` only follows window resizes while the surface is a container, and
- * because owning it keeps every subscription in one bag the unload path empties.
- */
-export async function createPixiDashboardHost(options: PixiHostOptions): Promise<DashboardHost> {
-  const application = (options.createApplication ?? ((): Application => new Application()))()
-
-  await application.init({
-    width: options.size.width,
-    height: options.size.height,
-    background: PROTOTYPE_COLORS.pageBackground,
-    antialias: true,
-    autoDensity: true,
-    resolution: globalThis.devicePixelRatio > 1 ? globalThis.devicePixelRatio : 1,
-  })
-
-  const canvas = application.canvas
-  // The canvas carries no semantics of its own: the DOM mirror added in DP-3 is
-  // the accessible twin, and announcing an empty canvas only adds noise.
-  canvas.setAttribute('aria-hidden', 'true')
-  canvas.style.display = 'block'
-  options.container.appendChild(canvas)
-
-  const root = new Container()
-  application.stage.addChild(root)
-
-  let tornDown = false
-
-  return {
-    canvas,
-    root,
-    getSize(): Size {
-      const { width, height } = application.screen
-      return { width, height }
-    },
-    setSize(size: Size): void {
-      if (tornDown) return
-      application.renderer.resize(size.width, size.height)
-    },
-    stopRendering(): void {
-      if (tornDown) return
-      application.ticker.stop()
-    },
-    get isTornDown(): boolean {
-      return tornDown
-    },
-    teardown(): void {
-      if (tornDown) return
-      tornDown = true
-      application.destroy(RENDERER_DESTROY_OPTIONS, STAGE_DESTROY_OPTIONS)
-    },
-  }
-}
+export type { DashboardHost, PixiHostOptions, Size }
 
 // ---------------------------------------------------------------------------
 // Mount

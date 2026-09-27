@@ -7,6 +7,19 @@
 // Graphics and Text objects. Keeping the two apart is what lets a headless test
 // drive the same plan the browser paints, instead of asserting a parallel
 // re-implementation of it.
+//
+// WHAT LD-1 ADDED TO IT, AND WHY IT IS HERE RATHER THAN IN THE LIVE MODULE
+// The geometry lives in `layoutGroups`, which takes a repository, some rows, an
+// icon and a word and nothing about where they came from. `buildScene` is the mock
+// module's adapter onto it. The live page (src/dashboard/live/session-list.ts)
+// adapts the hub's own session rows onto the same shape and lays them out with the
+// same function, because the approved prototype layout *is* the layout (LD-FR-01,
+// LD-FR-10): a second copy of the arithmetic would be a second layout that can
+// drift from the one a human signed off, and the row model, the group model and
+// the state union are all parameterised for exactly that reason. Nothing the
+// prototype draws changes: `contentHeight` for the three mock rows, every row
+// position and every draw command is still the output of the same arithmetic,
+// which is what tests/dashboard/prototype-scene.test.ts pins.
 
 import { Container, Graphics, Rectangle, Text, TextStyle } from 'pixi.js'
 import type { MockRepository, MockSession, SessionState } from './mock-data'
@@ -76,11 +89,16 @@ const SYSTEM_FONT =
 // ---------------------------------------------------------------------------
 
 /**
- * Three silhouettes, not three hues: a filled square reads as "stopped", a tick
- * as "done", a triangle as "in flight". Each is paired with a word, so a row is
- * fully legible with colour, with the icon, or with neither.
+ * Four silhouettes, not four hues: a filled square reads as "stopped", a tick as
+ * "done", a triangle as "in flight", a dot as "reported, nothing needed". Each is
+ * paired with a word, so a row is fully legible with colour, with the icon, or with
+ * neither.
+ *
+ * `dot` arrives with LD-1: information-only is the live page's fourth state
+ * (LD-FR-02), and a state that is not colour alone needs a shape of its own. The
+ * prototype's three rows do not use it, so the approved page is unchanged.
  */
-export type StateIconName = 'stop' | 'check' | 'triangle'
+export type StateIconName = 'stop' | 'check' | 'triangle' | 'dot'
 
 export interface StateEncoding {
   readonly icon: StateIconName
@@ -169,7 +187,18 @@ export function formatAge(lastEventAt: string, now: string): string {
  * as separate fields for the DOM mirror while the canvas spends one line on them.
  */
 export function statusLine(session: MockSession): string {
-  return session.label.length === 0 ? session.status : `${session.label} – ${session.status}`
+  return composeStatusLine(session.label, session.status)
+}
+
+/**
+ * The one composition of a row's label and status into the line the canvas draws.
+ *
+ * Shared with the live page (`composeStatusLine` is what `layoutGroups` calls), so
+ * the approved row and the live row speak the same single line rather than two
+ * similar ones.
+ */
+export function composeStatusLine(label: string, status: string): string {
+  return label.length === 0 ? status : `${label} – ${status}`
 }
 
 // ---------------------------------------------------------------------------
@@ -238,12 +267,12 @@ export interface HoverRegion {
 }
 
 /** One visible session row, in canvas order. DP-3's DOM mirror derives from this. */
-export interface RenderedRow {
+export interface RenderedRow<S extends string = SessionState> {
   readonly sessionId: string
   readonly repositoryId: string
   readonly repositoryShortName: string
   readonly repositoryPath: string
-  readonly state: SessionState
+  readonly state: S
   readonly encoding: StateEncoding
   readonly label: string
   readonly status: string
@@ -262,14 +291,14 @@ export interface RenderedGroup {
   readonly rowIds: readonly string[]
 }
 
-export interface ScenePlan {
+export interface ScenePlan<S extends string = SessionState> {
   readonly width: number
   readonly height: number
   /** How tall the rows actually are, which can be less than the canvas height. */
   readonly contentHeight: number
   readonly groups: readonly RenderedGroup[]
   /** Canvas order: groups in order, blocked-first rows within each group. */
-  readonly rows: readonly RenderedRow[]
+  readonly rows: readonly RenderedRow<S>[]
   /** Paint order. Every command here is a command the painter issues. */
   readonly draws: readonly DrawCommand[]
   readonly hoverRegions: readonly HoverRegion[]
@@ -285,15 +314,49 @@ export interface BuildSceneOptions {
 }
 
 /**
- * Lay the mock data out into a draw plan. Pure: the same inputs always produce
- * the same plan, which is what makes the design review repeatable.
+ * A row the layout is told about, before it is positioned.
+ *
+ * The layout needs a repository, a row, an icon and a word - nothing about where
+ * the data came from. That is what lets the live page lay its own rows out with
+ * this module's geometry instead of restating it: the approved layout is one
+ * function, and a second copy of the arithmetic is a second layout that can drift.
  */
-export function buildScene(
-  repositories: readonly MockRepository[],
+export interface LayoutRow<S extends string = string> {
+  readonly id: string
+  readonly state: S
+  readonly encoding: StateEncoding
+  /** The row's own short label, spoken separately from the status line. */
+  readonly label: string
+  /** One line of state text. Never conversation content (APX-FR-01). */
+  readonly status: string
+  /** Already formatted against the plan's own clock. */
+  readonly age: string
+}
+
+/** One repository's rows, in the order the layout must draw them. */
+export interface LayoutGroup<S extends string = string> {
+  readonly id: string
+  /** The primary label: the short name, never the path (APX-CON-09). */
+  readonly shortName: string
+  readonly path: string
+  readonly rows: readonly LayoutRow<S>[]
+}
+
+/**
+ * Lay groups of rows into a draw plan. Pure, and the one place the geometry lives.
+ *
+ * Every row is laid out, whatever the canvas height: the plan describes the rows
+ * the surface has, and the canvas paints the part of them that fits. A caller whose
+ * rows can exceed its own height decides what to do about that (the live page
+ * grows its canvas to the content; the prototype's three rows never reach the
+ * question).
+ */
+export function layoutGroups<S extends string>(
+  groups: readonly LayoutGroup<S>[],
   options: BuildSceneOptions,
-): ScenePlan {
+): ScenePlan<S> {
   const hovered = options.hoveredRepositoryId ?? null
-  const hoveredIsKnown = repositories.some((repository) => repository.id === hovered)
+  const hoveredIsKnown = groups.some((group) => group.id === hovered)
   const hoveredId = hoveredIsKnown ? hovered : null
 
   const width = Math.max(0, Math.round(options.width))
@@ -314,15 +377,15 @@ export function buildScene(
       radius: 0,
     },
   ]
-  const rows: RenderedRow[] = []
-  const groups: RenderedGroup[] = []
+  const rows: RenderedRow<S>[] = []
+  const groups_: RenderedGroup[] = []
   const hoverRegions: HoverRegion[] = []
 
   let cursorY = LAYOUT.pagePaddingTop
 
-  for (const repository of repositories) {
+  for (const group of groups) {
     const groupTop = cursorY
-    const shortName = repositoryShortName(repository.path)
+    const shortName = group.shortName
     const headerTextTop = groupTop + 4
 
     draws.push({
@@ -340,11 +403,11 @@ export function buildScene(
     // The full path is revealed beside the short name, right-aligned to the
     // content edge so it can never sit on top of the primary label. It is never
     // the primary label and never appears alone.
-    if (hoveredId === repository.id && contentWidth > 0) {
+    if (hoveredId === group.id && contentWidth > 0) {
       draws.push({
         kind: 'text',
         role: 'repository-full-path',
-        text: repository.path,
+        text: group.path,
         x: contentRight,
         y: headerTextTop,
         size: LAYOUT.metaSize,
@@ -366,32 +429,29 @@ export function buildScene(
       width: LAYOUT.dividerWidth,
     })
 
-    const ordered = orderSessions(repository.sessions)
     const groupRowIds: string[] = []
     let rowY = headerRuleY + 1
 
-    for (const [index, session] of ordered.entries()) {
-      const encoding = stateEncoding(session.state)
-      const age = formatAge(session.lastEventAt, options.now)
+    for (const [index, row] of group.rows.entries()) {
       const iconX = rowX
       const iconY = rowY + LAYOUT.labelLineTop + (LAYOUT.labelLineHeight - LAYOUT.iconSize) / 2
       const textX = iconX + LAYOUT.iconSize + LAYOUT.iconGap
       const statusWidth = Math.max(0, contentRight - textX)
 
       rows.push({
-        sessionId: session.id,
-        repositoryId: repository.id,
+        sessionId: row.id,
+        repositoryId: group.id,
         repositoryShortName: shortName,
-        repositoryPath: repository.path,
-        state: session.state,
-        encoding,
-        label: session.label,
-        status: session.status,
-        age,
+        repositoryPath: group.path,
+        state: row.state,
+        encoding: row.encoding,
+        label: row.label,
+        status: row.status,
+        age: row.age,
         y: rowY,
         height: LAYOUT.rowHeight,
       })
-      groupRowIds.push(session.id)
+      groupRowIds.push(row.id)
 
       // A row carries four things: a state icon, the word that goes with it, an
       // age, and one line of status. The session's own label and its status are
@@ -399,16 +459,16 @@ export function buildScene(
       // because density is what the design review is judging.
       draws.push({
         kind: 'icon',
-        icon: encoding.icon,
+        icon: row.encoding.icon,
         x: iconX,
         y: iconY,
         size: LAYOUT.iconSize,
-        color: encoding.accent,
+        color: row.encoding.accent,
       })
       draws.push({
         kind: 'text',
         role: 'session-state-label',
-        text: encoding.label,
+        text: row.encoding.label,
         x: textX,
         y: rowY + LAYOUT.labelLineTop,
         size: LAYOUT.stateLabelSize,
@@ -419,7 +479,7 @@ export function buildScene(
       draws.push({
         kind: 'text',
         role: 'session-age',
-        text: age,
+        text: row.age,
         x: contentRight,
         y: rowY + LAYOUT.labelLineTop,
         size: LAYOUT.metaSize,
@@ -430,7 +490,7 @@ export function buildScene(
       draws.push({
         kind: 'text',
         role: 'session-status',
-        text: statusLine(session),
+        text: composeStatusLine(row.label, row.status),
         x: textX,
         y: rowY + LAYOUT.statusLineTop,
         size: LAYOUT.statusSize,
@@ -441,7 +501,7 @@ export function buildScene(
       })
 
       rowY += LAYOUT.rowHeight
-      if (index < ordered.length - 1) {
+      if (index < group.rows.length - 1) {
         draws.push({
           kind: 'line',
           x1: rowX,
@@ -455,16 +515,16 @@ export function buildScene(
     }
 
     const groupHeight = rowY - groupTop
-    groups.push({
-      repositoryId: repository.id,
+    groups_.push({
+      repositoryId: group.id,
       shortName,
-      path: repository.path,
+      path: group.path,
       y: groupTop,
       height: groupHeight,
       rowIds: groupRowIds,
     })
     hoverRegions.push({
-      repositoryId: repository.id,
+      repositoryId: group.id,
       x: 0,
       y: groupTop,
       width,
@@ -480,12 +540,40 @@ export function buildScene(
     width,
     height: Math.max(0, Math.round(options.height)),
     contentHeight,
-    groups,
+    groups: groups_,
     rows,
     draws,
     hoverRegions,
     hoveredRepositoryId: hoveredId,
   }
+}
+
+/**
+ * Lay the mock data out into a draw plan. Pure: the same inputs always produce
+ * the same plan, which is what makes the design review repeatable.
+ *
+ * The mock module's own types are adapted into the layout's neutral row shape and
+ * nothing else: ordering, encoding and ageing are the renderer's job, and the
+ * geometry below is the single copy of it that the live page also draws with.
+ */
+export function buildScene(
+  repositories: readonly MockRepository[],
+  options: BuildSceneOptions,
+): ScenePlan {
+  const groups: LayoutGroup<SessionState>[] = repositories.map((repository) => ({
+    id: repository.id,
+    shortName: repositoryShortName(repository.path),
+    path: repository.path,
+    rows: orderSessions(repository.sessions).map((session) => ({
+      id: session.id,
+      state: session.state,
+      encoding: stateEncoding(session.state),
+      label: session.label,
+      status: session.status,
+      age: formatAge(session.lastEventAt, options.now),
+    })),
+  }))
+  return layoutGroups(groups, options)
 }
 
 // ---------------------------------------------------------------------------
@@ -518,7 +606,7 @@ export interface SceneTarget {
   setHoverRegions(regions: readonly HoverRegion[]): void
 }
 
-export function paintScene(plan: ScenePlan, target: SceneTarget): void {
+export function paintScene<S extends string>(plan: ScenePlan<S>, target: SceneTarget): void {
   for (const command of plan.draws) {
     switch (command.kind) {
       case 'rect':
@@ -553,6 +641,11 @@ export function drawStateIcon(graphics: Graphics, command: IconCommand): void {
       break
     case 'triangle':
       graphics.poly([x, y, x + size, y + size / 2, x, y + size]).fill(color)
+      break
+    case 'dot':
+      // A disc, not a fifth square: a reader told these apart by shape alone must
+      // still tell this one apart from the blocked row's square.
+      graphics.circle(x + size / 2, y + size / 2, size / 2.7).fill(color)
       break
   }
 }

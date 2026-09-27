@@ -31,6 +31,13 @@
         position: absolute;
         inset: 0;
       }
+
+      /* Set here rather than inline on the element by the mount, because the hub's
+         content-security-policy has no `unsafe-inline` in `style-src` and a browser
+         refuses an inline style it did not hash. */
+      [data-dashboard-root] canvas {
+        display: block;
+      }
     </style>
   </head>
   <body>

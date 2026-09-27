@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>agent-ping</title>
+    <!--
+      The page header's own stylesheet, linked rather than inlined: the hub sends a
+      strict `style-src 'self'` with no `unsafe-inline` (src/hub/security.ts), so an
+      inline <style> element is refused by the browser. The same reason the mirror's
+      hiding rules are written here as well as in the module that injects them - the
+      module's sheet is invisible under this policy, and without these rules the
+      live page would show the mirror as an ordinary visible list above the canvas.
+      tests/dashboard/session-list.test.ts asserts the two agree.
+
+      The scroll on the page's own container is load-bearing: the canvas grows to
+      the rows rather than hiding the ones past its edge, and a busy afternoon is
+      taller than one screen.
+
+      `?mirror=visible` on this page's URL un-clips the DOM mirror and draws the
+      focus and activation classes it carries. The mirror is otherwise hidden, which
+      is what the DP-4 review required be made inspectable.
+    -->
+    <link rel="stylesheet" href="./dashboard.css" />
+  </head>
+  <body>
+    <!--
+      The pending count and the connection state, in that order and next to each
+      other, which is the whole reason this header exists: a page that has stopped
+      hearing from the hub must not be able to look quiet. The entry point fills both
+      in and marks the connection state as a live region, so a disconnect reaches
+      someone who is not looking at the top of the page.
+    -->
+    <header data-dashboard-header>
+      <span data-dashboard-pending>pending count not read yet</span>
+      <span data-dashboard-connection-text>Connecting to the hub</span>
+    </header>
+    <main data-dashboard-root></main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,136 @@
+/* The live dashboard page's own surface: the header, the scrolling container, and
+   the mirror's hiding rules.
+   Linked from index.html rather than inlined, because the hub sends a strict
+   `style-src 'self'` with no `unsafe-inline` (DASHBOARD_CSP in
+   src/hub/security.ts) and a browser refuses an inline <style> element under it.
+
+   The colours mirror LIVE_COLORS in live/session-list.ts, so the page background
+   and the canvas background are one surface rather than two shades, and the header
+   text meets the same contrast the canvas text does. Every value here is a token
+   the plan also paints with, so the two cannot drift apart silently. */
+
+:root {
+  color-scheme: dark;
+  --page-background: #0f1115;
+  --row-label-text: #f2f4f8;
+  --row-muted-text: #a8b0c0;
+  --focus-fill: #1b2029;
+  --focus-rail: #f2f4f8;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--page-background);
+  /* The canvas is grown to its rows and the page scrolls it. Hiding the overflow
+     instead would silently drop every session past the fold, which is the one
+     wrongness this page must not have: a session that needs the developer and is
+     not on the screen. */
+  overflow: auto;
+}
+
+/* --------------------------------------------------------------------------
+   The header
+   -------------------------------------------------------------------------- */
+
+[data-dashboard-header] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 16px;
+  padding: 12px 24px;
+  color: var(--row-label-text);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 12.5px;
+}
+
+[data-dashboard-pending] {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* The connection state is words, and the words are the encoding. A rule that
+   changes only colour would fail the requirement this page is judged on, so the
+   only emphasis here is a heavier weight on the same text. */
+[data-dashboard-connection-text] {
+  color: var(--row-muted-text);
+}
+
+[data-dashboard-connection='stale'] [data-dashboard-connection-text],
+[data-dashboard-connection='disconnected'] [data-dashboard-connection-text] {
+  color: var(--row-label-text);
+  font-weight: 600;
+}
+
+[data-dashboard-root] {
+  display: block;
+  width: 100%;
+}
+
+/* The canvas is a block, so there is no baseline gap under it. Set here rather
+   than inline on the element because this policy has no `unsafe-inline`. */
+[data-dashboard-root] canvas {
+  display: block;
+}
+
+/* --------------------------------------------------------------------------
+   The DOM mirror
+   -------------------------------------------------------------------------- */
+
+/* The same clip the mirror injects for itself, restated here because this policy
+   refuses the sheet it injects. Hidden by clipping and never by `display: none`,
+   `visibility: hidden` or the `hidden` attribute: each of those three makes the
+   entries unfocusable or drops them from the accessibility tree, which passes a
+   DOM-count assertion and still leaves a dead-end page (APX-CON-07). */
+.dashboard-mirror {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------------------------------
+   The inspection flag: `?mirror=visible`
+   -------------------------------------------------------------------------- */
+
+/* DP-4 required the mirror to be inspectable by a person and not only by a
+   hand-written console query. The rules are gated on an attribute the entry point
+   sets from the query string, so a page opened without the flag is unchanged. */
+html[data-mirror-inspect='visible'] .dashboard-mirror {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  clip-path: none;
+  white-space: normal;
+  padding: 8px 24px;
+  border-top: 1px solid #2a2f3a;
+  color: var(--row-muted-text);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 12px;
+}
+
+/* The classes the tests assert, drawn here so a reviewer sees the same state the
+   assertions read. */
+html[data-mirror-inspect='visible'] .dashboard-mirror .is-focused {
+  background: var(--focus-fill);
+  box-shadow: inset 3px 0 0 0 var(--focus-rail);
+  color: var(--row-label-text);
+}
+
+html[data-mirror-inspect='visible'] .dashboard-mirror .is-activated {
+  color: var(--row-label-text);
+  text-decoration: underline;
+}

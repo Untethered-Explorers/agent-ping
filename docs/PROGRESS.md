@@ -1,10 +1,10 @@
 # Project Progress
 
 ## Current State
-**Phase**: OPENCODE-PLUGIN-ADAPTER-2
+**Phase**: LIVE-DASHBOARD-1
 **Status**: In Progress
-**Validation Gaps**: 87 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-27T12:19:44.732Z
+**Validation Gaps**: 93 unverified check(s) - see "Validation Gaps"
+**Last Updated**: 2026-09-27T13:19:16.307Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -64,6 +64,8 @@
   - Files: src/plugin/opencode/poll-fallback.ts, src/plugin/opencode/index.ts, tests/plugin/poll-fallback.test.ts, src/plugin/opencode/translate.ts, tests/plugin/install.test.ts, tests/plugin/opencode-translate.test.ts
 - [x] Phase OPENCODE-PLUGIN-ADAPTER-2, Task OA-5: Write the live opencode verification script (@qa-engineer)
   - Files: scripts/verify-opencode-live.mjs, tests/scripts/verify-opencode-live.test.ts
+- [x] Phase LIVE-DASHBOARD-1, Task LD-1: Wire the dashboard to live hub state (@dashboard-engineer)
+  - Files: src/dashboard/index.html, src/dashboard/main.ts, src/dashboard/live/stream-client.ts, src/dashboard/live/session-list.ts, tests/dashboard/session-list.test.ts, tests/dashboard/stream-client.test.ts, src/dashboard/a11y/dom-mirror.ts, src/dashboard/prototype/index.html, src/dashboard/prototype/main.ts, src/dashboard/prototype/scene.ts, vite.config.ts, src/dashboard/dashboard.css, src/dashboard/host.ts, tests/dashboard/live-harness.ts
 - [x] Phase COPILOT-CLI-ACP-SPIKE-1, Task CP-1: Probe the real Copilot ACP surface (@connector-engineer)
   - Files: scripts/probe-copilot-acp.mjs, tests/scripts/probe-copilot-acp.test.ts, docs/research/copilot-acp-capture.json, tests/scripts/fixtures/copilot-acp-capture.json
 - [x] Phase COPILOT-CLI-ACP-SPIKE-1, Task CP-2: Probe the Copilot hook surface and write the report (@connector-engineer)
@@ -173,6 +175,12 @@
 - Task OA-5: A stub run loads the same installed plugin file and drives the same journeys, so it verifies the script rather than the live adapter claim. Its summary carries liveEvidence:false and a note saying so.
 - Task OA-5: The card recorder records what the product asked it to present (class, lifetime cell, urgency, title, text lengths) and never a card's text, so no observation here says a card was legible or correctly worded.
 - Task OA-5: No human judgement is recorded anywhere: there is no review file, and the run's findings are recorded as required product changes with an owner rather than as approvals.
+- Task LD-1: The committed jsdom suites cannot execute the real renderer: jsdom has no 2D or WebGL context, so Application.init() does not resolve there. The real PixiJS host is exercised through its createApplication seam and the painter against real PixiJS objects; the actual pixels are proven only by the Vite build plus the headless-Chrome run reported above.
+- Task LD-1: No human read a word off the page in this attempt. The browser probe reads the DOM, the accessibility attributes and the command stream, and captured a 26 kB screenshot at /tmp/ld1probe/dashboard.png; it asserts nothing about what the pixels look like, and the design verdicts in DP-4 and LD-5 remain unperformed.
+- Task LD-1: The disconnect half of the browser run was produced by SIGKILLing the hub process, which is a genuine dropped socket for an SSE client. The one console error the probe reported (ERR_INCOMPLETE_CHUNKED_ENCODING) is that kill's own doing, and the page produced no error of its own - but I did not verify a hub that is alive yet no longer streaming, and CDP offline emulation does not tear down an already-open EventSource.
+- Task LD-1: The browser probe lives in /tmp/ld1probe/probe.mjs and is not a deliverable: the browser journey, playwright.config.ts and any committed evidence file are qa-engineer's LD-4 outputs, and adding one here would duplicate that surface. Running it needs `cp src/storage/schema.sql dist/main/storage/schema.sql` first, which is the pre-existing build gap HC-1 and NT-9 recorded and is not fixed here.
+- Task LD-1: The reconnect observation is a reconnect onto a freshly started hub on the same port with the same state directory, so the hub's run-scoped cursor is gone and the page correctly answered refresh-required and re-read. That is the too-old-cursor path rather than a successful replay, so a successful replay across a restart is unobserved.
+- Task LD-1: Nothing here measures the hub's idle RSS or the ingest p95; those are HC-1's and HC-3's numbers and appear in the whole-suite output (ingest p95 12.90 ms against the 50 ms budget) but were not re-measured for this task.
 - Task CP-1: The permission finding is from one run on one machine against one Copilot version. It is evidence, not a proof across versions, and the gate decision should cite the version alongside the claim.
 - Task CP-1: The hook surface is untouched: CP-2 owns the documented Copilot hook triggers and the consolidated report.
 - Task CP-1: The stub-binary deadline test executes a shebang script directly, so it assumes a POSIX-style platform, consistent with the existing tests/tooling/runner-convention.test.ts, which already spawns npm by bare name.
