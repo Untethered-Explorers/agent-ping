@@ -56,4 +56,20 @@ export default tseslint.config(
       sourceType: 'module',
     },
   },
+  {
+    // The card surface's preload, and the only file in the repository that uses
+    // `require`. A preload in a renderer with `sandbox: true` is parsed by Chromium
+    // as a plain script: it has no ESM context, and its `require` is a polyfill that
+    // resolves `electron` and nothing else. Both were measured against the real
+    // Electron 44.4.5 binary - a `.mjs` preload and a `.js` preload using `import`
+    // fail with `SyntaxError: Cannot use import statement outside a module`, and
+    // `require('./sibling')` fails with `module not found`. The file is `.cts` for
+    // that reason, so this rule is off for it and for nothing else; the other half of
+    // the rule, that nothing under `src` may reach a Node built-in from a renderer,
+    // is a test in tests/notify/surface-channel.test.ts rather than a lint rule.
+    files: ['src/notify/surface/preload.cts'],
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
 )

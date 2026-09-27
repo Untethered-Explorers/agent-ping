@@ -119,6 +119,12 @@ import {
   type ScreenLike,
 } from '@/notify/surface/electron-host'
 import {
+  CARD_PRELOAD_FILE_NAME,
+  CARD_PRELOAD_PATH,
+  CARD_PRELOAD_SOURCE_FILE,
+  resolveCardPreloadPath,
+} from '@/notify/surface/preload'
+import {
   SurfaceWindowRefusedError,
   type CreateSurfaceHostOptions,
   type NotificationSurfaceHost,
@@ -222,6 +228,21 @@ function stubElectron(options: StubElectronOptions = {}): StubElectron {
     readonly calls: WindowCall[] = []
     private gone = false
     readonly record: RecordedWindow
+    /**
+     * The window's own message channel, recorded rather than sent.
+     *
+     * Added for the card channel (NS-2) and the reason the stub has one: the channel
+     * sends a card model on this object, and a test that could not see the send would be
+     * unable to say whether a delivery reached a document. `webContents` is a member of
+     * the real `BrowserWindow` too - nothing here pretends to be a window that Electron
+     * would not accept.
+     */
+    readonly webContents = {
+      send: (channel: string, ...args: readonly unknown[]): void => {
+        this.note('send', { channel, args })
+      },
+      isDestroyed: (): boolean => this.gone,
+    }
 
     constructor(readonly options: unknown) {
       this.record = {
@@ -337,7 +358,95 @@ describe('the BrowserWindow option object', () => {
         'width',
       ].sort(),
     )
-    expect(options['webPreferences']).toEqual({ contextIsolation: true, nodeIntegration: false, sandbox: true })
+    // The webPreferences key set, enumerated exactly, because NT-FR-12's channel is a
+    // `preload` path and a preload that arrived by any other route - a string in a
+    // spread, an option added at the call site - would not be the one the window loads.
+    expect(Object.keys(options['webPreferences'] as Record<string, unknown>).sort()).toEqual(
+      ['contextIsolation', 'nodeIntegration', 'preload', 'sandbox'].sort(),
+    )
+  })
+
+  // AMENDED DELIBERATELY, BY NS-2. NT-6 asserted the webPreferences object equals exactly
+  // { contextIsolation, nodeIntegration, sandbox }, and that assertion was correct for the
+  // window NT-6 built: with no preload there was no way for a card model to reach the card
+  // document, and NT-FR-12's requirement is that the product itself supplies that way. The
+  // only change is one added key, `preload`, naming this product's own preload file
+  // (src/notify/surface/preload.cts). The three settings NT-6 added it for are untouched
+  // and are still asserted by name, in the next two tests and in the launch-policy
+  // section; the object is still frozen, which the test after this one checks. Nothing was
+  // loosened: the equality is still exact, and the key enumeration above is a *new*
+  // assertion rather than a weakened one.
+  it('carries the preload the card channel runs in, and nothing else beside it (NT-FR-12)', () => {
+    const electron = stubElectron()
+    stubHost(electron)
+
+    const webPreferences = (electron.windows[0]?.options as Record<string, unknown>)['webPreferences'] as Record<
+      string,
+      unknown
+    >
+    expect(webPreferences).toEqual({
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      preload: CARD_PRELOAD_PATH,
+    })
+    // A path beside the module that names it, ending in the file tsc emits for a `.cts`
+    // source. The extension is not a convention: a preload in a `sandbox: true` renderer
+    // has no ESM context, so a `.mjs` or ESM `.js` preload fails with `SyntaxError:
+    // Cannot use import statement outside a module` (measured against Electron 44.4.5),
+    // and this repository's `moduleDetection: "force"` and `type: "module"` would append a
+    // module marker to any `.ts` it compiled. The *resolution* is asserted from a real
+    // `file:` URL in the next test, because this runner does not hand out one.
+    expect(
+      CARD_PRELOAD_PATH.endsWith(`/notify/surface/${CARD_PRELOAD_FILE_NAME}`) ||
+        CARD_PRELOAD_PATH === `./${CARD_PRELOAD_FILE_NAME}`,
+    ).toBe(true)
+  })
+
+  it('names the preload source the build compiles and the file it emits', () => {
+    // The preload is two files on purpose: ./preload.ts is the address - this module's
+    // `webPreferences` carries its value - and ./preload.cts is the body, because tsc emits
+    // a module marker into any `.ts` in this ES module package and a sandboxed preload is
+    // parsed as a plain script. The two are asserted against each other here so neither can
+    // be renamed without the other (NT-FR-12).
+    expect(CARD_PRELOAD_SOURCE_FILE).toBe('src/notify/surface/preload.cts')
+    expect(CARD_PRELOAD_FILE_NAME).toBe('preload.cjs')
+    // And the build really does compile that source to that file's name: `.cts` in,
+    // `.cjs` out, whatever the module setting says. Read through the suite's own source
+    // reader, so the file is proved to be there rather than named.
+    expect(readModuleWithoutProse(CARD_PRELOAD_SOURCE_FILE)).toContain('require')
+    expect(CARD_PRELOAD_FILE_NAME.endsWith('.cjs')).toBe(true)
+  })
+
+  it('resolves the preload beside the module that names it, from a real file URL', () => {
+    // The packaged application runs the compiled file, so this is the branch that
+    // decides the path the window loads. Driven from a literal `file:` URL rather than
+    // from `import.meta.url`, which a test runner that serves modules over HTTP cannot
+    // provide - and the fallback is asserted right after, because a module loader with no
+    // `file:` URL must produce a name rather than a path into a test server.
+    expect(
+      resolveCardPreloadPath('file:///opt/agent-ping/dist/main/notify/surface/electron-host.js'),
+    ).toBe(`/opt/agent-ping/dist/main/notify/surface/${CARD_PRELOAD_FILE_NAME}`)
+    expect(resolveCardPreloadPath('http://localhost:5173/src/notify/surface/electron-host.ts')).toBe(
+      `./${CARD_PRELOAD_FILE_NAME}`,
+    )
+  })
+
+  it('leaves the three renderer settings that make the card document safe (NT-FR-04)', () => {
+    // The ones NT-FR-04 is about, asserted by name rather than as part of a whole object,
+    // because NT-FR-12's channel was required to be built *without* widening them: the
+    // alternative ways to carry a card model - `webSecurity: false`, `nodeIntegration:
+    // true`, `executeJavaScript` - each trade exactly these for a convenience this
+    // product does not need.
+    const electron = stubElectron()
+    stubHost(electron)
+    const webPreferences = (electron.windows[0]?.options as Record<string, unknown>)['webPreferences'] as Record<
+      string,
+      unknown
+    >
+    expect(webPreferences['contextIsolation']).toBe(true)
+    expect(webPreferences['nodeIntegration']).toBe(false)
+    expect(webPreferences['sandbox']).toBe(true)
   })
 
   it('is frozen, so a caller cannot change the contract at run time', () => {
@@ -905,12 +1014,18 @@ describe('the interface module imports no electron module', () => {
 describe('the surface path reaches no platform notification mechanism', () => {
   it('contains no notification API call, no spawned command, no audio element and no platform branch', () => {
     // NT-FR-02 and NT-FR-11, enforced by the suite rather than promised in a comment. The
-    // three modules that make up the surface are read with their prose stripped, so this
-    // is about the identifiers and calls the code uses.
+    // six modules that make up the surface are read with their prose stripped, so this
+    // is about the identifiers and calls the code uses. The three added by NS-2 - the
+    // channel contract, the preload's address and the preload's body - are in the same
+    // list, so the code that now crosses into a renderer is held to the same rule as the
+    // window that shows it.
     for (const relative of [
       'src/notify/surface/host.ts',
       'src/notify/surface/electron-host.ts',
       'src/notify/surface/position.ts',
+      'src/notify/surface/channel.ts',
+      'src/notify/surface/preload.ts',
+      'src/notify/surface/preload.cts',
     ]) {
       const source = readModuleWithoutProse(relative)
       for (const forbidden of [

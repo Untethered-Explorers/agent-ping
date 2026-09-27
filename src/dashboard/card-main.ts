@@ -33,17 +33,29 @@
 // closure this file reaches is therefore checked in the same test: three modules, no
 // `node:` import, no subprocess, no filesystem.
 //
-// THE CHANNEL IS NOT BUILT HERE, DELIBERATELY
-// Nothing in this file shows or removes a card. How a `CardModel` travels from the
-// Electron main process into a document running under a renderer sandbox is a decision
-// with no precedent in this product, and it is not this task's to make: the surface
-// currently supplies no card presenter at all, so a real delivery is recorded
-// `not-wired` and no window is ever shown, which means an inert card document cannot put
-// an empty rectangle on a developer's screen (NT-FR-10). The mounted view is exported so
-// the channel has a product object to reach, and the document is otherwise honest: it
-// shows nothing until something is allowed to show something (NT-FR-12).
+// THE CHANNEL IS THIS PRODUCT'S OWN, AND IT IS THE ONLY WAY IN (NS-2)
+// The surface window's `webPreferences` name a preload (SURFACE_WINDOW_OPTIONS in
+// src/notify/surface/electron-host.ts), and that preload exposes exactly two calls on one
+// global: `show(model, cell)` and `remove(end)`. This entry installs the document's end
+// of that channel with `listenForCardSurface`, which listens for the two messages the
+// preload hands over and calls this product's own view.
+//
+// Three things this file deliberately does not do:
+//   - it does not name `window`, `ipcRenderer` or any privileged global. The channel
+//     module reaches the target itself, so this entry names no global at all;
+//   - it does not build the card. `createCardView` is the view, and it is the sink the
+//     channel calls - `CardView` already carries exactly `show` and `remove`, which is why
+//     the channel's sink needs nothing more from it;
+//   - it does not acknowledge anything. Acknowledging a block is a hub concern whose
+//     destination is the dashboard, and the signal belongs on a dismissal port rather
+//     than on the card window (NT-FR-12's third clause, and NS-2 excluded it).
+//
+// A card document with the channel installed and no card delivered still draws nothing
+// and occupies no screen space, which is NT-FR-10's promise and the reason an inert
+// document is not a defect.
 
 import { createCardView, type CardElement, type CardView } from '@/notify/surface/card-view'
+import { listenForCardSurface } from '@/notify/surface/channel'
 
 /**
  * The element cards are put inside.
@@ -106,3 +118,16 @@ export const cardDocumentView: CardView | null =
   document.querySelector(`[${CARD_SURFACE_ATTRIBUTE}]`) === null
     ? null
     : mountCardDocument()
+
+/**
+ * Take the card document's end of the channel down again, or `null` when there was no
+ * view to attach it to.
+ *
+ * Exported rather than kept private because a document that is torn down has to stop
+ * listening, and a listener left on a window that is going away is a closure this product
+ * can no longer account for (APX-FR-02). A page that is never torn down simply never
+ * calls it, which is the normal case: the surface window exists for the life of the hub
+ * and is destroyed with it (NT-FR-04).
+ */
+export const stopCardDocumentChannel: (() => void) | null =
+  cardDocumentView === null ? null : listenForCardSurface(cardDocumentView)

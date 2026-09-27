@@ -46,7 +46,7 @@ belongs in a feature document, not here.
 | [ADR-002](ADR-002-loopback-only-single-mutating-route.md) | Loopback-only hub with exactly one mutating route | Accepted | Implemented |
 | [ADR-003](ADR-003-never-store-conversation-content.md) | Never store or transmit conversation content | Accepted | Implemented |
 | [ADR-004](ADR-004-three-loudness-classes.md) | Three loudness classes, silent by default, no sound in v1 | Accepted | Implemented, with amendments |
-| [ADR-005](ADR-005-acp-typed-connector-interface.md) | Connector interface specified in ACP terms | Accepted | Partial — the Copilot spike and its gate decision are owed |
+| [ADR-005](ADR-005-acp-typed-connector-interface.md) | Connector interface specified in ACP terms | Accepted | Partial — the spike ran and the gate recorded deferral; v1 ships opencode only |
 | [ADR-006](ADR-006-global-install-no-per-repo-registry.md) | One global install; no per-repository configuration or registry | Accepted | Partial — the install mechanism is built; the CLI and autostart units are not |
 | [ADR-007](ADR-007-single-node-typescript-toolchain.md) | Single toolchain: Node 22 + TypeScript, Electron main, PixiJS dashboard | Accepted | Partial — toolchain verified; Electron is not yet a dependency and the CLI is not built |
 | [ADR-008](ADR-008-repository-short-name-identity.md) | Identity is the repository short name | Accepted | Implemented |

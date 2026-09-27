@@ -3,8 +3,8 @@
 ## Current State
 **Phase**: NOTIFICATION-AND-TRAY-PRESENCE-4
 **Status**: In Progress
-**Validation Gaps**: 98 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-27T14:33:37.551Z
+**Validation Gaps**: 104 unverified check(s) - see "Validation Gaps"
+**Last Updated**: 2026-09-27T15:56:53.605Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -56,6 +56,8 @@
   - Files: scripts/verify-notification-surface.mjs, docs/reviews/notification-surface-evidence.json, docs/runbooks/notification-surface.md, tests/scripts/verify-notification-surface.test.ts
 - [x] Phase NOTIFICATION-AND-TRAY-PRESENCE-4, Task NS-1: Build and serve the card document (@dashboard-engineer)
   - Files: src/dashboard/card.html, src/dashboard/card.css, src/dashboard/card-main.ts, vite.config.ts, tests/dashboard/card-document.test.ts, tests/hub/server.test.ts, tests/hub/metrics.test.ts, src/main/index.ts, src/notify/surface/card-view.ts, src/notify/surface/card.ts
+- [x] Phase NOTIFICATION-AND-TRAY-PRESENCE-4, Task NS-2: Open the renderer channel and wire the card presenter (@notification-engineer)
+  - Files: src/notify/surface/channel.ts, src/notify/surface/preload.ts, src/notify/surface/electron-host.ts, src/main/index.ts, tests/notify/surface-channel.test.ts, tests/notify/surface-host.test.ts, docs/runbooks/notification-surface.md, eslint.config.js, src/dashboard/card-main.ts, tests/dashboard/card-document.test.ts, tests/notify/policy.test.ts, tests/notify/surface-card.test.ts, tsconfig.build.json, tsconfig.json, src/notify/surface/preload.cts, tests/helpers/read-module.ts
 - [x] Phase OPENCODE-PLUGIN-ADAPTER-1, Task OA-1: Translate opencode events into the normalized envelope (@connector-engineer)
   - Files: src/plugin/opencode/index.ts, src/plugin/opencode/translate.ts, src/plugin/opencode/work-signal.ts, tests/plugin/opencode-translate.test.ts, tests/plugin/opencode-work-signal.test.ts, docs/engine-config.json
 - [x] Phase OPENCODE-PLUGIN-ADAPTER-1, Task OA-2: Deliver events to the hub and leave a breadcrumb on failure (@connector-engineer)
@@ -164,6 +166,12 @@
 - Task NS-1: Nothing here says what a card looks like. jsdom applies no layout and no paint, and the contrast figures are computed from the declared tokens rather than read off a rendered pixel, so the palette is proven legible and the composition is not.
 - Task NS-1: The import-closure reader is a hand-written comment stripper: a backtick template is read as one string to its closing backtick, so a nested template inside a ${...} would end the scan early. No module in the card document's closure contains one, and the built chunk is checked independently for node built-ins, require and process.env, which does not depend on the stripper.
 - Task NS-1: The prototype page (src/dashboard/prototype/index.html) carries an inline <style> element that the hub's style-src 'self' refuses. That is pre-existing, it is one of the two pages this task was told not to reshape, and I did not touch it; it is a defect in a design-review artefact rather than in a served surface, and it is recorded here rather than fixed.
+- Task NS-2: No macOS or Windows observation of any kind is claimed and none was possible: one Linux desktop (Ubuntu 24.04, X11 :1), one compositor, one run, and the implementation has no platform branch (NT-FR-03, APX-CON-06).
+- Task NS-2: No word was read off a card. The pixel capture counts distinct values in the window's own drawable, which separates a painted card from a blank rectangle. Legibility, real font metrics and contrast stay a manual per-platform step, and the card's own stylesheet is the product's on this path - which is a change from the harness run, where the stylesheet was the run's.
+- Task NS-2: No pointer was moved, so click-through and its release are unobserved live; showInactive's focus behaviour is unobserved because the X server exposes no focus reading for a card window on this desktop; the tray icon was not observed, because a StatusNotifierItem is not an X window. Each is asserted against the product's own interfaces in tests/notify/surface-host.test.ts instead.
+- Task NS-2: The live run covered one journey: one needs-you block, delivered, and the card present. It did not exercise a finished card's expiry on a desktop, an fyi, a greeting-and-close session, a restart replay, or an acknowledgement. Those remain what tests/notify/surface-channel.test.ts and the section 8 harness cover.
+- Task NS-2: The suites run the Electron half against a structural stub, so what is proven there is every decision this product makes and not one thing about how any desktop composites a transparent frameless window. The live run covers that for the card path on this desktop only.
+- Task NS-2: The source sweeps that assert the absence of executeJavaScript, webSecurity, a notification API, a spawned command and a per-platform branch are hand-written comment strippers: a backtick template is read as one string to its closing backtick, so a nested template inside a ${...} would end the scan early. No module these are pointed at contains one.
 - Task OA-1: No live opencode session was run. The payload shapes are the 1.18.32 type declarations, not a capture from a running harness; proving the harness delivers them is OA-5's script and OA-6's gate, not this task.
 - Task OA-1: The one-envelope and block-lifecycle tests use the real ingest pipeline and the real SQLite log but drive it from fixtures rather than from a harness's event stream.
 - Task OA-1: The plugin was not loaded by opencode itself. Its structural plugin and client types mirror the 1.18.32 declarations rather than importing @opencode-ai/plugin, which is deliberate (the adapter must load with no dependency), so a signature change upstream would not be caught by a compile error here - the OA-3 install and OA-5 live run are where that surfaces.

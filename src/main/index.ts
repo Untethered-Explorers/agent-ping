@@ -71,6 +71,13 @@
 // this package as of NT-6, and the Chromium process-sandbox launch policy is applied
 // explicitly before the app is ready rather than inherited from a default that aborts at
 // startup on a per-user install (src/notify/surface/electron-host.ts).
+// The Electron bridge also supplies `renderCard` (NS-2), so a real block now becomes a
+// real card: the window's `webPreferences` name a preload, the preload exposes exactly
+// `show` and `remove` on one global, and this file's presenter sends the one message
+// behind each. Nothing about the renderer was widened to make that work - `contextIsolation`,
+// `nodeIntegration: false` and the renderer `sandbox` are all still in force, and a test
+// asserts all three survive this wiring. A runtime with no `ipcMain` gets a diagnostic and
+// the previous honest `not-wired` answer rather than a card it cannot deliver (NT-FR-12).
 // What remains deliberately absent is any route that can spawn, steer, interrupt, prompt
 // or approve anything inside a harness (APX-CON-08): the mutating set in
 // src/hub/server.ts is exactly two signatures, the append-only ingest route and the ack
@@ -155,6 +162,7 @@ import {
 } from '../notify/registry.js'
 import {
   applyChromiumLaunchPolicy,
+  createElectronCardChannel,
   createElectronSurfaceHost,
   launchPolicyApplied,
   surfaceDocumentUrl,
@@ -251,12 +259,16 @@ export interface DesktopBridge {
    * (src/notify/surface/card.ts) that has to become a document somewhere. This member
    * is that somewhere (NT-8, ADR-012).
    *
+   * The Electron bridge supplies it (NS-2): a preload named in the window's
+   * `webPreferences`, one global on the card document carrying exactly `show` and
+   * `remove`, and this file's presenter sending the one message behind each. A run with
+   * it is wired, and a real block posted to it becomes a real card counted as delivered.
+   *
    * Absent means this run has a window and no way to put a card in it, which is
-   * reported as `not-wired` with a diagnostic rather than as a delivery - a
-   * transparent rectangle on a developer's screen is not a card, and reporting it as
-   * one would be the exact lie APX-FR-02 forbids. That is the honest state today: the
-   * card document is in the build and nothing can put a model in it, and NT-9 records
-   * what that costs (NT-FR-01, APX-FR-02).
+   * reported as `not-wired` with a diagnostic rather than as a delivery - a transparent
+   * rectangle on a developer's screen is not a card, and reporting it as one would be the
+   * exact lie APX-FR-02 forbids. That is what a headless run, a test, a verification
+   * script and an Electron runtime with no `ipcMain` all get today.
    *
    * Absent entirely on a headless run, exactly as `tray` and `surface` are: no desktop,
    * no window, no card, and no stub pretending otherwise.
@@ -1308,6 +1320,22 @@ interface ElectronScreenLike {
   getPrimaryDisplay(): { readonly workArea: { x: number; y: number; width: number; height: number } }
 }
 
+/**
+ * The slice of `ipcMain` the card channel uses.
+ *
+ * One method, and it is the whole of the main process's use of `ipcMain`: the card
+ * document's preload announces once that its channel is listening, and the composition
+ * root's card presenter waits for that before it sends anything
+ * (src/notify/surface/electron-host.ts, `createElectronCardChannel`).
+ *
+ * Structural for the reason `ElectronAppLike` is: the package is a runtime dependency of
+ * the packaged application rather than of the source tree, so nothing under `src` may
+ * import an Electron type, and an interface this small is checkable by reading.
+ */
+interface ElectronIpcMainLike {
+  on(channel: string, listener: (event: unknown, ...args: unknown[]) => void): unknown
+}
+
 interface ElectronModuleLike {
   readonly app?: ElectronAppLike
   readonly Tray?: new (icon: unknown) => ElectronTrayLike
@@ -1320,9 +1348,15 @@ interface ElectronModuleLike {
     isDestroyed(): boolean
     setBounds(bounds: { x: number; y: number; width: number; height: number }): void
     setIgnoreMouseEvents(ignore: boolean, options?: { forward?: boolean }): void
+    /** How a card model reaches the document (NT-FR-12). */
+    webContents: {
+      send(channel: string, ...args: readonly unknown[]): void
+      isDestroyed(): boolean
+    }
   }
   readonly screen?: ElectronScreenLike
   readonly nativeImage?: ElectronNativeImageLike
+  readonly ipcMain?: ElectronIpcMainLike
 }
 
 /**
@@ -1461,17 +1495,25 @@ function electronTrayBridge(electron: ElectronModuleLike): TrayBridge {
 }
 
 /**
- * The Electron window surface, as this product's one operation.
+ * The Electron window surface and its card channel, as this product's two operations.
  *
  * The counterpart to `electronTrayBridge`, and shaped the same way on purpose: the
- * desktop supplies the platform object and this product supplies every decision about
- * it. Everything Electron-specific about a notification card is in the one call below -
- * the `BrowserWindow` option set (which is data in
+ * desktop supplies the platform objects and this product supplies every decision about
+ * what to do with them. Everything Electron-specific about a notification card is in the
+ * two calls below - the `BrowserWindow` option set (which is data in
  * src/notify/surface/electron-host.ts, and is asserted rather than restated), the
- * `workArea` read that keeps a card off the taskbar, and `showInactive`, which is the
- * difference between a notification and an interruption. The composition root decides
- * when a card exists and what corner it goes in, because those are this product's
- * decisions (src/notify/surface/host.ts).
+ * `workArea` read that keeps a card off the taskbar, `showInactive`, which is the
+ * difference between a notification and an interruption, and the two ipc messages the
+ * preload carries. The composition root decides when a card exists and what corner it goes
+ * in, because those are this product's decisions (src/notify/surface/host.ts).
+ *
+ * ONE HOLDER, BECAUSE BOTH HALVES NEED THE SAME WINDOW
+ * The host owns the window and creates it when the hub mounts the surface; the channel
+ * needs that window's `webContents` to send on. The host is given an `onWindowCreated`
+ * hook rather than being widened, because `NotificationSurfaceHost` must stay exactly
+ * `probe`, `show`, `hide`, `setClickThrough` and `destroy` - tests/notify/surface-host.test.ts
+ * enumerates the interface from source, and a sixth member added to make this convenient
+ * would be a card's delivery surface on the window contract (NT-FR-12).
  *
  * The origin arrives as a thunk because the host is mounted before the loopback socket
  * is bound, and the card document must be loaded from the port this hub actually took
@@ -1479,48 +1521,117 @@ function electronTrayBridge(electron: ElectronModuleLike): TrayBridge {
  * the boundary, so the loopback guarantee is a property of how the bridge is built and
  * not of every future caller.
  *
- * WHAT THIS BRIDGE DELIBERATELY DOES NOT SUPPLY: a card renderer. It hands out a
- * window and nothing else, so the composition root finds `DesktopBridge.renderCard`
- * absent and reports the run as `not-wired` with a diagnostic rather than showing an
- * empty rectangle on somebody's screen (NT-FR-01, APX-FR-02). The reason is recorded
- * rather than worked around: the card document is in the built artefacts
- * (`dist/dashboard/card.html`, the third entry of the dashboard build), and what is
- * still missing is the main-to-renderer channel that would hand a model to that document
- * running under `contextIsolation` with no `require` in it - a decision NT-7 named,
- * NS-1 left alone and NT-9's evidence records as a required product change. Until that
- * channel exists the document is inert, which is why an inert document cannot put an
- * empty window on a screen (NT-FR-10, NT-FR-12).
+ * WHAT SUPPLIES THE CARD RENDERER, AND WHAT IT DOES NOT
+ * `renderCard` is built over the real preload and the real `ipcMain`, and a run with them
+ * is a *wired* run: a real block becomes a real card, and the notifier reports
+ * `delivered` rather than `not-wired`. That is the change this wiring exists for - before
+ * it, the shipped Electron bridge handed out a window and nothing else, so every delivery
+ * was honestly recorded as not-wired and no card ever left this machine
+ * (NT-FR-12, APX-FR-02).
  *
- * VERIFICATION STATE: the window primitives this bridge uses were proved by the
- * pre-flight on the authoring machine, and the host itself is unit-tested against a
- * structural Electron stub. What has never been run is *this composition*: a real
- * Electron process mounting a real hub's surface with a real card in it. NT-9's script
- * is where that happens (NT-FR-03, APX-CON-06).
+ * It is still absent in one case, and it is absent rather than throwing: a runtime with
+ * no `ipcMain` cannot carry a model into a document at all, so this reports a diagnostic
+ * and hands the composition root no renderer, which is the product's existing `not-wired`
+ * answer with its existing words. A window with nothing in it is not a card, and reporting
+ * it as one would be the exact lie APX-FR-02 forbids.
+ *
+ * VERIFICATION STATE: the window primitives and the channel were both driven against the
+ * real Electron 44.4.5 binary on the authoring machine (Ubuntu 24.04, X11 :1) with this
+ * product's own option set: the exposed surface arrived in the document with a key set of
+ * exactly `remove` and `show`, a model crossed and rendered, a removal emptied the
+ * surface, and the page had neither `process` nor `require`. What that run cannot say is
+ * anything about how the three desktops composite the window (NT-FR-03, APX-CON-06).
  */
-function electronSurfaceBridge(electron: ElectronModuleLike): SurfaceHostBridge {
-  return {
+function electronSurfaceChannel(electron: ElectronModuleLike): {
+  readonly surface: SurfaceHostBridge
+  readonly renderCard: CardPresenter | undefined
+} {
+  // The one window both halves share, read rather than captured: the host is created when
+  // the hub mounts the surface, which is after this runs.
+  const holder: { host: NotificationSurfaceHost | null; window: BrowserWindowLike | null } = {
+    host: null,
+    window: null,
+  }
+  const needed = <T,>(what: string, available: T | undefined): T => {
+    if (available === undefined) {
+      throw new SurfaceWindowRefusedError(
+        `the Electron runtime did not provide \`${what}\`. The hub is unaffected and every ` +
+          'delivery is recorded as not-wired rather than as a card somebody saw (NT-FR-04).',
+      )
+    }
+    return available
+  }
+  const surface: SurfaceHostBridge = {
     create: (options): NotificationSurfaceHost => {
-      const needed = <T,>(what: string, available: T | undefined): T => {
-        if (available === undefined) {
-          throw new SurfaceWindowRefusedError(
-            `the Electron runtime did not provide \`${what}\`. The hub is unaffected and every ` +
-              'delivery is recorded as not-wired rather than as a card somebody saw (NT-FR-04).',
-          )
-        }
-        return available
-      }
-      return createElectronSurfaceHost({
+      const host = createElectronSurfaceHost({
         BrowserWindow: needed('BrowserWindow', electron.BrowserWindow) as unknown as new (
           options: unknown,
         ) => BrowserWindowLike,
         screen: needed('screen', electron.screen) as ScreenLike,
         documentUrl: (): string => surfaceDocumentUrl(options.origin()),
+        onWindowCreated: (window): void => {
+          holder.window = window
+        },
         onDiagnostic: (message: string): void => {
           process.stderr.write(`${message}\n`)
         },
         ...(options.corner === undefined ? {} : { corner: options.corner }),
       })
+      holder.host = host
+      return host
     },
+  }
+
+  const ipcMain = electron.ipcMain
+  if (ipcMain === undefined) {
+    process.stderr.write(
+      'agent-ping: the Electron runtime provided no `ipcMain`, so no card model can cross into the ' +
+        'card document and this run can show no card. The hub is unaffected, the tray badge and the ' +
+        'pending set are unchanged, and every delivery is recorded as not-wired rather than as a ' +
+        'card somebody saw (NT-FR-12, APX-FR-02).\n',
+    )
+    return { surface, renderCard: undefined }
+  }
+  // Built once, here, and not per card. The channel's `ipcMain` listener is registered
+  // eagerly so it is in place before the card document loads, and its readiness state and
+  // its one expiry have to be shared across every card; a channel built per presentation
+  // would register a second listener, arrive after the announcement it was waiting for,
+  // and give every card a fresh expiry arm (APX-FR-02, NT-FR-08).
+  const channel = createElectronCardChannel({
+    ipcMain,
+    window: (): BrowserWindowLike | null => holder.window,
+    hide: (): void => {
+      holder.host?.hide()
+    },
+    onDiagnostic: (message: string): void => {
+      process.stderr.write(`${message}\n`)
+    },
+  })
+  return { surface, renderCard: channel }
+}
+
+/**
+ * Everything the Electron entry point hands `startHub` as its desktop shell.
+ *
+ * One function rather than three bridges constructed at the call site, and exported for a
+ * reason that is a test rather than a caller: a test can build a *structural* Electron
+ * module - a `BrowserWindow` that records, a `screen`, an `ipcMain` - and hand the result
+ * to the real `startHub`, so the question "does the shipped bridge supply a card renderer,
+ * and does a real block then count as delivered" is answered by the real composition root
+ * over a real socket rather than by reading this file's source. That is the only way the
+ * claim can be made without a display and without an Electron binary in the test runner,
+ * and it is what tests/notify/surface-channel.test.ts does.
+ */
+export function electronDesktopBridge(electron: ElectronModuleLike): {
+  readonly tray: TrayBridge
+  readonly surface: SurfaceHostBridge
+  readonly renderCard: CardPresenter | undefined
+} {
+  const { surface, renderCard } = electronSurfaceChannel(electron)
+  return {
+    tray: electronTrayBridge(electron),
+    surface,
+    renderCard,
   }
 }
 
@@ -1586,11 +1697,13 @@ export async function startElectronMain(): Promise<RunningHub | null> {
   const hub = await startHub({
     desktop: {
       isPrimaryInstance: true,
-      tray: electronTrayBridge(electron),
-      // The card surface, mounted beside the tray and before the delivery policy (NT-6).
-      // A desktop that refuses the window leaves the hub serving with a diagnostic and
-      // every delivery recorded as `not-wired` (NT-FR-04, APX-FR-02).
-      surface: electronSurfaceBridge(electron),
+      // The tray, the card surface and the card channel, built together over the one
+      // Electron module: the surface is mounted beside the tray and before the delivery
+      // policy (NT-6), and the channel is what turns a delivery into a card rather than
+      // into a `not-wired` record (NT-FR-12). A desktop that refuses the window still
+      // leaves the hub serving with every delivery recorded as `not-wired`
+      // (NT-FR-04, APX-FR-02).
+      ...electronDesktopBridge(electron),
     },
     lifecycle: { exit: (): void => app.quit() },
   })
@@ -1606,21 +1719,45 @@ export async function startElectronMain(): Promise<RunningHub | null> {
 /**
  * Run the Electron entry point when this module is the process entry.
  *
- * Two conditions, both necessary. `process.versions.electron` is present only
+ * Three conditions, all necessary. `process.versions.electron` is present only
  * inside Electron, so importing this file from a test or a script does nothing. The
  * entry check keeps a second `import` of this module inside the application from
  * starting a second hub, which the runtime file would then refuse anyway - but
  * refusing at the file level is a clearer failure than refusing at the lock.
+ *
+ * THE ENTRY CHECK SCANS ARGV RATHER THAN READING argv[1], and that is a fix.
+ * Electron's `process.argv` puts Chromium's own switches *before* the script path, so
+ * `electron --no-sandbox dist/main/main/index.js` gives
+ * `['<electron>', '--no-sandbox', 'dist/main/main/index.js']` - and `argv[1]` is the
+ * switch. A check that compared `argv[1]` to this module therefore answered "not the
+ * entry point" for exactly the launch this product's own Chromium launch policy
+ * requires (CHROMIUM_LAUNCH_POLICY in src/notify/surface/electron-host.ts), and the
+ * application started nothing at all: no hub, no port, no runtime file, and no line on
+ * stderr, because the branch that was taken was the one that returns. Every argv entry
+ * that is not a switch is compared instead, so a switch anywhere in the command line no
+ * longer hides the script. This was found by running the real built entry point under the
+ * real binary on the authoring machine; the environment form of the policy
+ * (`ELECTRON_DISABLE_SANDBOX=1`) does not shift argv, which is why it was not seen
+ * before.
  */
 function isElectronEntryPoint(): boolean {
   if (process.versions['electron'] === undefined) return false
-  const entry = process.argv[1]
-  if (entry === undefined) return false
+  let self: string
   try {
-    return path.resolve(entry) === fileURLToPath(import.meta.url)
+    self = fileURLToPath(import.meta.url)
   } catch {
     return false
   }
+  return process.argv.some((argument) => {
+    // A Chromium switch is never a path this module could be, and one that resolves to
+    // nothing is not evidence either way.
+    if (argument.startsWith('-')) return false
+    try {
+      return path.resolve(argument) === self
+    } catch {
+      return false
+    }
+  })
 }
 
 if (isElectronEntryPoint()) {

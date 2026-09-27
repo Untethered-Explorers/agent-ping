@@ -3,20 +3,30 @@
 - **Status:** Accepted
 - **Date:** 2026-09-26
 - **Decision owners:** Project author (settled with the user via `forge-grill-idea`)
-- **Implementation state:** **Partial.** The interface exists — the normalized
-  envelope is `src/domain/envelope.ts` and the delivery sink is
-  `POST /api/ingest` — and opencode is a working reference adapter in
-  `src/plugin/opencode/`. What is missing is the second harness: no Copilot
-  adapter and no ACP probe exist yet, so the gate decision this ADR depends on
-  has not been made. The two things that keep the *decision* honest in the
-  meantime are already in place. `KNOWN_HARNESSES` is a closed union, so a
-  harness is a one-line addition rather than an edit. And the classifier's table
-  already carries eleven `copilot-cli` rows, marked `observed` or `unresolved`
-  where upstream is unresolved — the signals are recorded rather than invented,
-  which is what this ADR requires before the spike.
-  **The ACP version claims below remain research findings recorded in the PRD,
-  not verified by this repository**; nothing here has been confirmed against a
-  live ACP session.
+- **Implementation state:** **The decision is made; the second adapter is deferred.** The
+  interface exists — the normalized envelope is `src/domain/envelope.ts` and the delivery sink
+  is `POST /api/ingest` — and opencode is a working reference adapter in
+  `src/plugin/opencode/`. The Copilot spike ran against the real binary at **Copilot CLI
+  1.0.88** and its gate recorded **deferral**: v1 ships opencode only. The evidence is in
+  [docs/research/copilot-acp-probe.md](../research/copilot-acp-probe.md) and the decision,
+  with its residual risk, in
+  [docs/reviews/CP-3-console-review.md](../reviews/CP-3-console-review.md).
+
+  The decision is narrower than "Copilot cannot report a block". The ACP permission signal is
+  `observed`: `session/request_permission` is a real agent-to-client request. What is missing
+  is the rest of what a class needs. The per-turn boundary an *attaching* client would receive
+  is unproven, because the turn boundary is `stopReason` on a response to a prompt rather than
+  a notification. The documented idle hook type is `unclear` — it describes a background agent
+  and no subagent was started — and the probe's own rule refuses a mapping built on `unclear`.
+  And the work-detection that agent-ping's idle-after-nothing suppression depends on never
+  fired at all, which is the part that keeps this product quiet.
+
+  So this ADR's central claim is **untested by that deferral and worth stating anyway**: a
+  third harness is additive work. `KNOWN_HARNESSES` is a closed union, so adding one is a
+  one-line change rather than an edit to the hub, the store, the classifier or the dashboard.
+  Nothing about the deferral weakens that, and nothing about it should be read as the interface
+  being wrong. What the deferral says is that one adapter being easy to add is not a reason to
+  add it before its `finished` and noise paths can be observed.
 
 ## Context
 

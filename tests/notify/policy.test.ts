@@ -1151,7 +1151,12 @@ function notifyModules(directory = 'src/notify'): string[] {
       found.push(...notifyModules(relative))
       continue
     }
-    if (entry.name.endsWith('.ts')) found.push(relative)
+    // `.cts` as well as `.ts`, added by NS-2. The card surface's preload is the only
+    // CommonJS module in this product and it is the only module on the notification path
+    // that runs inside a renderer, so a sweep that read only `.ts` was not reading the
+    // file most worth sweeping. A module that cannot be read by the sweep is a module
+    // nobody has checked.
+    if (entry.name.endsWith('.ts') || entry.name.endsWith('.cts')) found.push(relative)
   }
   return found.sort()
 }
@@ -1220,18 +1225,25 @@ const PLATFORM_LITERALS = ["'linux'", "'darwin'", "'win32'", "'macos'", "'window
 
 describe('no child process spawn, no exec call and none of the removed tool names exists anywhere under src/notify', () => {
   it('reads every module under src/notify, and says which it read', () => {
-    // The sweep is only as good as its coverage, so the file list is asserted: the six
+    // The sweep is only as good as its coverage, so the file list is asserted: the seven
     // surface modules, the class policy, the surface notifier and the notifier's own
     // vocabulary. A module added later fails here until the sweep's reach is restated.
+    //
+    // NS-2 added two: the channel contract, and the preload. Both are on the
+    // notification path - the second is the only module here that runs inside a
+    // renderer - so both are swept rather than listed as exemptions.
     expect(notifyModules()).toEqual([
       'src/notify/policy.ts',
       'src/notify/registry.ts',
       'src/notify/surface/card-view.ts',
       'src/notify/surface/card.ts',
+      'src/notify/surface/channel.ts',
       'src/notify/surface/electron-host.ts',
       'src/notify/surface/host.ts',
       'src/notify/surface/lifetime.ts',
       'src/notify/surface/position.ts',
+      'src/notify/surface/preload.cts',
+      'src/notify/surface/preload.ts',
       'src/notify/types.ts',
     ])
   })
@@ -1272,21 +1284,58 @@ describe('no child process spawn, no exec call and none of the removed tool name
     }
   })
 
-  it('imports nothing from a package, so there is no library that could notify', () => {
-    // The belt to the braces above: the only imports on this path are this product's own
-    // modules and the `@/` alias the tests and the build resolve. A bare specifier here -
-    // an Electron import, a notification library, a `child_process` reached indirectly -
-    // is a dependency this product no longer has, and it fails before it ships.
+  it('imports nothing from a package that could notify, and exactly one package at all', () => {
+    // The belt to the braces above: the imports on this path are this product's own
+    // modules, the `@/` alias the tests and the build resolve, and one named exception.
+    //
+    // THE EXCEPTION, added by NS-2: `src/notify/surface/preload.cts` requires `electron`.
+    // A preload in a renderer with `contextIsolation: true` and `sandbox: true` is the
+    // *only* place a card model can be handed to a document, and `contextBridge` is what
+    // hands it over; there is no product module that can do it, because the preload runs
+    // before any of this product's own code exists in that renderer. The test therefore
+    // names the one permitted specifier rather than forbidding the word: a second package
+    // on this path - a notification library, a `child_process` reached indirectly - still
+    // fails, and `electron` in any other file on this path still fails.
+    const PERMITTED: Readonly<Record<string, readonly string[]>> = Object.freeze({
+      // The preloader itself: `contextBridge` and `ipcRenderer`, and nothing else, because
+      // that is the whole reason the file exists.
+      'src/notify/surface/preload.cts': Object.freeze(['electron']),
+      // The address module: `node:url`, to turn this module's own `import.meta.url` into the
+      // path the window is given. It is Node-hosted and runs in the main process, so this
+      // is the same `node:url` any Node-hosted module in this product may import.
+      'src/notify/surface/preload.ts': Object.freeze(['node:url']),
+    })
     for (const file of notifyModules()) {
       const source = readModuleWithoutProse(file)
       const specifiers = [...source.matchAll(/(?:from|import|require\()\s*\(?\s*'([^']*)'/g)].map(
         (match) => match[1] ?? '',
       )
+      const permitted = PERMITTED[file] ?? []
       for (const specifier of specifiers) {
+        if (permitted.includes(specifier)) continue
         const relative = specifier.startsWith('.') || specifier.startsWith('@/')
         expect(relative, `${file} imports the package ${specifier}`).toBe(true)
       }
+      // And the exception is used, so it cannot rot into a module that imports nothing
+      // and a permission that is quietly stale.
+      expect(specifiers.filter((s) => permitted.includes(s)).length, file).toBeLessThanOrEqual(permitted.length)
     }
+    // `electron` appears on this path in exactly this one file.
+    const withElectron = notifyModules().filter((file) => readModuleWithoutProse(file).includes(`require('electron')`))
+    expect(withElectron).toEqual(['src/notify/surface/preload.cts'])
+    // And every module on this path is either a product module or one of the two named
+    // exceptions, so a third package cannot arrive by being added to a list nobody reads.
+    const packageImports = notifyModules().flatMap((file) => [
+      ...readModuleWithoutProse(file).matchAll(/(?:from|import|require\()\s*\(?\s*'([^']*)'/g),
+    ].map((match) => [file, match[1] ?? ''] as const))
+      .filter(([, specifier]) => !specifier.startsWith('.') && !specifier.startsWith('@/'))
+    for (const [file, specifier] of packageImports) {
+      expect(PERMITTED[file] ?? [], `${file} imports the package ${specifier}`).toContain(specifier)
+    }
+    expect(packageImports.map(([file, specifier]) => `${file} -> ${specifier}`).sort()).toEqual([
+      'src/notify/surface/preload.cts -> electron',
+      'src/notify/surface/preload.ts -> node:url',
+    ])
   })
 })
 

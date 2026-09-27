@@ -29,6 +29,11 @@
     "src/storage/**/*.ts",
     "src/domain/**/*.ts",
     "src/notify/**/*.ts",
+    // The card surface's preload, and the only CommonJS file in the repository.
+    // `.cts` is emitted as `.cjs` beside the other output, so the window option
+    // that names it resolves to a real file in dist/main. See tsconfig.json for
+    // why the extension is not optional.
+    "src/notify/**/*.cts",
     "src/cli/**/*.ts"
   ],
   "exclude": ["node_modules", "dist", "**/*.test.ts"]

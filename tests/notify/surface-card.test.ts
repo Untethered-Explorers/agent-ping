@@ -324,7 +324,10 @@ function notifyModules(directory = 'src/notify'): string[] {
       found.push(...notifyModules(relative))
       continue
     }
-    if (entry.name.endsWith('.ts')) found.push(relative)
+    // `.cts` as well as `.ts` (NS-2): the preload is CommonJS and is the only module on
+    // this path that runs inside a renderer, so a sweep that read only `.ts` was not
+    // reading the file most worth reading.
+    if (entry.name.endsWith('.ts') || entry.name.endsWith('.cts')) found.push(relative)
   }
   return found.sort()
 }
@@ -426,12 +429,19 @@ describe('the notification path reaches no platform notification mechanism', () 
         'src/notify/surface/lifetime.ts',
         'src/notify/surface/card.ts',
         'src/notify/surface/card-view.ts',
+        // NS-2 added these three: the channel contract, the preload that carries a card
+        // into the document, and the module that says where that preload is. All three are
+        // on the notification path, and the preload is the only one of them that runs
+        // inside a renderer - so they are swept, not exempted.
+        'src/notify/surface/channel.ts',
+        'src/notify/surface/preload.cts',
+        'src/notify/surface/preload.ts',
         'src/notify/policy.ts',
         'src/notify/registry.ts',
         'src/notify/types.ts',
       ]),
     )
-    expect(modules).toHaveLength(9)
+    expect(modules).toHaveLength(12)
   })
 
   it('has no notification API call, no audio and no spawned command on the surface path', () => {

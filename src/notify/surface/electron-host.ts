@@ -48,6 +48,27 @@
 // (src/dashboard/card.html, built by the dashboard's own build step); NT-7 owns what the
 // document contains.
 //
+// HOW A CARD REACHES THAT DOCUMENT (NT-FR-12)
+// Through a preload and a context bridge, and this file's `webPreferences` names it. The
+// card document runs with `contextIsolation: true`, `nodeIntegration: false` and
+// `sandbox: true`, so it has no `require`, no `process` and no `ipcRenderer`, and nothing
+// in it can be reached from here by calling a function. The preload is the standard
+// answer and the only one of the three that does not widen the renderer: it exposes
+// exactly two calls on one global, and this file's `createElectronCardChannel` sends the
+// two messages behind them. `executeJavaScript` would need no boundary at all, which is
+// why it is not used, and `webSecurity: false` or `nodeIntegration: true` would trade the
+// isolation this product's whole claim rests on for a convenience it does not need - a
+// test asserts all three absences across every file under `src`. The two messages carry a
+// `CardModel` and a lifetime cell, and nothing else; the guard that decides what may cross
+// is src/notify/surface/channel.ts and it runs on both sides (APX-FR-01).
+//
+// The preload is two files, and both are this product's own: `./preload.ts` names it -
+// the source tsc compiles, the `.cjs` it emits, and the path this option set carries -
+// and `./preload.cts` is the body, because a preload in a sandboxed renderer is parsed as
+// a plain script and this package is an ES module, so tsc would emit a module marker into
+// any `.ts` it compiled. src/notify/surface/preload.ts states that at greater length with
+// the measurements behind it.
+//
 // VERIFICATION STATE, AND IT DIFFERS BY LAYER
 // The *product* layers are unit-tested against a structural Electron stub in
 // tests/notify/surface-host.test.ts, which proves the option set, the placement, the
@@ -102,6 +123,16 @@ import {
   type SurfaceAvailability,
   type SurfaceCardRequest,
 } from './host.js'
+import {
+  CARD_CHANNEL_READY,
+  CARD_CHANNEL_REMOVE,
+  CARD_CHANNEL_SHOW,
+  cardChannelRemove,
+  cardChannelShow,
+} from './channel.js'
+import { CARD_PRELOAD_PATH } from './preload.js'
+import { armCardExpiry, timerCardScheduler, type CardEnd, type CardExpiryScheduler, type CardLifetimeCell } from './lifetime.js'
+import type { CardModel } from './card.js'
 
 // ---------------------------------------------------------------------------
 // The window option set
@@ -115,6 +146,14 @@ import {
  * a test would then be asserting. `width` and `height` are here because a window has to
  * be given a size before anything can be placed, and they are the same two numbers
  * ./position.ts places by - the pre-flight's measured card (NT-FR-04).
+ *
+ * The `webPreferences` object grew exactly one key since NT-6 asserted it: `preload`,
+ * which is what carries a card into the document at all (NT-FR-12). Its value comes from
+ * ./preload.ts rather than from a literal here, so the option set states *which* preload
+ * and the preload module is the one that says where it is and why it is CommonJS. The
+ * three NT-FR-04 settings it already carried are unchanged, the object is still frozen,
+ * and tests/notify/surface-host.test.ts asserts the exact key set of both levels - with
+ * that one addition made deliberately, and said so where the assertion is.
  */
 export const SURFACE_WINDOW_OPTIONS: Readonly<Record<string, unknown>> = Object.freeze({
   width: CARD_SIZE.width,
@@ -131,6 +170,7 @@ export const SURFACE_WINDOW_OPTIONS: Readonly<Record<string, unknown>> = Object.
     contextIsolation: true,
     nodeIntegration: false,
     sandbox: true,
+    preload: CARD_PRELOAD_PATH,
   }),
 })
 
@@ -375,6 +415,23 @@ export function assertLoopbackDocumentUrl(url: string): string {
 // The structural Electron surface
 // ---------------------------------------------------------------------------
 
+/**
+ * The slice of a window's `webContents` this file uses. One call, and that is the list.
+ *
+ * `send` is how a card model crosses into the document, and it is the *only* way: the
+ * alternative - `executeJavaScript` - injects code into a renderer and needs no boundary
+ * at all, which is why a test asserts this member exists and that `executeJavaScript`
+ * appears nowhere under `src` (NT-FR-12, APX-FR-01).
+ *
+ * `isDestroyed` is read before every send, because sending to a destroyed window throws
+ * and the caller is the delivery path, where an exception would be a swallowed block
+ * (APX-FR-02).
+ */
+export interface WebContentsLike {
+  send(channel: string, ...args: readonly unknown[]): void
+  isDestroyed(): boolean
+}
+
 /** The slice of `BrowserWindow` this host uses. Nine calls, and that is the whole list. */
 export interface BrowserWindowLike {
   loadURL(url: string): Promise<void>
@@ -384,6 +441,8 @@ export interface BrowserWindowLike {
   destroy(): void
   setBounds(bounds: { x: number; y: number; width: number; height: number }): void
   setIgnoreMouseEvents(ignore: boolean, options?: { forward?: boolean }): void
+  /** How a card model reaches the document. Added for the channel (NT-FR-12). */
+  readonly webContents: WebContentsLike
 }
 
 /** The slice of `screen` this host uses: one display's usable rectangle, read per show. */
@@ -405,6 +464,21 @@ export interface CreateElectronSurfaceHostOptions {
   readonly corner?: SurfaceCorner
   /** One bounded line on a diagnostic callback when a card cannot be shown. */
   readonly onDiagnostic?: (message: string) => void
+  /**
+   * Told about the window, once, as it is created.
+   *
+   * The seam the channel needs, and it is an option rather than a sixth method for the
+   * reason NT-FR-12 is a test's business: the host owns the window, the channel needs its
+   * `webContents`, and `NotificationSurfaceHost` must still carry exactly `probe`, `show`,
+   * `hide`, `setClickThrough` and `destroy` (tests/notify/surface-host.test.ts enumerates
+   * the interface from source). A host that widened to hand out its window would put a
+   * card's delivery surface on the window contract; this way the host says nothing about
+   * cards and the channel is told about a window that already exists.
+   *
+   * Called before `createElectronSurfaceHost` returns, so a caller that answers straight
+   * away has the window before anything can ask for a card.
+   */
+  readonly onWindowCreated?: (window: BrowserWindowLike) => void
 }
 
 // ---------------------------------------------------------------------------
@@ -443,6 +517,15 @@ export function createElectronSurfaceHost(
   let destroyed = false
   let visible = false
   let clickThrough: boolean | null = null
+  // Told once, straight after construction, so a channel mounted alongside the host is
+  // holding this window before a delivery can ask for a card (NT-FR-12).
+  try {
+    options.onWindowCreated?.(window)
+  } catch (cause) {
+    throw new SurfaceWindowRefusedError(
+      `the caller that adopts the surface window threw (${cause instanceof Error ? cause.message : String(cause)})`,
+    )
+  }
 
   /** The display's usable rectangle, or a refusal that names why it has none. */
   const workArea = (): WorkArea => {
@@ -576,6 +659,213 @@ export function createElectronSurfaceHost(
       destroyed = true
       visible = false
       window.destroy()
+    },
+  }
+}
+
+// ---------------------------------------------------------------------------
+// The main-process end of the card channel
+// ---------------------------------------------------------------------------
+
+/**
+ * The slice of `ipcMain` the channel uses. One listener, registered once, at
+ * construction.
+ *
+ * Structural for the same reason everything else here is, and registered eagerly rather
+ * than on the first card because the message it waits for is sent by the preload as the
+ * window's document loads - which happens before anything can ask for a card. A
+ * listener added on first use would arrive after the announcement and wait for a second
+ * one that never comes.
+ */
+export interface IpcMainLike {
+  on(channel: string, listener: (event: unknown, ...args: unknown[]) => void): unknown
+}
+
+/**
+ * How long a card waits for the card document to announce that its channel is listening.
+ *
+ * A safety net, not the normal path, and it is worth saying why. `host.show()` resolves
+ * on the document's load, and the preload runs before any document script, so by the time
+ * the notifier calls `present` the announcement has already been sent - the wait is
+ * already satisfied and this number is never reached. It exists for the case the ordering
+ * does not cover: a window whose document failed to run the preload, or a preload that
+ * Electron refused, either of which would otherwise be a card that never arrives with
+ * nothing to say so.
+ *
+ * A number and not a policy: no card lifetime is expressed here, nothing re-arms, and
+ * the clock is a single `setTimeout` that is cleared the moment it is answered
+ * (NT-FR-08, APX-FR-02).
+ */
+export const CARD_CHANNEL_READY_TIMEOUT_MS = 2_000
+
+export interface CreateCardChannelOptions {
+  /** Electron's `ipcMain`, for the one readiness announcement. */
+  readonly ipcMain: IpcMainLike
+  /**
+   * The window to send on, read when a card is presented.
+   *
+   * A reader rather than a value because the channel is built before the window exists:
+   * the composition root builds both and the window is created when the hub mounts the
+   * host. Reading at send time is also what keeps a destroyed window from being a stale
+   * reference.
+   */
+  readonly window: () => BrowserWindowLike | null
+  /**
+   * Takes the window down when a card ends on its own.
+   *
+   * The host's own `hide`, passed in rather than reimplemented: the host knows whether it
+   * is visible, and a second hide would be a second place NT-FR-10's promise is decided.
+   */
+  readonly hide: () => void
+  /** One bounded line on a diagnostic callback. Never the card's own text. */
+  readonly onDiagnostic?: (message: string) => void
+  /** Where the expiry clock comes from. Defaults to this environment's `setTimeout`. */
+  readonly scheduler?: CardExpiryScheduler
+  /** Overrides `CARD_CHANNEL_READY_TIMEOUT_MS`, for a test that will not wait. */
+  readonly readyTimeoutMs?: number
+}
+
+/**
+ * The main process's half of the card channel: the `CardPresenter` NT-8 made a required
+ * port, over the two messages the preload carries.
+ *
+ * Structurally this is the notifier's `CardPresenter` and nothing wider, which is why
+ * src/main/index.ts can hand it to `resolveSurfaceNotifier` without either file naming
+ * the other's type.
+ */
+export interface CardChannelPresenter {
+  present(model: CardModel, cell: CardLifetimeCell): Promise<void>
+}
+
+/**
+ * Build the main process's end of the card channel.
+ *
+ * It does four things and refuses two.
+ *
+ *   1. It waits for the card document to say its channel is listening. `webContents.send`
+ *      to a document that has not finished loading is a message nobody receives, and a
+ *      card that silently never arrived is the one failure this product exists to avoid
+ *      (APX-FR-02, ADR-010).
+ *   2. It refuses a payload the guard in ./channel.ts refuses, by throwing - the delivery
+ *      path turns that into a recorded failure with its reason, and the value never
+ *      crosses (APX-FR-01).
+ *   3. It sends the one `show` message.
+ *   4. It arms the *same* clock the card document's own view arms, from the same cell and
+ *      through the same `armCardExpiry`, and when it elapses it removes the card through
+ *      the channel and takes the window down. Two arms of one interval, not two policies:
+ *      the document's arm takes the card out of the document, this one takes the *window*
+ *      down, and only the main process can do that. A cell with no interval - needs-you,
+ *      which is every cell that waits for a decision - arms nothing here either, so there
+ *      is nothing that can time a block out while it is still a block (NT-FR-08,
+ *      ADR-004).
+ *
+ *   Refusal 1: no window, or a destroyed one. That is a wiring fault or a shutdown, and
+ *   it throws with a reason rather than resolving as though a card were shown.
+ *   Refusal 2: a cell that is never rendered. `planNotification` never produces one -
+ *   the cell that renders nothing belongs to a class that is refused before it gets here -
+ *   so it is checked rather than assumed, because a window with an empty card in it is
+ *   exactly what NT-FR-10 forbids.
+ *
+ * It is NOT the acknowledgement path. Nothing here is told that a block was resolved or
+ * acknowledged: that is a hub concern, its destination is the dashboard, and the
+ * acknowledgement belongs on a dismissal port rather than on the host window. A
+ * needs-you card therefore leaves the screen when the host is destroyed, which is correct
+ * at shutdown and is recorded as the hub's next piece of work rather than worked around
+ * here (NT-FR-12's third clause, ADR-010).
+ */
+export function createElectronCardChannel(options: CreateCardChannelOptions): CardChannelPresenter {
+  const diagnostic = options.onDiagnostic ?? ((): void => {})
+  const scheduler = options.scheduler ?? timerCardScheduler
+  const readyTimeoutMs = options.readyTimeoutMs ?? CARD_CHANNEL_READY_TIMEOUT_MS
+  if (options.ipcMain === null || typeof options.ipcMain.on !== 'function') {
+    throw new Error(
+      'the Electron runtime provided no `ipcMain`, so a card model cannot reach the card document ' +
+        'and this build can show no card at all. The hub is unaffected and every delivery is ' +
+        'recorded as not-wired rather than as a card somebody saw (NT-FR-12, APX-FR-02).',
+    )
+  }
+
+  let ready = false
+  let waiting: Array<() => void> = []
+  options.ipcMain.on(CARD_CHANNEL_READY, (): void => {
+    if (ready) return
+    ready = true
+    const answered = waiting
+    waiting = []
+    for (const resolve of answered) resolve()
+  })
+
+  /** The announcement, or a refusal that says the document never listened. */
+  const whenReady = (): Promise<void> => {
+    if (ready) return Promise.resolve()
+    return new Promise<void>((resolve, reject) => {
+      let settled = false
+      const settle = (): void => {
+        if (settled) return
+        settled = true
+        clearTimeout(handle)
+        resolve()
+      }
+      const handle = setTimeout(() => {
+        if (settled) return
+        settled = true
+        waiting = waiting.filter((entry) => entry !== settle)
+        const detail =
+          `the card document did not announce a listening channel within ${String(readyTimeoutMs)}ms, ` +
+          'so nothing was sent and no card is on the screen. The event is stored, the block is still ' +
+          'pending and nothing was retried (NT-FR-12, APX-FR-02)'
+        diagnostic(`notify: ${detail}`)
+        reject(new Error(detail))
+      }, readyTimeoutMs)
+      waiting.push(settle)
+    })
+  }
+
+  // One expiry at a time, and cancelled by the next card: a replaced card must not come
+  // back later to take down the window a newer card is using. Nothing here re-arms.
+  let arm: { cancel(): void } | null = null
+
+  /** Remove the current card through the channel, and take the window down. */
+  const endCard = (end: CardEnd): void => {
+    const window = options.window()
+    if (window === null || window.isDestroyed()) return
+    window.webContents.send(CARD_CHANNEL_REMOVE, cardChannelRemove(end))
+    options.hide()
+  }
+
+  return {
+    present: async (model: CardModel, cell: CardLifetimeCell): Promise<void> => {
+      // Throws `CardChannelPayloadError` for anything the guard refuses, which the
+      // notifier records as a failure with its reason. Nothing crosses before this.
+      const payload = cardChannelShow(model, cell)
+      if (!cell.rendered) {
+        throw new Error(
+          `a card was presented for the class "${String(cell.class)}", whose card is never rendered. ` +
+            'The class policy refuses that class before it reaches here, so this is a defect in the ' +
+            "policy's own table rather than something to draw (NT-FR-02, NT-FR-10).",
+        )
+      }
+      arm?.cancel()
+      arm = null
+      await whenReady()
+      const window = options.window()
+      if (window === null) {
+        throw new Error(
+          'the card channel was asked to present a card with no surface window, so nothing was sent ' +
+            'and no card is on the screen (NT-FR-12, APX-FR-02).',
+        )
+      }
+      if (window.isDestroyed()) {
+        throw new Error(
+          'the card channel was asked to present a card into a destroyed surface window, so nothing ' +
+            'was sent and no card is on the screen (NT-FR-12, APX-FR-02).',
+        )
+      }
+      window.webContents.send(CARD_CHANNEL_SHOW, payload)
+      arm = armCardExpiry(cell, scheduler, () => {
+        arm = null
+        endCard('expired')
+      })
     },
   }
 }

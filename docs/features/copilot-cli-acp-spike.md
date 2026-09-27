@@ -228,9 +228,15 @@ Key test scenarios:
 
 ## 8. Open Questions
 
-| # | Question | Default Assumption |
-|---|----------|--------------------|
-| 1 | Does ACP mode emit a permission request from Copilot CLI? | Unresolved upstream, so the probe records what happens rather than assuming either answer |
-| 2 | Can a session-end reason stand in for idle? | Only if the captured payload shows a per-turn reason; otherwise finished detection for Copilot needs its own signal |
-| 3 | Should heuristic detection be shipped at all if it can miss blocks? | Only with the degradation path visible to the user, since a silently missed block is the exact failure this product exists to prevent |
-| 4 | Does Copilot CLI load hooks per repository, which would break the global-install promise? | If so, the adapter uses ACP rather than hooks, and the runbook says so plainly |
+**All four are answered by the captured probe, and the answers decided the feature.** The
+gate recorded **deferral**: v1 ships opencode only. The decision and its evidence are
+[docs/reviews/CP-3-console-review.md](../reviews/CP-3-console-review.md); CP-4 turns it into
+the deferral record a user reads. The answers, with the state each signal carries in the
+probe's own vocabulary, are:
+
+| # | Question | Answered by the capture | State |
+|---|----------|-------------------------|-------|
+| 1 | Does ACP mode emit a permission request from Copilot CLI? | Yes. `session/request_permission`, an agent-to-client request carrying `[["allow_once","allow_always","reject_once"]]` | `observed` |
+| 2 | Can a session-end reason stand in for idle? | No. `sessionEnd.reason` arrived once, at the end, and says nothing about the turn that completed. The per-turn boundary is `stopReason` on the `session/prompt` response, which is a response to a request rather than a notification - and whether an attaching client sees responses to prompts a human issued is not captured | `not-triggered` as a notification |
+| 3 | Should heuristic detection be shipped at all if it can miss blocks? | No, not on this evidence. The `notification` hook's `agent_idle` type is `unclear` because the driven session started no subagent, and the probe's own rule refuses a mapping built on `unclear`. The work-detection the idle-after-nothing suppression depends on never fired at all | `unclear` |
+| 4 | Does Copilot CLI load hooks per repository, which would break the global-install promise? | A repository-level hook fired 8 times in `copilot -p` and 0 times in ACP mode in the same workspace, while a user-level hook fired in both. A global install is therefore the shape that suits this harness; a per-repository one cannot be relied on. This is one version on one machine and a future reader should re-probe rather than inherit it | `observed` for user-level, `not-triggered` for repository-level in ACP mode |

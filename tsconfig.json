@@ -9,6 +9,16 @@
   // and the directly-loaded plugin need. The Node-hosted tsc build overrides
   // this to NodeNext in tsconfig.build.json, where relative imports must carry
   // an explicit .js extension.
+  //
+  // `.cts` is here for one file: src/notify/surface/preload.cts, the card
+  // surface's preload. A preload in a renderer with `sandbox: true` is parsed by
+  // Chromium as a plain script and has no ESM context, which was measured
+  // against Electron 44.4.5 - both a `.mjs` and a `.js` preload using `import`
+  // fail with `SyntaxError: Cannot use import statement outside a module`. A
+  // `.cts` source is always emitted as CommonJS whatever the module setting says,
+  // and `"moduleDetection": "force"` below would otherwise append an `export {};`
+  // marker to it - the exact syntax that fails. Nothing else in the repository is
+  // CommonJS, so this is the only file the extension applies to.
   "compilerOptions": {
     "target": "ES2023",
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
@@ -45,6 +55,7 @@
     "src/**/*.ts",
     "src/**/*.tsx",
     "src/**/*.mts",
+    "src/**/*.cts",
     "tests/**/*.ts",
     "tests/**/*.tsx",
     "vite.config.ts",

@@ -22,17 +22,22 @@
 | A greeting-and-close session produces no window and no card | **LIVE-VERIFIED on Linux** | same evidence file, journey `greeting-and-close`: zero events, zero windows, pending set unchanged, no viewable card window while nothing was pending |
 | The operating system's notification centre received nothing from agent-ping, and the instrument was capable of seeing a notification | **observed on a real desktop** | same evidence file, `notificationCentre`: 0 calls during the journeys, 2 from a deliberate positive control through the same monitor. Recorded as an observation, never asserted |
 | The Chromium launch policy is load-bearing | **observed on a real Electron process** | same evidence file, `machine.launchPolicy`: with `ELECTRON_DISABLE_SANDBOX=1` the binary starts; without it, the setuid-sandbox FATAL (PRD 16 Open Question 13) |
-| **The product *as shipped* can show a card today** | **NO, and that is the shipped state, not a gap in the evidence** | same evidence file, `shippedPosture`: the real built entry point started, answered `GET /card.html` with **404**, and reported `delivery.status: "not-wired"` with `toast_deliveries: 0` after a real block. Section 4 items 1 and 2 |
+| **The product *as shipped* can show a card today** | **YES, in code: the card document is a build entry, the window names a preload, and the Electron bridge supplies `renderCard`** | `tests/dashboard/card-document.test.ts` (the document is in the built artefacts), `src/notify/surface/electron-host.ts` (`SURFACE_WINDOW_OPTIONS.webPreferences.preload`), `src/main/index.ts` (`electronDesktopBridge` supplies `renderCard`), and `tests/notify/surface-channel.test.ts`, which drives the real `startHub` over a real loopback socket with the real bridge and gets `wired` with `delivered: 1` |
+| …and that shipped path on a **real desktop** | **OBSERVED BY HAND on Linux, after NS-1 and NS-2** — `wired: true`, a real posted block counted `delivered: 1`, and a real `agent-ping card` window at `320x96+1584+48`, `IsViewable`, 1 193 painted values, with no seam supplied by a script | section 8.6, which also says what that run did not see: no word read, no pointer moved, no acknowledgement exercised, no tray, and nothing about macOS or Windows |
+| …and that same path under the full section 8 harness | **NOT RUN since the channel was built.** The evidence file's journeys predate both pieces and were produced through a harness | `scripts/verify-notification-surface.mjs` is the owner's next step; its own `requiredProductChanges` still names the card document and the channel, which are built now (section 4, item 3) |
+| The card document is in the built artefacts and is served by the hub | **implemented, unit-tested, and proved over a real socket** | `tests/dashboard/card-document.test.ts` (13 tests, which run the real Vite build), `tests/hub/server.test.ts` (a real `GET /card.html`: 200, `text/html; charset=utf-8`, `nosniff`, the full CSP, no `unsafe-inline`) |
+| A card model reaches that document across a channel that leaves `contextIsolation`, `nodeIntegration: false` and the renderer sandbox in force | **implemented, unit-tested, and driven once by hand against the real binary** | `tests/notify/surface-channel.test.ts` (one global, key set exactly `remove` and `show`; the payload is exactly a `CardModel` and a `CardLifetimeCell`; no `executeJavaScript` and no `webSecurity` anywhere under `src`; the host interface still exactly five methods), and the hand-run in `src/notify/surface/electron-host.ts`'s header |
 | A card on **macOS** | **NOT LIVE-VERIFIED, AND NOT CLAIMED** | one implementation, but only Linux was ever run. No statement in this repository is evidence about macOS |
 | A card on **Windows** | **NOT LIVE-VERIFIED, AND NOT CLAIMED** | as above |
-| The shipped build serving a card document and showing a card without the run's harness | **NOT LIVE-VERIFIED — it does not happen**, and it is a recorded fact rather than a missing observation | `shippedPosture` in the evidence file: `GET /card.html` → 404, `delivery.status: "not-wired"`, no viewable card window while that hub served |
 
 Nothing in this file is a claim that a human read a word off a card. The pixel capture counts
 distinct values in the window's own drawable, which separates a painted card from a blank
-rectangle and reads no text; legibility stays a manual, per-platform step (section 8.4). And
-nothing in it claims the shipped build can produce that card on its own: the journeys in
-section 8 are driven through a run-time harness that supplies exactly three seams the product
-has not built, and every one of them is named, owned and recorded as a required product change.
+rectangle and reads no text; legibility stays a manual, per-platform step (section 8.4). The
+journeys in section 8 were driven through a run-time harness that supplied three seams the
+product did not have *at the time of that run*, and every one of them is named, owned and
+recorded there; the card document and the channel are the product's own now (NS-1 and NS-2),
+so section 8.6 is the observation about the shipped path — five facts and a list of what it
+did not see, made on one Linux desktop.
 
 ## 1. What the surface is
 
@@ -52,6 +57,15 @@ A **card** is a document this product renders in a window it creates and owns:
   closes, so a card cannot outlive the hub that could resolve its deep link
 - loaded from `/card.html` **on the hub's own loopback origin**, so the dashboard's
   strict content-security policy governs the card and no new origin exists
+
+A card reaches that document through a **preload and a context bridge**, because the
+document runs with `contextIsolation: true`, `nodeIntegration: false` and `sandbox: true`
+and therefore has no `require` and no `ipcRenderer` of its own. The window names the
+preload in `webPreferences`; the preload puts exactly two calls — `show` and `remove` — on
+exactly one global; the main process sends the two messages behind them. Nothing was
+widened to make that work: there is no `executeJavaScript` and no `webSecurity` change
+anywhere under `src`, and a test asserts both absences over every file in the tree
+(NT-FR-12).
 
 **No operating system notification mechanism is involved on any platform.** There is no
 notification service, no notification centre, no focus-assist integration, no permission
@@ -102,8 +116,10 @@ curl -sS -X POST "http://127.0.0.1:$PORT/api/ingest" \
        "repoFullPath":"/home/you/Projects/agent-ping","transitionId":"manual-1",
        "occurredAt":"2026-09-27T09:00:00.000Z"}'
 
-# 4. Read what the hub recorded about that attempt. Today this is the honest answer:
-#    `not-wired`, because the card document is not in the build (see section 4).
+# 4. Read what the hub recorded about that attempt. With the shipped Electron bridge
+#    this is `ok` with `delivered: 1` and a window in the work area. `not-wired` is
+#    still the correct answer for a headless run, for a runtime that provides no
+#    `ipcMain`, and for a desktop that refused the window (see section 4).
 curl -sS "http://127.0.0.1:$PORT/api/health" | jq '.delivery'
 ```
 
@@ -136,14 +152,26 @@ agent-ping
 Look for the same four things, including that the Windows Action Center and the toast
 surface stay empty.
 
-### What "by hand" means when nothing is wired yet
+### What "by hand" means when the answer is `not-wired`
 
-If `GET /api/health` reports `not-wired`, then **that is the correct result, not a failure
-of the check** — and on the shipped build today that is what you will get, because there is
-no card renderer to wire (section 4, items 1 and 2, both re-confirmed on the running system
-by the script in section 8). Section 4 explains why. To see a real card on a real display
-today, run that script rather than a hand-rolled command: it supplies the three missing
-seams itself and tells you, in the evidence file, exactly which three things it supplied.
+`GET /api/health` reports `not-wired` in three real cases, and in each of them that is the
+correct result rather than a failure of the check:
+
+- **a headless run** — no desktop bridge at all, so no window and no renderer. This is
+  what the test suite and the CLI get.
+- **a runtime that provides no `ipcMain`** — the window exists and nothing can be put in
+  it, so `resolveSurfaceNotifier` answers `no-card-renderer` and every delivery is
+  recorded as not-wired with a diagnostic on stderr. A transparent rectangle with nothing
+  in it is not a card, and reporting one as a delivery would be the lie APX-FR-02 forbids.
+- **a desktop that refused the window** — `window-refused`; the hub keeps serving.
+
+The shipped Electron bridge is none of those: it supplies a window *and* a card presenter,
+so a real `permission.asked` on it is a `delivered` delivery. If you are driving a card by
+hand and get `not-wired`, the reason field in `.delivery` says which of the three it was.
+
+To see a real card on a real display without any of that, run
+`scripts/verify-notification-surface.mjs` (section 8): it drives a real built hub, and its
+evidence file records on the record every seam it supplied itself.
 Do not work around it by calling any notification tool by hand: the whole point of ADR-012
 is that there is no such call in this product, and a manual check that reached for one
 would be checking the wrong thing.
@@ -160,6 +188,11 @@ Covered, with no display and no Electron binary in the process:
 - the composition root, end to end over a real log and a real socket: the three classes,
   the refused-class counter, the failure on health, the restart replay
 - the absence of every withdrawn mechanism, asserted from source over all of `src/notify`
+- the card channel: one global, a key set of exactly `remove` and `show`, a payload that is
+  exactly a `CardModel` and a lifetime cell and nothing else, and a refusal that quotes no
+  value — plus the end-to-end path, where the real `startHub` with the real Electron bridge
+  over a real loopback socket answers `wired` and counts a real posted block as `delivered`
+  (`tests/notify/surface-channel.test.ts`)
 - the verification script's own judgement and every parser, with injected results and
   captured tool output, in `tests/scripts/verify-notification-surface.test.ts` (120 tests,
   including a run where nothing executed and a run where the display or the Electron
@@ -168,6 +201,11 @@ Covered, with no display and no Electron binary in the process:
 Not covered by those, and covered only by the live run in section 8:
 
 - whether a compositor draws a transparent frameless always-on-top window correctly
+- whether the card document loads and paints in a real window, and whether the preload's
+  context bridge hands a model to it on a real renderer — the preload and the window
+  options were driven once by hand against the real Electron 44.4.5 binary (recorded in
+  `src/notify/surface/electron-host.ts`), and the *end-to-end* shipped path has not been
+  re-run on a desktop since
 - whether a card is legible at the real size, and whether the real font metrics fit — the
   live run measures *painted pixels*, never a word, and the stylesheet that drew the card
   in that run is the harness's own, so legibility stays manual even on Linux
@@ -176,39 +214,53 @@ Not covered by those, and covered only by the live run in section 8:
 - whether a pointer can reach the card, and whether click-through and its release both work
 - whether the tray icon mounts, and what number it carries: a StatusNotifierItem is not an X
   window, so neither is observable from outside the process
-- whether the card document loads at all in the built artefacts — **it does not**
 - anything at all about macOS or Windows
 
 ## 4. What is missing, in the order it blocks something
 
-Every item below was confirmed on the running system by `scripts/verify-notification-surface.mjs`
-(section 8) rather than inferred from the source.
+Items 1, 2 and 5 were open when this section was written and have since been built; they
+are kept, with what closed them, because a list that deletes its own history is a list
+nobody can date. Items 3, 4 and 6 are still open.
 
-1. **The card document.** `src/dashboard/card.html` does not exist, and the dashboard's
-   Vite build has one entry, so `GET /card.html` currently 404s. The card view exists
-   (`src/notify/surface/card-view.ts`) and is unit-tested; the page that mounts it does
-   not. Owner: dashboard-engineer, because the Vite root and the entry list are its file.
-   **Observed:** the live run asked the running hub for `/card.html` and got 404.
-2. **The main-to-renderer channel.** The main process has a window and a card model, and
-   the renderer runs with `contextIsolation: true`, `nodeIntegration: false` and
-   `sandbox: true` — so it has no `require` and no `ipcRenderer`, confirmed on real
-   Electron. Something has to carry the model from the first to the second. It has not
-   been chosen, and choosing it is a decision about the host's Electron surface, not a
-   detail. **Observed:** because nothing supplies a `DesktopBridge.renderCard`, the
-   delivery policy is never wired and no delivery is even attempted.
-3. **The consequence, stated rather than hidden.** Until both exist, the composition root
-   finds no renderer, reports the run as `not-wired`, and **records no deliveries as
-   made**. That is the honest answer and it is the behaviour `tests/notify/policy.test.ts`
-   asserts. A transparent rectangle with nothing in it is not a card, and reporting one as
-   a delivery would be the exact lie APX-FR-02 forbids. **Observed on the shipped build,
-   before the harness started and in a state directory of its own:** `GET /api/health`
-   reported `delivery.status: "not-wired"` and `wired: false`, `GET /card.html` answered
-   404, `toast_deliveries` stayed at 0 through a real `permission.asked`, the pending set
-   still went 0 → 1, and the display held **no viewable card window at all** while the hub
-   that owns one was serving. That is the `shippedPosture` section of the evidence file,
-   and it is a record rather than an assertion on purpose: a build that grows either piece
-   tomorrow would make a passing assertion here a false alarm, and this runbook would be
-   the stale artefact.
+1. **The card document — CLOSED by NS-1.** `src/dashboard/card.html` is now a third entry in
+   the dashboard's one Vite build, so `npm run build:dashboard` emits
+   `dist/dashboard/card.html` and the hub's existing static route serves it at
+   `GET /card.html`. The view it mounts is the product's own `createCardView`, and the
+   document writes its state through attributes under the dashboard's strict CSP.
+   **Proven** by `tests/dashboard/card-document.test.ts` (which runs the real build itself
+   and compares the other two pages byte for byte) and by `tests/hub/server.test.ts`, which
+   drives a real `GET /card.html` over a real socket and asserts 200, `text/html;
+   charset=utf-8`, `nosniff`, the full CSP and no `unsafe-inline`. **Not re-observed on a
+   desktop:** the 404 in the evidence file is a capture of a build that predates this.
+2. **The main-to-renderer channel — CLOSED by NS-2.** The card document runs with
+   `contextIsolation: true`, `nodeIntegration: false` and `sandbox: true`, so it has no
+   `require` and no `ipcRenderer`. The channel is a **preload with a context bridge**:
+   `SURFACE_WINDOW_OPTIONS.webPreferences.preload` names `preload.cjs`, the preload exposes
+   exactly two calls on exactly one global (`show` and `remove`), and the main process's
+   side sends the two messages behind them with `webContents.send`. `executeJavaScript` was
+   not used (it needs no boundary at all, which is exactly why it is not used) and the
+   renderer settings were not widened. The Electron bridge now supplies
+   `DesktopBridge.renderCard`, so a real block becomes a real card and the delivery is
+   counted as delivered. **Proven** by `tests/notify/surface-channel.test.ts`, which drives
+   the real `startHub` over a real loopback socket with a structural Electron module and
+   asserts `wired: true` with `delivered: 1` for a real posted block, that the key set is
+   exactly `remove` and `show`, that the payload is content-free, that the three renderer
+   settings and the frozen option object survive, and that a card which ends is removed
+   through the channel with the window hidden. **Observed by hand** against the real
+   Electron 44.4.5 binary: the exposed surface arrived in the document with a key set of
+   exactly `remove` and `show`, a model crossed and rendered, and the page had neither
+   `process` nor `require`.
+3. **The consequence, and what is left of it.** With both pieces in place, the composition
+   root finds a renderer, the delivery policy is wired, and a real block is recorded as
+   `delivered` with a card in the work area — **observed by hand on Linux**, in section 8.6,
+   with no seam supplied by a script. What that leaves is the rest of the desktop evidence:
+   the full section 8 harness has not been re-run since, and its `requiredProductChanges`
+   still names the card document and the channel, which a re-run would retire. Re-running
+   `scripts/verify-notification-surface.mjs` is the owner's next step (qa-engineer). Until
+   then the evidence file's `shippedPosture` — `GET /card.html` → 404,
+   `delivery.status: "not-wired"`, `toast_deliveries: 0`, no viewable card window — is a
+   record of a past build, not a claim about this one, and it is kept for that reason
+   rather than edited.
 4. **Removing a card when the block is acknowledged.** The lifetime table names
    `resolved` and `acknowledged` as the two ends of a needs-you card, and the card view
    removes on either. Nothing in the delivery path is *told* about an acknowledgement
@@ -223,14 +275,19 @@ Every item below was confirmed on the running system by `scripts/verify-notifica
    observed is that the *product's* card view and the *product's* lifetime cell do the
    right thing the moment anything tells them; what is missing is the telling, and the
    harness's `suppliedByThisRun` field says so on the record.
-5. **Nothing takes the window down when a card ends.** The same missing edge, one step on:
-   the card view's end never reaches the host, so `host.hide()` never runs and a mapped
-   transparent window outlives its card. NT-FR-10 promises the surface occupies no screen
-   space and draws nothing when nothing is showing. **Observed:** at the moment the
-   finished card expired, the host window was still mapped and visible and its own
-   drawable was empty. An empty mapped rectangle is not a card, so the card itself had
-   gone — but the window outliving it is a real gap. Owner: notification-engineer with
-   hub-engineer.
+5. **Nothing takes the window down when a card ends — CLOSED by NS-2 for the card's own
+   end.** The main process's half of the channel now arms the *same* clock the card
+   document's own view arms, from the same lifetime cell and through the same
+   `armCardExpiry`; when it elapses it sends the removal through the channel and calls the
+   host's own `hide()`. Two arms of one interval, not two policies: the document's arm
+   takes the card out of the document, the main process's arm takes the *window* down, and
+   only the main process can do that. A needs-you cell arms nothing at all, so a block
+   somebody is waiting on cannot be timed out (NT-FR-08, NT-FR-10). **Proven** by
+   `tests/notify/surface-channel.test.ts` over a real host and a real channel with the
+   clock injected: the interval is the table's own, the removal names `expired`, `hide()`
+   is called once, and a needs-you card arms nothing. What remains open is the same
+   acknowledgement edge as item 4: when *that* arrives, the window comes down through this
+   same path.
 6. **The `not-wired` reason has nowhere to go.** `startHub` defaults `onDiagnostic` to a
    no-op and `startElectronMain` passes none, so the diagnostic the composition root emits
    when it finds no renderer is written nowhere at all. **Observed:** the run captured the
@@ -284,11 +341,13 @@ privileged install is a change to that object, not to a call site.
 | Symptom | What it means | Where to look |
 | --- | --- | --- |
 | `not-wired`, reason `no-surface` | a headless run: no desktop bridge, so no window. A supported run, not a fault | the diagnostic at start-up |
-| `not-wired`, reason `no-card-renderer` | a window exists and nothing can be put in it. Today's shipped state (section 4) | `GET /api/health`, and section 8's evidence file |
+| `not-wired`, reason `no-card-renderer` | a window exists and nothing can be put in it: a runtime that provided no `ipcMain`, so the bridge hands the composition root no renderer (section 2) | the child's stderr, which carries the diagnostic, and `CHROMIUM_LAUNCH_ENVIRONMENT` first |
 | `not-wired`, reason `window-refused` | the desktop would not give the window. The hub keeps serving; every delivery is `not-wired` | `CHROMIUM_LAUNCH_POLICY` first, then the compositor |
 | `not-wired` and **nothing in the log or on stderr** | the reason is real but has no destination: the Electron entry point passes no `onDiagnostic` (section 4, item 6) | the child process's stderr; this is a product gap, not a silent success |
 | `failed` with `document-unavailable` | `GET /card.html` did not serve a document | the dashboard build, and `dashboardRoot` |
 | `failed` with `card-not-rendered` | the window came up and the card did not go in; the window was taken back down | the renderer channel (section 4) |
+| `failed` with `card-channel-payload-refused` | the guard in `src/notify/surface/channel.ts` refused what was about to cross, so nothing was rendered and no value appears in the reason | the model's five fields; a session identifier or a path has no field to travel in, and a deep link with a second query parameter is refused (section 4, item 2) |
+| no card, no failure, and a finished session | the preload is refused because the build has no `preload.cjs` beside `preload.js` — the same class of gap as a missing `schema.sql` | `npm run build` (tsc emits `dist/main/notify/surface/preload.cjs` from the `.cts` source), and `CARD_PRELOAD_SANDBOX_REQUIREMENT` in `src/notify/surface/preload.ts` for why it is a `.cjs` |
 | a `SIGTRAP` at start-up with no message | the launch policy did not reach the process | `agent-ping` writes the gap to stderr; see section 5 |
 | the tray badge is right and no card appeared | the badge is the durable signal and does not depend on the card (NT-FR-05, PRD 16 Open Question 3) | this is expected, not a fault |
 
@@ -379,17 +438,19 @@ observed value, so the verdict is 19 named comparisons and not a score.
 
 ### 8.2 What the run had to supply, and what it did not
 
-The product as shipped **cannot draw a card** (section 4, items 1 and 2). NT-9 was told to
-record that rather than change product code, and to prove the card on the running system.
-Both are only satisfiable if the run supplies the open seams itself — and then says so on
-the record, which is what the `harness` section of the evidence file is for. Three seams,
-each one the product's own documented injection point:
+**This section describes the run that produced the evidence file, and that run happened
+before NS-1 and NS-2.** At that time the product could not draw a card: the card document
+was not a build entry and there was no main-to-renderer channel. NT-9 was told to record
+that rather than change product code, and to prove the card on the running system. Both are
+only satisfiable if the run supplies the open seams itself — and then says so on the record,
+which is what the `harness` section of the evidence file is for. Three seams, each one the
+product's own documented injection point:
 
-| Seam | What the product has | What the run supplied, and why that is not a rewrite |
+| Seam | What the product had **at the time of that run** | What the run supplied, and why that is not a rewrite |
 | --- | --- | --- |
-| the card document | `src/dashboard/card.html` does not exist; `GET /card.html` is a 404 | a run-time document, stylesheet and module entry in a copy of the built dashboard. The card those two files show is mounted by the **product's own compiled card view** — `card-view.js`, `card.js` and `lifetime.js` copied byte for byte out of `dist/main/notify/surface/`, and the evidence file records `identicalToTheBuild: true` for each |
-| the main-to-renderer channel | no `DesktopBridge.renderCard`, and the renderer has `contextIsolation`, no `nodeIntegration`, `sandbox: true` and no preload | `webContents.executeJavaScript` into the product's own window. The renderer options were **not** touched: they came from the product's own frozen `SURFACE_WINDOW_OPTIONS`. The channel shape is recorded as a required product change with an owner, not adopted as the answer — choosing it is a decision about NT-6's Electron surface |
-| the acknowledgement signal | `POST /api/ack/:eventId` has no notifier hook, and nothing takes the window down when a card ends | the hub's own pending accessor watched by the run, which then calls the card view's own `remove('acknowledged')` and the host's own `hide()` — **only after** the product's card view has reported an end the product's lifetime cell names |
+| the card document | `src/dashboard/card.html` did not exist; `GET /card.html` was a 404 | a run-time document, stylesheet and module entry in a copy of the built dashboard. The card those two files show is mounted by the **product's own compiled card view** — `card-view.js`, `card.js` and `lifetime.js` copied byte for byte out of `dist/main/notify/surface/`, and the evidence file records `identicalToTheBuild: true` for each. **Superseded:** the product's own document is a build entry now (section 4, item 1) |
+| the main-to-renderer channel | no `DesktopBridge.renderCard`, and the renderer had `contextIsolation`, no `nodeIntegration`, `sandbox: true` and no preload | `webContents.executeJavaScript` into the product's own window. The renderer options were **not** touched: they came from the product's own frozen `SURFACE_WINDOW_OPTIONS`. The channel shape was recorded as a required product change with an owner, not adopted as the answer. **Superseded, and deliberately not adopted:** the product now uses a preload with a context bridge, and `executeJavaScript` is asserted to appear nowhere under `src` (section 4, item 2) |
+| the acknowledgement signal | `POST /api/ack/:eventId` had no notifier hook, and nothing took the window down when a card ended | the hub's own pending accessor watched by the run, which then calls the card view's own `remove('acknowledged')` and the host's own `hide()` — **only after** the product's card view has reported an end the product's lifetime cell names. **Half superseded:** the window now comes down on the card's own end (section 4, item 5); the acknowledgement *signal* is still open (item 4) |
 
 Everything else was the product's, unmodified and unstubbed: the real built `startHub`,
 the real loopback server and every real route, the real ingest classifier, the real class
@@ -445,6 +506,8 @@ route, answered `GET /card.html` with **404**, reported `delivery.status: "not-w
 1 — and the display held **no viewable card window at all**. It is a record and not an
 assertion, on purpose: a build that grows either missing piece tomorrow would make a
 passing assertion here a false alarm, and this runbook would be the stale artefact.
+**Both pieces have since been built** (section 4, items 1 and 2), so this paragraph is now
+a record of the build that run exercised, kept unedited for exactly the reason it gives.
 
 **Positive — the Chromium launch policy, measured both ways on the real binary.** With
 `ELECTRON_DISABLE_SANDBOX=1` the binary starts and reports `v44.4.5`; with the variable
@@ -498,9 +561,11 @@ this file claims they hold elsewhere.
   StatusNotifierItem and not an X window, so neither is observable from outside the process.
   The badge's number was read from `GET /api/pending`, which is the accessor the badge itself
   reads — an honest substitute, and the same one `tests/hub/tray.test.ts` asserts against.
-- **That the product as shipped can show a card.** It cannot, and `shippedPosture` is the
-  record of that rather than a footnote. Every card in 8.3 was produced through the harness
-  in 8.2, and each of the three seams is a required product change with a named owner.
+- **That the product as shipped can show a card.** At the time of *that* run it could not,
+  and `shippedPosture` is the record of that rather than a footnote: every card in 8.3 was
+  produced through the harness in 8.2. The product's own path has since been built and
+  driven by hand — see 8.6, which is the observation that replaces it, and which was made
+  without any harness seam at all.
 - **Anything about macOS or Windows.** One Linux desktop, one compositor, one run
   (APX-CON-06). No statement in this file or in the evidence file is evidence about another
   platform, and the manual steps in section 2 are where macOS and Windows belong.
@@ -521,3 +586,60 @@ card's shape, never the basis of a visibility claim: visibility is the X server'
 Card *lengths* are recorded and card *words* are not, and the file records no prompt, no
 tool name, no diff, no D-Bus payload and no absolute path from this machine (APX-FR-01,
 APX-CON-12).
+
+### 8.6 The shipped path, driven by hand after NS-1 and NS-2
+
+This is the observation that replaces 8.3's harness journeys as evidence about *the
+product*, and it is deliberately small: it is one run on one machine, made with the same
+rules as everything else in this file — say what was observed, and say what was not.
+
+**What was run.** `npm run build`, then `cp src/storage/schema.sql dist/main/storage/`
+(the tsc build emits JavaScript only, which is a required product change recorded for
+DP-1 and IO-1), then the real built entry point under the real binary with the launch
+policy in section 5 and a state directory of its own:
+
+```bash
+ELECTRON_DISABLE_SANDBOX=1 AGENT_PING_STATE_DIR="$STATE" \
+  AGENT_PING_SURFACE_DASHBOARD_ROOT="$PWD/dist/dashboard" \
+  node_modules/electron/dist/electron dist/main/main/index.js
+```
+
+**What was observed.**
+
+- `GET /api/health` reported `delivery.status: "ok"`, `wired: true`, `attempted: 0` — a real
+  run with a window **and** a card presenter, where the old build reported `not-wired`
+- one real `POST /api/ingest` of a `permission.asked` over the real loopback socket with the
+  per-install token: `202`, `pendingCount: 1`, and afterwards `attempted: 1`,
+  **`delivered: 1`**, `failed: 0`, `notWired: 0`, with the pending set at one item
+- the display server's own answer, not the product's: a window titled `agent-ping card`
+  at **`320x96+1584+48`**, `Map State: IsViewable`, with **1 193 distinct painted values**
+  in its own drawable. That rectangle is the pre-flight's measured card, and it is inside
+  the advertised work area
+- **no preload error and no diagnostic of any kind** on the child's stderr, which is the
+  expected silence for a wired run and is *not* a substitute for the diagnostic a
+  not-wired run owes an operator (section 4, item 6)
+
+So: a real block produced a real card on a real desktop with **no seam supplied by a
+script** — the document, the preload, the channel and the presenter were all the product's
+own. That is NT-FR-12's first two clauses observed rather than asserted.
+
+**What this run did not see, and does not claim.**
+
+- **No word was read.** The capture counts distinct values in the drawable, which separates
+  a painted card from a blank rectangle. Legibility at the real size, real font metrics and
+  real contrast remain a manual step on every platform, including this one.
+- **The acknowledgement edge was not exercised.** The run was ended by its own deadline
+  before an `ack` was issued, so nothing here says what happens to a card when its block is
+  acknowledged mid-run. That edge is still open (section 4, item 4) and it is the same open
+  edge in both harnessed and shipped paths.
+- **No pointer was moved**, so click-through and its release are unobserved here, as they
+  are in 8.4. `showInactive`'s focus behaviour is unobserved, because the X server exposes
+  no focus reading for a card window on this desktop.
+- **The tray icon was not observed.** A `StatusNotifierItem` is not an X window.
+- **Nothing at all about macOS or Windows.** One Linux desktop, one compositor, one run.
+- **This is not a re-run of `scripts/verify-notification-surface.mjs`.** It is a smaller,
+  hand-driven observation of the product's own path. That script still carries a
+  `requiredProductChanges` entry naming the card document and the channel; both are built
+  now, and a re-run by its owner would retire them, close item 3 properly with 19
+  assertions rather than 5 observations, and give the acknowledgement and tray edges their
+  own evidence.
