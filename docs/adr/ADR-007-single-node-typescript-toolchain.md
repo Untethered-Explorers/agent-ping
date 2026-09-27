@@ -1,7 +1,10 @@
 # ADR-007: Single toolchain — Node 22 + TypeScript, Electron main, PixiJS dashboard
 
-- **Status:** Accepted
+- **Status:** Accepted, **amended by [ADR-012](ADR-012-surface-is-rendered-by-agent-ping.md)**
 - **Date:** 2026-09-26
+- **Amended:** 2026-09-27. The libnotify row leaves the technology table, Electron is
+  promoted from an uninstalled shell to a load-bearing runtime dependency, and the
+  notification path becomes this product's own rendering rather than a platform service.
 - **Decision owners:** Project author (decided with the user; versions recorded
   in the PRD)
 - **Implementation state:** **Partial, with one recorded divergence.** The
@@ -20,8 +23,8 @@
 ## Context
 
 The product needs a resident daemon (Electron main process), a rendered
-interactive surface (the dashboard), a native durable store, a per-platform
-notification path including a tray or menu-bar icon, and a plugin that must be
+interactive surface (the dashboard), a native durable store, its own notification
+path including a tray or menu-bar icon, and a plugin that must be
 loadable by a Node process the user already runs.
 
 The user-facing dashboard is a canvas surface by choice — the project targets a
@@ -30,10 +33,13 @@ toolchain question, because a canvas surface also forces the accessibility
 question: a canvas has no semantics, so it must be paired with a DOM mirror
 (ADR-009, and APX-CON-07).
 
-The ecosystem options for a resident process with a tray icon and native
-notifications are thin, which pushes toward Electron. Electron is a large
-dependency for what is conceptually a notification daemon, and that cost is
-real: it is recorded as a named risk in the PRD.
+The ecosystem options for a resident process with a tray icon and a window are
+thin, which pushes toward Electron. Electron is a large dependency for what is
+conceptually a notification daemon, and that cost is real: it is recorded as a
+named risk in the PRD. **ADR-012 makes this cost unavoidable rather than
+optional**: the card, the badge and the dashboard window all execute inside
+Electron, so it is now a runtime dependency rather than a shell that might be
+avoided.
 
 A second constraint is decisive: **one toolchain only**. A second implementation
 language, or a runtime dependency the supported Node line does not satisfy, is
@@ -65,7 +71,7 @@ The stack as recorded in the PRD technology table:
 | opencode plugin types | `@opencode-ai/plugin` | 1.18.32 | npm registry |
 | opencode client | `@opencode-ai/sdk` | 1.18.32 | npm registry |
 | ACP client | `@agentclientprotocol/sdk` | 1.5.0 (protocol version 1) | npm registry |
-| Linux notifications | `notify-send` via libnotify | system package | local system |
+| Notification rendering | plain DOM in an Electron host window | part of the Electron dependency | live probe on the authoring machine |
 
 The three build entry points, and why each exists separately:
 
@@ -90,8 +96,10 @@ Source layout, per the PRD, is organised by concern: `src/domain/`,
 - **A plain Node daemon with no Electron, serving the dashboard to a browser.**
   Rejected for v1 because it loses the tray or menu-bar icon, and the tray badge
   is load-bearing: it is the **durable** signal that does not depend on the user
-  catching a toast moment. Losing it would push the product back toward
-  "easy to miss", which is the failure mode ADR-004 is designed to avoid.
+  catching a card. Losing it would push the product back toward
+  "easy to miss", which is the failure mode ADR-004 is designed to avoid. ADR-012
+  did not reopen this: the tray badge remains the durable signal, and a card that
+  is never drawn must still leave a number behind.
 - **Tauri instead of Electron.** Rejected. It is a credible footprint
   improvement, but it adds a Rust build dependency to a project whose defining
   constraint is a single Node/TypeScript toolchain.

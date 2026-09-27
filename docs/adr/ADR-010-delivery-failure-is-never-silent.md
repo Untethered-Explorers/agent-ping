@@ -1,7 +1,9 @@
 # ADR-010: Delivery failure is never silent
 
-- **Status:** Accepted
+- **Status:** Accepted, **amended by [ADR-012](ADR-012-surface-is-rendered-by-agent-ping.md)**
 - **Date:** 2026-09-26
+- **Amended:** 2026-09-27. A surface that cannot mount joins the failure classes this
+  decision already covers; a refused class must not be counted as a delivery.
 - **Decision owners:** Project author (settled with the user via `forge-grill-idea`)
 - **Implementation state:** Implemented, and the failure is visible from all three
   places a caller could look. The breadcrumb is `src/plugin/transport/breadcrumb.ts`
@@ -13,13 +15,17 @@
   it. On the hub side, `src/hub/delivery.ts` keeps a per-event ledger and a
   `lastFailure`, `GET /api/health` reports `delivery.status`, and the
   `toast_deliveries` counter moves only on a real `delivered` outcome — a failed
-  attempt is never counted as a delivery. A platform with no notifier is recorded
-  as `not-wired` from both ends rather than passing silently.
+  attempt is never counted as a delivery, and since ADR-012 a refused class must
+  not be counted as one either, which NT-8 fixes in a defect the old registry
+  documented and left. A desktop with no usable surface is recorded as
+  `not-wired` from both ends rather than passing silently.
   `tests/plugin/transport.test.ts` drives the failure table over **real loopback
   failures**, not mocks. **Not yet verified live:** the breadcrumb path has been
   exercised through a stub logging client and through a live opencode run that
   never reached a hub; no real harness session has yet failed to deliver to a
-  real hub, and no desktop has been shown a real toast.
+  real hub, and no desktop has been shown a real card. Under ADR-012 the delivery
+  mechanism is this product's own rendering, so a surface that refuses to mount is a
+  first-class failure of this decision rather than an edge case of someone else's API.
 
 ## Context
 
@@ -69,7 +75,7 @@ was delivered.
 Because the on-demand surface can be missed (ADR-009), a single delivery channel
 is not sufficient. The **tray or menu-bar badge carrying the pending count is
 the durable signal** — it persists on screen, needs no action, and does not
-depend on catching a toast at the right moment. A block remains pending until
+depend on catching a card at the right moment. A block remains pending until
 the harness reports it resolved or the developer acknowledges it, and it
 **survives hub restart** unchanged.
 
@@ -94,12 +100,13 @@ the harness reports it resolved or the developer acknowledges it, and it
 - **Raise an error that fails the harness session.** Rejected. This would make
   the notifier able to break the thing it observes — a direct violation of
   ADR-001. The user must never lose agent work because a notification failed.
-- **A repeating toast as a primary durability mechanism for needs-you.**
+- **A repeating card as a primary durability mechanism for needs-you.**
   Rejected, and the question is now closed rather than bounded. ADR-004
   originally retained a bounded, deduplicated form of this; its
   [amendment](ADR-004-three-loudness-classes.md) removed the repetition entirely.
-  The badge carries the durable signal, so a repeating toast is neither needed
-  nor wanted.
+  The badge carries the durable signal, so a repeating card is neither needed
+  nor wanted. ADR-012 did not reopen this: the card's lifetime policy explicitly
+  forbids re-arming.
 
 ## Consequences
 
@@ -108,7 +115,7 @@ the harness reports it resolved or the developer acknowledges it, and it
   rather than an assumption.
 - **Benefit:** Because the failure is visible in the harness, diagnosis does not
   require the user to suspect agent-ping specifically.
-- **Benefit:** The badge is meaningful even if every toast is missed, so the
+- **Benefit:** The badge is meaningful even if every card is missed, so the
   design degrades to a persistent, glanceable signal rather than to nothing.
 - **Cost:** Events are lost when the hub is down. This is accepted and
   deliberately **not** fixed by queueing; the breadcrumb makes the loss visible
@@ -117,9 +124,16 @@ the harness reports it resolved or the developer acknowledges it, and it
 - **Cost:** A breadcrumb in the harness UI is noise in a context the user did
   not ask to instrument. It is justified because the alternative is invisible
   data loss, and it is bounded to the failure case only.
-- **Cost:** Per-platform toast behaviour differs, so "non-auto-dismissing" is
-  only verified on one platform. The PRD is explicit that the badge, not the
-  toast, is the durable signal precisely because of this.
+- **Cost, now resolved:** Per-platform toast behaviour used to differ, so
+  "non-auto-dismissing" was only verified on one platform. ADR-012 removes the
+  cause: the card is rendered by this product on every platform, so the
+  interruption is uniformly persistent. The badge remains the durable signal, but
+  for the original reason rather than as compensation for a platform defect.
+- **Cost, newly introduced:** the surface can now fail to mount — no usable
+  window, no display, a Chromium sandbox abort. That failure is in the same class
+  as the ones this ADR already covers: it must be reported, recorded as
+  `not-wired` or failed with a reason, visible in `doctor`, and never silently
+  treated as delivered. NT-6 and NT-9 own it.
 - **Constraint carried forward:** this decision and ADR-001 are load-bearing
   together. The sidecar property is what makes hub-absent a routine state; this
   decision is what makes that state survivable. Removing either one breaks the

@@ -22,8 +22,9 @@ find out an hour later. agent-ping watches those sessions and tells you when one
 waiting on you and when one finished real work — quietly enough that you are willing
 to leave it running.
 
-It is a **local-only sidecar**: one global install, a loopback port, an OS toast and
-a tray badge. It never stores what your agents said, and it never drives them.
+It is a **local-only sidecar**: one global install, a loopback port, a notification
+card agent-ping draws in its own window, and a tray badge. It never stores what your
+agents said, and it never drives them.
 
 ## Status
 
@@ -35,7 +36,8 @@ line and the live dashboard are not.
 |------|-------|
 | Content-free SQLite log, retention, local counters | Built, tested |
 | Loopback hub: reads, live stream, ingest, ack + security, delivery, restart replay, metrics, clean shutdown | Built, tested |
-| Notifiers for Linux, macOS and Windows; tray icon with pending badge | Built, tested |
+| Tray icon with pending badge | Built, tested |
+| Self-rendered notification card, replacing the platform notifiers (NT-6 → NT-9) | Not started — the three platform notifiers still exist and NT-8 removes them |
 | opencode adapter: event translation, transport with visible failure, global plugin install | Built, tested |
 | PixiJS 8 dashboard prototype, DOM mirror, keyboard model | Built, reviewed |
 | Live dashboard wired to the hub (LD-1 → LD-4) | Not started |
@@ -64,7 +66,7 @@ line and the live dashboard are not.
   └───┬─────────────┬─────────────┬────────────┘
      │             │             │
      ▼             ▼             ▼
-   SQLite log     OS toast      tray badge
+   SQLite log     card surface  tray badge
    state only     needs-you /  durable pending
                   finished      count
      │
@@ -86,14 +88,23 @@ the app.
 
 | Class | Trigger | What you get |
 |-------|---------|--------------|
-| **Needs you** | Session blocked on a permission decision or your input | Resident critical toast, never auto-dismissed. One toast per block — the badge and the history carry persistence, not a repeat timer. |
-| **Finished** | Session went idle *after doing real work* | One normal toast that expires. |
+| **Needs you** | Session blocked on a permission decision or your input | One card, drawn by agent-ping, that stays until the block is resolved or acknowledged. One card per block — the badge and the history carry persistence, not a repeat timer. |
+| **Finished** | Session went idle *after doing real work* | One card that expires on its own. |
 | **FYI** | Errors, retries, long tool calls, compaction, token burn | Nothing. In-app only; the dashboard is where you read it. |
 
-Two rules that matter more than the table:
+**agent-ping renders the card itself** — in a small always-on-top window it creates and
+owns, in a corner of your screen that never covers a taskbar or dock. Nothing is handed
+to your operating system's notification service, so there is no permission to grant, no
+focus-assist to fight, and no behaviour that differs between Linux, macOS and Windows.
+See [ADR-012](docs/adr/ADR-012-surface-is-rendered-by-agent-ping.md) for why, and for
+what it costs.
+
+Three rules that matter more than the table:
 
 - A session that goes idle having done **nothing** — opened, greeted, closed — fires
-  no event at all. That gate lives in the classifier, not in the notifier.
+  no event at all. That gate lives in the classifier, not in the card.
+- **Nothing occupies your screen when nothing is happening.** The host window exists but
+  draws nothing unless a card is showing.
 - **No sound in v1.** Deferred rather than rejected, and structurally so: there is no
   sound field anywhere on the notification path.
 
@@ -196,7 +207,7 @@ appends a row.
 |--------|------|--------------|
 | `GET` | `/api/sessions` | Every session, grouped by repository short name |
 | `GET` | `/api/sessions/:sessionId` | One session and its most recent events |
-| `GET` | `/api/pending` | The pending set — the same accessor the tray badge reads |
+| `GET` | `/api/pending` | The pending set — the same accessor the tray badge and the card read |
 | `GET` | `/api/events` | Bounded event history, optionally filtered by `sessionId` |
 | `GET` | `/api/metrics` | Four local counters and when each last moved |
 | `GET` | `/api/health` | Instance, database, server, dashboard and delivery status |
@@ -232,7 +243,8 @@ src/
   domain/      the normalized envelope, the classifier, the pending lifecycle
   storage/     the content-free SQLite schema, the store, retention, counters
   hub/         the loopback server, routes, SSE feed, delivery, security, tray
-  notify/      the notifier interface and the Linux, macOS and Windows backends
+  notify/      the notifier interface, the class policy, and the self-rendered
+               notification surface (host window, card, lifetime)
   plugin/      the opencode adapter, its transport, and the global installer
   dashboard/   the PixiJS 8 prototype and its accessibility modules
   main/        the composition root: the one place collaborators are wired
@@ -247,11 +259,12 @@ docs/          the requirements, decisions, evidence and build log
 |----------|------------|
 | [docs/IDEA.md](docs/IDEA.md) | The idea of record: the problem, the boundaries, the questions left open on purpose. |
 | [docs/PRD.md](docs/PRD.md) | Product requirements, constraints, risks and the requirement-ID matrix. |
-| [docs/adr/](docs/adr/) | Eleven architecture decision records: the sidecar boundary, the loopback surface, the content-free guarantee, the loudness policy, the connector interface, the global install, the toolchain, identity, the on-demand surface, visible failure, and build ordering. Each record separates whether the decision is in force from whether code exists for it. |
+| [docs/adr/](docs/adr/) | Twelve architecture decision records: the sidecar boundary, the loopback surface, the content-free guarantee, the loudness policy, the connector interface, the global install, the toolchain, identity, the on-demand surface, visible failure, build ordering, and the self-rendered notification surface. Each record separates whether the decision is in force from whether code exists for it. |
 | [docs/features/](docs/features/) | Eight canonical feature documents with requirements, task contracts, testing strategy and acceptance criteria. |
 | [docs/PROGRESS.md](docs/PROGRESS.md) | The running build log: completed tasks, remaining work, and every unverified check. |
 | [docs/reviews/](docs/reviews/) | Human review records for the completed design and hub gates. |
-| [docs/runbooks/](docs/runbooks/) | Operational notes, currently the per-platform notification behaviour. |
+| [docs/runbooks/](docs/runbooks/) | Operational notes, currently the per-platform notification path. |
+| [docs/research/](docs/research/) | Probe evidence, including the live Electron pre-flight the notification surface decision rests on. |
 | [docs/artifacts/](docs/artifacts/) | Per-task evidence captured by the build engine. |
 
 > [!NOTE]

@@ -32,7 +32,9 @@ presence, and the design prototype itself. If the layout is discovered to be
 wrong after the connector work lands, the rework is not a mock-data swap; it
 touches the row model, the urgency encoding, the DOM mirror structure required
 by accessibility, and the tray badge's relationship to the page. That is
-expensive.
+expensive. ADR-012 did not disturb this ordering, and the reasoning behind it
+strengthened: the notification card is a DOM document that must agree with the
+page's own vocabulary, so the design is settled before either surface is built.
 
 The same problem applies to the toolchain. The recorded project structure has
 three separate build entry points (ADR-007) and an untested assumption about

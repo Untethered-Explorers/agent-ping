@@ -2,20 +2,24 @@
 
 - **Status:** Accepted
 - **Date:** 2026-09-26
+- **Amended:** 2026-09-27 by [ADR-012](ADR-012-surface-is-rendered-by-agent-ping.md) — the
+  delivery mechanism named in the needs-you row changed; the three classes, the
+  no-repeat-timer amendment and the no-sound rule are unchanged
 - **Decision owners:** Project author (settled with the user via `forge-grill-idea`)
-- **Implementation state:** Implemented, with one platform gate still open. The
-  classifier table in `src/domain/classify.ts` is the single place a harness
+- **Implementation state:** Implemented, with the delivery mechanism now owed a rebuild.
+  The classifier table in `src/domain/classify.ts` is the single place a harness
   event becomes a class, and it carries explicit `suppressed` rows for the
   signals this ADR says must not fire — the idle-after-nothing gate is a row in
   that table, not a branch in a notifier. The class *policy* is a second, pure
   table in `src/notify/policy.ts` (`CLASS_POLICIES`), total over the class union,
   where `fyi` is a **named refusal** rather than a no-op and no cell carries a
   sound field. Both tables are enumerated by tests rather than restated:
-  `tests/domain/classify.test.ts` and `tests/notify/policy.test.ts`. **Not yet
-  verified on a real desktop:** `persistence: 'resident'` is a request to the
-  installed notification server, and only Linux has had a real binary run against
-  it. Whether a real notification server honours it is still the NT-4 human gate
-  (see the Consequences entry on platform sensitivity).
+  `tests/domain/classify.test.ts` and `tests/notify/policy.test.ts`. Both tables
+  survive the ADR-012 change of track intact. **What is not yet true of the new
+  mechanism:** the lifecycle cell this ADR cares about is now a lifetime this
+  product owns rather than a request to an installed notification server, and it
+  has never been exercised against a real window. NT-7 builds it; NT-9's script
+  is where it gets observed. NT-4, the old Linux toast gate, is withdrawn.
 
 ## Context
 
@@ -50,7 +54,7 @@ with a fixed delivery policy.
 
 | Class | Trigger | Delivery |
 |-------|---------|----------|
-| **Needs You** | Session blocked on a permission decision or user input | OS toast, non-auto-dismissing, one per block; persistence carried by the badge and the history |
+| **Needs You** | Session blocked on a permission decision or user input | One card this product renders itself, non-auto-dismissing, one per block; persistence carried by the badge and the history |
 | **Finished** | Session went idle after doing real work | One notification per idle transition, then silent until the session resumes |
 | **FYI** | Errors, retries, long tool calls, compaction, token burn | In-app only; never leaves the app |
 
@@ -120,12 +124,15 @@ asserts the absence of a sound-capable argument and the single-toast property.
 - **Cost:** A user who genuinely wants per-subtask progress must wait for a
   later version, and the FYI class gives them no escape hatch beyond opening the
   dashboard.
-- **Cost:** The non-auto-dismissing toast for needs-you is platform-sensitive.
-  The PRD records this as a live risk: the badge count, not the toast, is the
-  durable signal, and per-platform implementations ship with scripted checks
-  whose human review gate can only be completed on that platform. This is now
-  also the *only* persistence mechanism, since the amendment removed the repeat
-  timer — which raises the stakes of that gate.
+- **Cost:** The non-auto-dismissing delivery for needs-you was platform-sensitive when
+  this was a platform toast, and the PRD recorded that as a live risk: the badge count,
+  not the toast, was the durable signal, and per-platform implementations shipped with
+  scripted checks whose human review gate could only be completed on that platform.
+  **Superseded by [ADR-012](ADR-012-surface-is-rendered-by-agent-ping.md):** the card is
+  rendered by this product on every platform, so the interruption is now reliably
+  persistent everywhere and the badge remains the durable signal for a different and
+  stronger reason — it is the one thing that survives the card being missed, noticed or
+  never drawn at all.
 - **Cost:** The idle gate depends on reliably observing tool calls, edits, and
   todo updates for every harness. On a harness that cannot report these
   precisely, the gate is inferred — which is exactly the risk recorded for the

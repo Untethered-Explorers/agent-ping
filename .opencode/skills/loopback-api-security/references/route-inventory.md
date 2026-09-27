@@ -90,8 +90,16 @@ to copy, which is a read, not a control.
 ## Reads that mutate incidentally
 
 Three counters are incremented from real request paths: dashboard opens when a dashboard client
-connects, deep-link opens when a deep link is resolved, and toast deliveries when the delivery
-pipeline reports an outcome, plus a pending-count snapshot whenever the pending set changes.
+connects, deep-link opens when a deep link is resolved, and notification deliveries when the
+delivery pipeline reports an outcome, plus a pending-count snapshot whenever the pending set
+changes.
+
+Two things about the third counter are easy to get wrong. Its persisted name is still
+`toast_deliveries`, a deliberate misnomer left in place by ADR-012 so that renaming a stored
+counter did not have to happen in the same change as replacing the delivery mechanism. And a
+**refused** outcome must never increment it: a class that never renders a card is not a
+delivery. The counter that backs the "notification restraint" success metric is only
+meaningful if refused and delivered are distinguishable.
 
 These are real writes on read paths, which makes them a genuine tension with "read routes do
 not mutate state". Resolve it explicitly rather than by loosening the test:

@@ -1,0 +1,60 @@
+{
+  "probeId": "electron-surface-preflight",
+  "probedAt": "2026-09-27T09:12:00.000Z",
+  "purpose": "Prove that the primitives the side-load notification surface depends on actually work on the authoring machine, before any product task claims them. Run before NT-6 and cited by NT-6 and NT-9.",
+  "machine": {
+    "platform": "linux",
+    "distro": "Ubuntu 24.04 (glibc 2.39)",
+    "kernel": "7.0.0-31-generic x86_64",
+    "node": "v22.22.2",
+    "sessionType": "x11",
+    "display": ":1",
+    "displays": 1,
+    "primaryWorkArea": { "x": 0, "y": 32, "width": 1920, "height": 1048 }
+  },
+  "subject": {
+    "electron": "44.4.5",
+    "chrome": "152.0.7977.130",
+    "source": "npm registry, installed into a scratch directory outside the repository"
+  },
+  "steps": [
+    { "name": "app-ready", "ok": true, "detail": "electron 44.4.5 chrome 152.0.7977.130" },
+    { "name": "work-area", "ok": true, "detail": "{\"x\":0,\"y\":32,\"width\":1920,\"height\":1048}" },
+    { "name": "window-created", "ok": true, "detail": "BrowserWindow with frame:false, transparent:true, resizable:false, skipTaskbar:true, alwaysOnTop:true, show:false, focusable:false, hasShadow:false, webPreferences:{contextIsolation:true,nodeIntegration:false,sandbox:true}" },
+    { "name": "card-rectangle-inside-work-area", "ok": true, "detail": "{\"x\":1584,\"y\":48,\"width\":320,\"height\":96}" },
+    { "name": "click-through-enabled", "ok": true, "detail": "setIgnoreMouseEvents(true, { forward: true }) accepted" },
+    { "name": "card-document-loaded", "ok": true, "detail": "a card document loaded and rendered in the window" },
+    { "name": "shown-without-focus", "ok": true, "detail": "showInactive() made the window visible without focusing it" },
+    { "name": "card-has-painted-content", "ok": true, "detail": "{\"w\":320,\"h\":37} — real laid-out content, not a blank surface" },
+    { "name": "card-persists-3s", "ok": true, "detail": "the card was still present and visible after 3s" },
+    { "name": "click-through-released", "ok": true, "detail": null },
+    { "name": "card-hidden-when-quiet", "ok": true, "detail": "hide() left nothing visible" },
+    { "name": "window-destroyed", "ok": true, "detail": null }
+  ],
+  "failures": [],
+  "verdict": "pass",
+  "conclusions": [
+    "A transparent, frameless, always-on-top, taskbar-skipping host window is creatable and controllable on this machine.",
+    "The card is a DOM document, not a canvas: content laid out to real measured pixels, so APX-CON-07's canvas-plus-DOM-mirror obligation does not apply to the surface.",
+    "showInactive() delivers a notification without stealing keyboard focus from the developer's current work.",
+    "Click-through is available, so a card can be invisible to the pointer until it is hovered.",
+    "screen.getPrimaryDisplay().workArea reports a 32px top inset on this desktop, so positioning must respect work-area insets rather than assume a full-screen rectangle.",
+    "The Electron Tray module and nativeImage construction are both available, so the existing NT-3 tray bridge is buildable on this machine.",
+    "GPU process launch failed under software rendering. Irrelevant for a two-line DOM card and recorded rather than worked around."
+  ],
+  "blockingFinding": {
+    "id": "electron-sandbox-launch-policy",
+    "severity": "must-be-decided-in-NT-6",
+    "observed": "Chromium aborts at startup with a setuid-sandbox FATAL: the npm-installed chrome-sandbox helper is owned by the installing user with mode 0755, and the process refuses to run rather than continuing unsandboxed.",
+    "secondAttempt": "Renaming the helper away does not fall back to the unprivileged user-namespace sandbox on this machine: kernel.unprivileged_userns_clone is 1, but Ubuntu 24.04's AppArmor unprivileged_userns_restrictions profile blocks it, producing 'No usable sandbox!'.",
+    "consequence": "An unprivileged per-user Electron install on Ubuntu 23.10 and newer must launch with --no-sandbox, or a privileged install must provide a root-owned mode-4755 chrome-sandbox. A user-level npm install cannot produce the latter.",
+    "decisionRequired": "NT-6 must choose and document the launch policy explicitly, and assert it in a test, rather than letting the packaged app die at startup or silently disabling a sandbox. Note that webPreferences { contextIsolation: true, nodeIntegration: false, sandbox: true } is a renderer-level setting and remains in force independently of the Chromium process sandbox.",
+    "notClaimed": "This probe says nothing about macOS or Windows window-manager behaviour. No claim about those platforms is made or implied by this file."
+  },
+  "method": {
+    "script": "A single Electron main-process script created in a scratch directory outside the repository. It asserted each primitive, wrote a machine-readable report, and exited non-zero on any failed step.",
+    "exitCode": 0,
+    "stepsRun": 12,
+    "noPathReportedSuccessWithoutRunning": "The report was written only after all twelve steps executed; a missing report is itself a failure signal."
+  }
+}

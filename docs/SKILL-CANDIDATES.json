@@ -67,11 +67,11 @@
         "qa-engineer"
       ],
       "action": "extend",
-      "reason": "The existing package covers ADRs, user and administrator guides, changelog and release notes, but not the artefacts this project actually repeats: docs/runbooks/notify-platforms.md and docs/runbooks/copilot-support.md must state explicitly which behaviour is not live-verified on the authoring machine, eight human gates write docs/reviews/*.json verdicts against a fixed acceptance shape, and docs/research/copilot-acp-probe.md must distinguish an absent signal from an untriggered one and from an unclear one. The honesty rules are project-specific and additive, so the existing package is extended rather than replaced or duplicated."
+      "reason": "The existing package covers ADRs, user and administrator guides, changelog and release notes, but not the artefacts this project actually repeats: docs/runbooks/notification-surface.md and docs/runbooks/copilot-support.md must state explicitly which behaviour is not live-verified on the authoring machine, and the withdrawn NT-4 and NT-5 gates are the precedent for recording a platform path as abandoned rather than outstanding, seven human gates write docs/reviews/*.json verdicts against a fixed acceptance shape, and docs/research/copilot-acp-probe.md must distinguish an absent signal from an untriggered one and from an unclear one. The honesty rules are project-specific and additive, so the existing package is extended rather than replaced or duplicated."
     },
     {
       "name": "human-review-gate",
-      "description": "A repeatable procedure for running and recording the project's eight human review gates across design, hub safety, notification behaviour, adapter reality, dashboard journey, operations and the Copilot authorisation decision.",
+      "description": "A repeatable procedure for running and recording the project's human review gates across design, hub safety, adapter reality, dashboard journey, operations and the Copilot authorisation decision, plus the scripted notification-surface probe that replaced the two per-platform notification gates.",
       "consumers": [
         "qa-engineer"
       ],

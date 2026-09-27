@@ -3,10 +3,11 @@
 ## 1. Overview
 
 **Product Name:** agent-ping
-**Summary:** A local-only notification surface that watches long-lived coding-agent sessions across every repository on one machine and tells the developer when a session is blocked on them, when it finished real work, and what else happened, without ever becoming the thing demanding attention.
+**Summary:** A local-only notification surface that watches long-lived coding-agent sessions across every repository on one machine and tells the developer when a session is blocked on them, when it finished real work, and what else happened, without ever becoming the thing demanding attention. The notification is a card agent-ping renders in its own window; it is never handed to the operating system's notification service.
 **Target Platform:** Linux, macOS and Windows desktops, single user, single machine, loopback only.
-**Key Constraints:** Node 22+ and TypeScript only; read-only except one ack route; no conversation content stored or transmitted; ACP as the connector interface contract.
+**Key Constraints:** Node 22+ and TypeScript only; read-only except one ack route; no conversation content stored or transmitted; ACP as the connector interface contract; one surface implementation for all three platforms.
 **Historical Sources:** [docs/IDEA.md](IDEA.md) (idea of record, preserved unchanged), [docs/research/model-inventory.json](research/model-inventory.json) (local model inventory, not a requirement source)
+**Delivery Decision:** [ADR-012](adr/ADR-012-surface-is-rendered-by-agent-ping.md) supersedes the original "notify through the platform" decision in ADR-009.
 
 ---
 
@@ -14,6 +15,7 @@
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
+| 1.1 | 2026-09-27 | Track change decided with the user | Notification delivery moved from the platform notification services to a surface agent-ping renders itself. `notify-send`, `osascript` and the PowerShell toast are abandoned; see [ADR-012](adr/ADR-012-surface-is-rendered-by-agent-ping.md). Goals G-1, G-4, G-5, G-6 and every non-goal except the platform-integration one survive unchanged; the delivery *mechanism* behind them does not. |
 | 1.0 | 2026-09-26 | forge-auto-build-prd, decided with the user | Initial vision authored from docs/IDEA.md |
 
 ---
@@ -25,7 +27,7 @@
 - G-1 Surface a blocked session the moment it blocks, and make "something is pending" impossible to lose.
 - G-2 Cover every repository from one global install, with no per-repository setup and no registry to drift.
 - G-3 Answer "which of my projects is asking for me" on an on-demand PixiJS dashboard grouped by repository.
-- G-4 Stay quiet: no sound, no repeat timers, no per-subtask firing, no always-on window in v1.
+- G-4 Stay quiet: no sound, no repeat timers, no per-subtask firing, and no always-*visible* surface. The notification host window exists for as long as the hub runs and draws nothing, occupying no screen space, unless a card is actually showing.
 - G-5 Remain observably read-only and content-free, so an unauthenticated loopback port cannot become a remote control.
 - G-6 Survive hub restarts, logins and harness restarts without losing a pending block.
 
@@ -37,7 +39,8 @@
 - Approving permissions, sending prompts or any other in-page agent control.
 - Transcript history, conversation search, or any stored prompt, response or tool output.
 - Sound of any kind.
-- An always-on-top ambient window (deferred, not rejected).
+- A persistently **visible** always-on-top panel: the promotion path if the badge and the card prove too easy to miss. A topmost host window that renders nothing and occupies no screen space is not what this non-goal excludes, and is not in tension with it.
+- Integration with the operating system's notification service, notification centre, or focus-assist behaviour on any platform. The surface is rendered by agent-ping.
 - Harnesses beyond opencode and GitHub Copilot CLI.
 - Mobile or remote clients of any kind.
 
@@ -86,7 +89,7 @@ Verified against vendor sources on 2026-09-26. Details and citations live with t
 |-----------|--------|---------|----------|
 | Runtime | Node.js | 22.23.3 (LTS line; local 22.22.2) | npm registry |
 | Language | TypeScript | 7.0.2 (latest stable) | npm registry |
-| Shell and tray host | Electron | 44.4.5 (requires Node >= 22.12.0) | npm registry |
+| Notification surface, tray host and shell | Electron | 44.4.5 (requires Node >= 22.12.0), a **runtime** dependency, not a build-time one | npm registry; window primitives live-verified on the authoring machine |
 | Dashboard renderer | PixiJS | 8.21.0 | npm registry |
 | Renderer build | Vite | 8.3.1 | npm registry |
 | Unit and integration tests | Vitest | 5.0.2 (requires Node ^22.12.0) | npm registry |
@@ -97,13 +100,15 @@ Verified against vendor sources on 2026-09-26. Details and citations live with t
 | opencode plugin types | @opencode-ai/plugin | 1.18.32, matching local opencode 1.18.32 | npm registry |
 | opencode client | @opencode-ai/sdk | 1.18.32 | npm registry |
 | ACP client | @agentclientprotocol/sdk | 1.5.0 (protocol version 1) | npm registry |
-| Linux notifications | notify-send via libnotify | system package, present locally | local system |
+| Notification rendering | Plain DOM in an Electron host window; no canvas, no OS notification API | part of the Electron dependency | [docs/research/electron-surface-preflight.json](research/electron-surface-preflight.json) |
 | Autostart | systemd user unit, launchd agent, Windows Startup entry | platform facilities | local system |
+
+Electron moved from a build-time consideration to a load-bearing runtime dependency in version 1.1: the tray badge, the notification card and the dashboard window all run inside it. Its Chromium process-sandbox launch policy on an unprivileged per-user install is an open question recorded in §16, not an assumption.
 
 No dependency in this table is deprecated or end-of-life. Where a version could not be verified it is recorded in Open Questions rather than guessed.
 
 ```forge-requirement
-{"id":"APX-CON-06","kind":"constraint","text":"Platform support is Linux, macOS and Windows in v1. Linux is the only live-verified path on the authoring machine; the macOS and Windows implementations ship with scripted checks and documented manual steps, and their human review gate can only be completed on those platforms."}
+{"id":"APX-CON-06","kind":"constraint","text":"Platform support is Linux, macOS and Windows in v1, served by one notification surface implementation rather than one per platform. Linux is the only live-verified path on the authoring machine; per-platform differences are limited to documented window-manager behaviour, shipped with scripted checks and documented manual steps, and no macOS or Windows claim is made from a Linux machine."}
 ```
 
 | ID | Kind | Priority |
@@ -119,11 +124,13 @@ src/
   domain/        event model, classification, pending lifecycle, dedupe
   storage/       sqlite schema, migrations, store, retention, counters
   hub/           electron main: loopback http, ingest, sse, delivery, tray wiring
-  notify/        notifier interface, linux, macos, windows implementations
+  notify/        notifier interface, class policy, and the self-rendered surface
+                 (host window, card model, card view, lifetime policy)
   dashboard/     pixijs renderer, dom mirror, mock prototype data
   plugin/        opencode global plugin and acp copilot adapter
   cli/           agent-ping install, uninstall, doctor, status
-scripts/         live verification scripts (opencode session, autostart, e2e)
+scripts/         live verification scripts (opencode session, notification surface,
+                 autostart, e2e)
 tests/           unit, integration and end-to-end suites mirroring src/
 docs/reviews/    human review evidence files
 ```
@@ -230,7 +237,7 @@ Budgets and cross-cutting rules are shared constraints so every feature resolves
 ```
 
 ```forge-requirement
-{"id":"APX-CON-04","kind":"constraint","text":"No sound in v1: no audio, no terminal bell, no notification sound on any platform."}
+{"id":"APX-CON-04","kind":"constraint","text":"No sound in v1: no audio, no terminal bell, and no sound capability anywhere on the notification path. Because agent-ping renders the card itself rather than handing it to a platform notification service, silence is a property of this product's own renderer rather than a property the operating system may override."}
 ```
 
 | ID | Kind | Priority |
@@ -276,7 +283,8 @@ Product-level acceptance:
 
 - opencode 1.18.32 plugin API and its event names, plus the local HTTP API used by the polling fallback.
 - GitHub Copilot CLI 1.0.83 and ACP protocol version 1, both gated by a live spike before any adapter work.
-- Platform notification and tray facilities: libnotify on Linux, launchd and the notification centre on macOS, the notification area and Startup folder on Windows.
+- Electron 44.4.5 as a runtime dependency: its `BrowserWindow` and `screen` modules for the notification surface and the dashboard window, and its tray and `nativeImage` facilities for the badge. A per-user install's Chromium process-sandbox launch policy on Ubuntu 23.10 and newer is unresolved and recorded in Open Questions.
+- The platform status-area or notification-area facilities for the tray icon, which remain an OS integration by design because a status icon is presence, not notification.
 - Node.js 22 LTS as the floor for Electron, Vitest and better-sqlite3.
 
 ### 12.2 Risks
@@ -284,8 +292,9 @@ Product-level acceptance:
 | Risk | Impact | Mitigation |
 |------|--------|------------|
 | Copilot exposes no idle or permission signal | "Needs You" degrades to a heuristic on one harness | Spike first, gate decision recorded before any adapter task |
-| Non-dismissible toast behaviour differs per platform | A block could stay invisible on macOS or Windows | Badge count is the durable signal; per-platform implementations ship with scripted checks and a gate that only completes on that platform |
-| Electron footprint and autostart behaviour | A 150 MB dependency for a notification daemon | Single package, no bundled Chromium download beyond the default, autostart is a user-level unit with no root |
+| The notification surface has never run, because Electron was not a dependency at all | The tray badge and the card could both be unbuildable on the authoring machine | A pre-flight probe proved every window primitive on the authoring machine ([docs/research/electron-surface-preflight.json](research/electron-surface-preflight.json)); NT-6 makes the launch policy an explicit tested decision and NT-9 drives a real window from a script |
+| Transparent, always-on-top window compositing differs per window manager | The card could be mispositioned, invisible, or steal focus on one platform | The card is positioned inside the display work area rather than the screen rectangle; `showInactive` avoids focus theft; a missing display or a failed window is a loud failure in the verification script, never a skip |
+| Electron footprint and autostart behaviour | A 150 MB dependency for a notification daemon | Single package, no bundled Chromium download beyond the default, autostart is a user-level unit with no root, and the dependency is now explicit rather than assumed |
 | Playwright browser download in a locked environment | End-to-end journey evidence unavailable | The dashboard is also served over loopback, so the journey can be driven in an existing browser; script failure is explicit, never silently skipped |
 | TypeScript 7 release line | Tooling incompatibility with the test runner or bundler | Pin the exact verified version and record the fallback in Open Questions |
 | Plugin API drift on a future opencode release | Silent loss of events | Version check in `doctor`, breadcrumb on delivery failure, pinned plugin package version |
@@ -294,8 +303,8 @@ Product-level acceptance:
 
 ## 13. Future Considerations
 
-- An always-on-top ambient panel, promoted from deferred to real only if the badge and toast prove too easy to miss.
-- Sound, once the signal is trusted, as an opt-in per class.
+- A persistently visible always-on-top panel, promoted from deferred to real only if the badge and the card prove too easy to miss.
+- Sound, once the signal is trusted, as an opt-in per class. The card is rendered by this product, so sound becomes a decision rather than a platform negotiation.
 - Additional harnesses that speak ACP, each additive through the connector interface.
 - Session-level grouping beyond the repository short name once multiple windows per repo become common.
 - Rich history filtering, still without content.
@@ -341,9 +350,11 @@ Live Dashboard also builds on Dashboard Design Prototype.
 | Needs You | Class for a block; the only class that leaves the app |
 | Finished | Class for a session that went idle after doing real work |
 | FYI | In-app-only class for errors, retries, long tool calls, compaction and token burn |
+| Card | The notification this product renders itself, in its own always-on-top window: two lines, the repository short name and one sentence. Never delivered through a platform notification service, notification centre or focus-assist mechanism |
+| Surface | The card and the machinery that draws it: the host window, the card model, the DOM view and the lifetime policy |
 | Pending item | A needs-you block that is neither resolved by the harness nor acknowledged |
 | Badge | The pending count drawn on the tray or menu-bar icon |
-| Hub | The local daemon that owns the store, the loopback API, delivery and the tray |
+| Hub | The local daemon that owns the store, the loopback API, delivery, the surface and the tray |
 | Adapter | A connector translating one harness's events into the normalized envelope |
 | Envelope | The normalized event record: harness, repo, session, class, subtype, timestamps |
 | Sidecar | An observer that can be killed and restarted without loss |
@@ -356,8 +367,8 @@ Live Dashboard also builds on Dashboard Design Prototype.
 | # | Question | Default Assumption |
 |---|----------|--------------------|
 | 1 | Does the dashboard design review approve the prototype, or does it force a layout change? | Prototype is accepted with minor changes; a rejection reopens the design feature before Live Dashboard starts |
-| 2 | Which exact libnotify hint keeps a toast resident on the target desktops? | `notify-send` urgency critical plus the resident hint; verified by the live notification gate, not assumed |
-| 3 | Which macOS and Windows mechanism delivers a non-auto-dismissing toast? | macOS `osascript` notification centre call, Windows PowerShell toast; each verified only on its own platform, badge carries the durable signal |
+| 2 | ~~Which exact libnotify hint keeps a toast resident on the target desktops?~~ | **Closed in 1.1.** No platform notification mechanism is used, so there is no hint to choose. Replaced by the surface's own lifetime policy, `NT-FR-02` |
+| 3 | ~~Which macOS and Windows mechanism delivers a non-auto-dismissing toast?~~ | **Closed in 1.1.** No platform notification mechanism is used on any platform. Per-platform variance is now limited to window-manager behaviour, covered by `APX-CON-06` |
 | 4 | Are the opencode HTTP fallback route shapes and payload fields as documented? | Adapter parses defensively and the live script fails loudly on an unexpected shape |
 | 5 | Are ACP notification names for permission and idle as expected? | Spike records the observed names verbatim and the gate decision binds the mapping to that evidence |
 | 6 | Does TypeScript 7.0.2 work cleanly with Vitest 5 and the chosen build path? | Pin 7.0.2; fall back to the 5.9.x line only if a concrete incompatibility appears, and record it |
@@ -367,6 +378,9 @@ Live Dashboard also builds on Dashboard Design Prototype.
 | 10 | Default loopback port and collision behaviour? | Fixed default with automatic next-free fallback, the live port written to a runtime file the plugin reads |
 | 11 | Can the badge be drawn for arbitrary counts on every desktop? | Counts above 99 render as a capped marker; the count itself is always in the dashboard and `status` |
 | 12 | Does the Copilot gate authorise a heuristic "Needs You" for v1? | Default is deferral: v1 ships opencode only unless the spike proves the signals exist |
+| 13 | What Chromium process-sandbox launch policy does an unprivileged per-user install use? | The pre-flight found that the npm-installed `chrome-sandbox` helper is not usable and the unprivileged user-namespace fallback is blocked by AppArmor on Ubuntu 24.04, so a per-user install must launch with `--no-sandbox`. NT-6 must choose and assert that policy explicitly rather than let the packaged app abort at startup. `webPreferences` `sandbox: true` is a renderer setting and is unaffected |
+| 14 | Does a transparent always-on-top window composite correctly under GNOME, KDE and Windows on every target desktop? | Unknown, and the honest answer is now cheap: the surface is one code path, so only the window manager varies. NT-9 proves it on the authoring machine and the runbook records what remains unobserved elsewhere |
+| 15 | Should the historical counter name `toast_deliveries` be renamed now that no toast exists? | Deferred. Renaming a persisted counter pulls the content-free schema guard into this track change for no functional gain; ADR-012 records it as a known misnomer and the rename is its own change |
 
 ---
 
@@ -396,7 +410,7 @@ One owning definition per ID. Feature documents reference these IDs; they never 
 | DP-FR-01..08 | requirement | Dashboard Design Prototype | none, terminal feature |
 | EL-FR-01..11 | requirement | Event Model and Durable Log | none, terminal feature |
 | HC-FR-01..10 | requirement | Hub Core and Delivery Policy | none, terminal feature |
-| NT-FR-01..09 | requirement | Notification and Tray Presence | none, terminal feature |
+| NT-FR-01..11 | requirement | Notification and Tray Presence | none, terminal feature |
 | OA-FR-01..09 | requirement | opencode Plugin Adapter | none, terminal feature |
 | LD-FR-01..11 | requirement | Live Dashboard | none, terminal feature |
 | IO-FR-01..09 | requirement | Install Autostart and Operations | none, terminal feature |

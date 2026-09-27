@@ -9,12 +9,18 @@ signal rather than a restyle.
 
 ## The four states
 
-| Class | Icon | Text label | Leaves the app | Badge |
-|-------|------|------------|----------------|-------|
-| needs-you | filled pause or hand glyph | "Needs you" | yes, one toast | yes |
-| finished | check glyph | "Finished" | yes, self-expiring toast | no |
+| Class | Icon | Text label | Leaves the dashboard | Badge |
+|-------|------|------------|---------------------|-------|
+| needs-you | filled pause or hand glyph | "Needs you" | yes, one card | yes |
+| finished | check glyph | "Finished" | yes, self-expiring card | no |
 | running | hollow ring or chevron | "Running" | no | no |
 | fyi | dot or info glyph | the subtype in words | no | no |
+
+"Leaves the dashboard" means the state produces a card this product renders in its own
+window. It does not mean a platform notification service is involved: since ADR-012 there
+is no `notify-send`, no notification centre and no per-platform path, so a state that
+leaves the dashboard behaves identically on every platform. A renderer for the card
+reads this same table rather than inventing its own vocabulary.
 
 `fyi` carries a subtype - error, retry, long-tool-call, compaction, token-burn - and the label
 is the subtype in words, not the literal string "fyi". A screen-reader user gets
@@ -22,7 +28,7 @@ is the subtype in words, not the literal string "fyi". A screen-reader user gets
 
 Two things follow from the class policy and belong in the encoder, not in a caller:
 
-- `fyi` is dashboard-only. It must never produce a toast or a badge change.
+- `fyi` is dashboard-only. It must never produce a card or a badge change.
 - Information-only rows are visually quieter than needs-you rows without relying on hue alone;
   the icon glyph and the label text carry the difference.
 
@@ -58,10 +64,10 @@ Keep the table the single source; both renderers read it.
 
 ```ts
 export const STATE_ENCODING = {
-  'needs-you': { icon: 'pause-filled', label: 'Needs you', exitsApp: true, badge: true },
-  finished:   { icon: 'check',        label: 'Finished',  exitsApp: true, badge: false },
-  running:    { icon: 'ring-hollow',  label: 'Running',   exitsApp: false, badge: false },
-  fyi:        { icon: 'info-dot',     label: subtypeLabel, exitsApp: false, badge: false },
+  'needs-you': { icon: 'pause-filled', label: 'Needs you', leavesDashboard: true, badge: true },
+  finished:   { icon: 'check',        label: 'Finished',  leavesDashboard: true, badge: false },
+  running:    { icon: 'ring-hollow',  label: 'Running',   leavesDashboard: false, badge: false },
+  fyi:        { icon: 'info-dot',     label: subtypeLabel, leavesDashboard: false, badge: false },
 } as const;
 ```
 
@@ -79,9 +85,9 @@ it('encodes every state with an icon and a text label', () => {
   }
 });
 
-it('fyi never exits the app', () => {
-  expect(STATE_ENCODING.fyi.exitsApp).toBe(false);
-  expect(STATE_ENCODING['needs-you'].exitsApp).toBe(true);
+it('fyi never leaves the dashboard', () => {
+  expect(STATE_ENCODING.fyi.leavesDashboard).toBe(false);
+  expect(STATE_ENCODING['needs-you'].leavesDashboard).toBe(true);
 });
 ```
 

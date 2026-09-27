@@ -65,9 +65,9 @@ Two promises are yours alone to keep: the hub is observably read-only except for
 
 #### HC-5 - delivery policy, restart replay, clean shutdown
 
-17. Implement `src/hub/delivery.ts`: decide from the classified event what must be delivered, exactly once per event, and hand it to the notifier boundary. Implement no platform notifier here.
+17. Implement `src/hub/delivery.ts`: decide from the classified event what must be delivered, exactly once per event, and hand it to the notifier boundary. Implement no notification surface here; since ADR-012 the boundary's other end is a card this product draws rather than a platform notification service, and the request and outcome shapes are unchanged.
 18. On start, replay unacknowledged pending items into the pipeline **exactly once**, so a hub killed mid-block delivers it again after restart (HC-FR-07).
-19. Track delivery outcomes per event for diagnostics and extend the health route to report database, server and delivery status for the doctor command; a forced notifier failure must be visible there.
+19. Track delivery outcomes per event for diagnostics and extend the health route to report database, server and delivery status for the doctor command; a forced delivery failure must be visible there. Note for whoever comes next: a refused class resolves through this boundary today, which inflates the delivered count, and NT-8 fixes it as a suppressed outcome rather than a delivery.
 20. Implement `src/hub/lifecycle.ts`: on a termination signal, refuse new events, flush counters, close the database, remove the runtime file, and exit with no orphaned listener (HC-FR-10).
 21. Write `tests/hub/delivery.test.ts` and `tests/hub/lifecycle.test.ts` covering single delivery, kill-and-restart replay exactly once, health surfacing a forced notifier failure, and full shutdown ordering.
 
@@ -95,7 +95,7 @@ Two promises are yours alone to keep: the hub is observably read-only except for
 - **Node.js 22 LTS or newer with TypeScript and npm only** (APX-CON-05).
 - No telemetry leaves the machine and no conversation content appears in any payload you serve (APX-CON-12, APX-FR-01).
 - Do not add authentication, a remote listener, a hosted component, or any second write route. These are explicit non-goals in PRD 3.2.
-- Do not implement a platform notifier or any tray rendering; both belong to the notification engineer. You mount the tray and hand delivery across the boundary.
+- Do not implement the notification surface or any tray rendering; both belong to the notification engineer. You mount both from the composition root and hand delivery across the boundary. NT-8 changes `src/hub/delivery.ts` to classify a refused class as suppressed; agree that with the notification engineer rather than editing around it.
 - Do not make ingest do the connector's job: no retry loop, no waiting, no blocking on a wedged peer.
 
 ---

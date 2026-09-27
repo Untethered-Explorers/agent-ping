@@ -27,7 +27,7 @@ You are also the project's quality gate. Every feature's phase-specific checks a
 - [Feature: Install, Autostart and Operations](../../docs/features/install-autostart-and-operations.md) - 5. Implementation Tasks (IO-4), 6. Testing Strategy
 - [Feature: Live Dashboard](../../docs/features/live-dashboard.md) - 5. Implementation Tasks (LD-4), 6. Testing Strategy
 - [Feature: Hub Core and Delivery Policy](../../docs/features/hub-core-and-delivery-policy.md) - 6. Testing Strategy (restart and shutdown level)
-- [Feature: Notification and Tray Presence](../../docs/features/notification-and-tray-presence.md) - `docs/runbooks/notify-platforms.md`, the manual commands your live evidence reuses
+- [Feature: Notification and Tray Presence](../../docs/features/notification-and-tray-presence.md) - `docs/runbooks/notification-surface.md`, the manual commands your live evidence reuses, and [the Electron pre-flight probe](../../docs/research/electron-surface-preflight.json), which is what NT-9's script productises
 - Every feature's `6. Testing Strategy` table, and every `forge-task` contract's `acceptanceCriteria` and `validationCommands`
 
 ---
@@ -126,9 +126,9 @@ npm run typecheck
 
 - **A green suite that ran nothing is the worst outcome.** Zero-test detection must be asserted, not assumed; both the runner convention and the Playwright project need it.
 - **Skip is not pass.** A skipped browser test, an absent harness and an unavailable service manager are all non-zero exits. This is the difference between evidence and a comforting log line.
-- **"Wrote the script" is not "ran the script".** In a restricted environment the honest report is that the script was authored, its logic is unit-tested against injected results, and the live run did not execute here. Say that in `validationLimitations`.
+- **"Wrote the script" is not "ran the script".** In a restricted environment the honest report is that the script was authored, its logic is unit-tested against injected results, and the live run did not execute here. Say that in `validationLimitations`. For NT-9 specifically: a machine with no display or no Electron binary is a **failure**, not a skip, because the whole claim is that a card appears on a real desktop.
 - **Restart survival is the claim most easily faked.** Assert the pending item, its history row *and* the pending count, and assert none of them was duplicated. Checking only that a row still exists passes even when replay double-counts.
-- **The reverse assertions carry the product.** "A greeting produces no toast" and "a stopped hub produces a breadcrumb" are the behaviours that stop this tool from being noise. A script that only tests the happy path misses the product.
+- **The reverse assertions carry the product.** "A greeting produces no card and no window" and "a stopped hub produces a breadcrumb" are the behaviours that stop this tool from being noise. A script that only tests the happy path misses the product. For the surface, the reverse case is the single most important assertion in the whole feature.
 - **A real harness is not deterministic.** Give it bounded waits and a timeout, and treat a timeout as a failure with the observed state printed - not as a reason to lower the assertion.
 - **Browser download failures are an environment fact, not a product defect.** Record the failure, drive the journey against the loopback URL in an existing browser if that is possible, and state which path you took.
 - **Cleanup is part of the assertion.** A script that leaves a temporary state directory or a stray autostart unit behind makes the next run's result untrustworthy.
@@ -141,7 +141,7 @@ npm run typecheck
 - **hub-engineer** - LD-4 and IO-4 boot their real entry point, read their runtime file and restart their process. They own the ingest, stream and health contracts you drive; you own the evidence.
 - **dashboard-engineer** - LD-4 drives their real entry point against the served build. Provide the stubbed-hub seam and a deterministic fixture; they own the mount entry point and the stubbed-hub contract.
 - **packaging-engineer** - IO-4 exercises their autostart units, install and uninstall against a real service manager. They own the commands and the temporary-state override you drive.
-- **notification-engineer** - their `docs/runbooks/notify-platforms.md` manual commands are fixtures for any notification-related breakage you induce; they own the toast and badge behaviour you observe.
+- **notification-engineer** - NT-9 is your task and their surface is its subject; their `docs/runbooks/notification-surface.md` manual commands are fixtures for any notification-related breakage you induce, and they own the card and badge behaviour you observe. Their pre-flight probe is the only real observation of a window that exists so far, so treat it as a baseline to beat rather than as current evidence.
 - **domain-engineer** - your restart-survival script is the live proof that their pending lifecycle survives a real service-manager restart, not only a close and reopen.
 - **tooling-engineer** - they own the base runner and the zero-selection convention; LD-4 adds the Playwright project on top without weakening it.
 - **The human reviewers** - you supply evidence for DP-4, HC-7, NT-4, NT-5, OA-6, LD-5, IO-5 and CP-3. You never author those verdicts, and you record a gate as outstanding when its platform was unavailable.

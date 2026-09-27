@@ -222,9 +222,9 @@ Task review table, kept outside the phase contracts as authoring evidence.
 {
   "id": "OA-5",
   "title": "Write the live opencode verification script",
-  "description": "Write one repository script that proves the adapter against the real harness rather than a mock. It installs the plugin into a temporary configuration directory, starts the hub against a temporary state directory, launches a real opencode session that reaches a permission decision and then goes idle, and asserts the hub received a needs-you envelope, a resolution and one finished envelope with the correct repository short name. It must also assert the reverse: a session that opens, greets and closes produces no finished envelope, and a hub that is not running produces a breadcrumb rather than a silent drop. Print a machine-readable summary of what was observed and exit non-zero on any failed assertion, with no path that reports success when nothing ran. Cover the script's own logic with a test that drives it against a stub harness. Exclude human judgement and any code change to the product.",
+  "description": "Write one repository script that proves the adapter against the real harness rather than a mock. It installs the plugin into a temporary configuration directory, starts the hub against a temporary state directory, launches a real opencode session that reaches a permission decision and then goes idle, and asserts the hub received a needs-you envelope, a resolution and one finished envelope with the correct repository short name. It must also assert the reverse: a session that opens, greets and closes produces no finished envelope and no card on the notification surface, and a hub that is not running produces a breadcrumb rather than a silent drop. Print a machine-readable summary of what was observed and exit non-zero on any failed assertion, with no path that reports success when nothing ran. Cover the script's own logic with a test that drives it against a stub harness. Exclude human judgement and any code change to the product.",
   "ownerAgent": "qa-engineer",
-  "dependencies": ["OA-2", "OA-3", "OA-4", "NT-1"],
+  "dependencies": ["OA-2", "OA-3", "OA-4", "NT-8"],
   "expectedOutputs": ["scripts/verify-opencode-live.mjs", "tests/scripts/verify-opencode-live.test.ts"],
   "validationCommands": ["npm test -- tests/scripts/verify-opencode-live.test.ts", "npm run typecheck"],
   "contract": {
@@ -236,7 +236,7 @@ Task review table, kept outside the phase contracts as authoring evidence.
       "A test drives the script against a stub harness and asserts it fails when the expected envelopes are missing",
       "A test asserts the script exits non-zero when the hub is absent and records the breadcrumb instead of reporting success",
       "The script asserts a permission-then-idle session produces a needs-you envelope, a resolution and exactly one finished envelope",
-      "The script asserts an open-greet-close session produces no finished envelope"
+      "The script asserts an open-greet-close session produces no finished envelope and no card on the notification surface"
     ],
     "constraints": ["Never invent passing results, tool availability, deployed resources, human review or compliance"],
     "constraintRefs": ["docs/PRD.md#APX-CON-03"],
@@ -251,8 +251,8 @@ Task review table, kept outside the phase contracts as authoring evidence.
 {
   "id": "OA-6",
   "title": "Confirm a real opencode session is caught end to end",
-  "description": "Human review of the adapter against the real harness on a real repository. Install the plugin globally, start the hub, and run an ordinary opencode session that asks for a permission decision. Confirm from the harness's own interface and from the dashboard that exactly one toast appeared for the block, that the tray badge went to one, and that answering the permission cleared it without a second toast. Then run a session that does real work and confirm exactly one finished toast, and run a session that opens and closes without work and confirm nothing appeared at all. Finally stop the hub and confirm a blocked session leaves a visible breadcrumb rather than failing silently, and confirm the plugin does not measurably slow the session. Record every observation, the commands used and the verdict in the review file. Do not change code in this task.",
-  "dependencies": ["OA-5", "NT-4"],
+  "description": "Human review of the adapter against the real harness on a real repository. Install the plugin globally, start the hub, and run an ordinary opencode session that asks for a permission decision. Confirm from the harness's own interface and from the dashboard that exactly one card appeared on the notification surface for the block, that the tray badge went to one, and that answering the permission cleared it without a second card. Confirm also that the operating system's own notification centre showed nothing at all, because this product renders the card itself. Then run a session that does real work and confirm exactly one finished card, and run a session that opens and closes without work and confirm nothing appeared at all: no card, no window, no badge change, no history row. Finally stop the hub and confirm a blocked session leaves a visible breadcrumb rather than failing silently, and confirm the plugin does not measurably slow the session. Record every observation, the commands used and the verdict in the review file. Do not change code in this task.",
+  "dependencies": ["OA-5", "NT-9"],
   "expectedOutputs": [],
   "validationCommands": [],
   "contract": {
@@ -262,6 +262,7 @@ Task review table, kept outside the phase contracts as authoring evidence.
     "requirementRefs": ["docs/features/opencode-plugin-adapter.md#OA-FR-01", "docs/features/opencode-plugin-adapter.md#OA-FR-02", "docs/features/opencode-plugin-adapter.md#OA-FR-05", "docs/features/opencode-plugin-adapter.md#OA-FR-09"],
     "acceptanceCriteria": [
       "The reviewer ran a real session that asked for a permission decision and stated what appeared, how many times, and how the badge behaved",
+      "The reviewer confirmed the operating system's notification centre showed nothing, since the card is rendered by agent-ping rather than handed to the platform",
       "The reviewer ran a session that did real work and an open-greet-close session and stated the observed difference",
       "The reviewer stopped the hub, blocked a session, and confirmed a visible breadcrumb rather than a silent drop",
       "The reviewer recorded the commands used and a verdict, including any event the adapter failed to report"

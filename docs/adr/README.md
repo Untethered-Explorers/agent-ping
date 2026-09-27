@@ -21,11 +21,14 @@ own **Implementation state** line rather than leaving the gap to be discovered.
 The live build log, with every unverified check enumerated, is
 [docs/PROGRESS.md](../PROGRESS.md).
 
-Two records diverge from their original text, deliberately and with the reasoning
-recorded in place: the [ADR-004](ADR-004-three-loudness-classes.md) amendment
-that removed the needs-you repeat timer, and the
+Several records diverge from their original text, deliberately and with the
+reasoning recorded in place: the [ADR-004](ADR-004-three-loudness-classes.md)
+amendment that removed the needs-you repeat timer, the
 [ADR-007](ADR-007-single-node-typescript-toolchain.md) divergence table for the
-toolchain as actually installed.
+toolchain as actually installed, and the set of records amended on 2026-09-27 by
+[ADR-012](ADR-012-surface-is-rendered-by-agent-ping.md), which replaced delivery
+through the platform notification services with a surface this product renders
+itself.
 
 ## What belongs here
 
@@ -42,14 +45,15 @@ belongs in a feature document, not here.
 | [ADR-001](ADR-001-sidecar-not-supervisor.md) | agent-ping is a sidecar, never a supervisor | Accepted | Implemented |
 | [ADR-002](ADR-002-loopback-only-single-mutating-route.md) | Loopback-only hub with exactly one mutating route | Accepted | Implemented |
 | [ADR-003](ADR-003-never-store-conversation-content.md) | Never store or transmit conversation content | Accepted | Implemented |
-| [ADR-004](ADR-004-three-loudness-classes.md) | Three loudness classes, silent by default, no sound in v1 | Accepted | Implemented, with an amendment |
+| [ADR-004](ADR-004-three-loudness-classes.md) | Three loudness classes, silent by default, no sound in v1 | Accepted | Implemented, with amendments |
 | [ADR-005](ADR-005-acp-typed-connector-interface.md) | Connector interface specified in ACP terms | Accepted | Partial — the Copilot spike and its gate decision are owed |
 | [ADR-006](ADR-006-global-install-no-per-repo-registry.md) | One global install; no per-repository configuration or registry | Accepted | Partial — the install mechanism is built; the CLI and autostart units are not |
-| [ADR-007](ADR-007-single-node-typescript-toolchain.md) | Single toolchain: Node 22 + TypeScript, Electron main, PixiJS dashboard | Accepted | Partial — toolchain verified; Electron and the CLI are not yet installed |
+| [ADR-007](ADR-007-single-node-typescript-toolchain.md) | Single toolchain: Node 22 + TypeScript, Electron main, PixiJS dashboard | Accepted | Partial — toolchain verified; Electron is not yet a dependency and the CLI is not built |
 | [ADR-008](ADR-008-repository-short-name-identity.md) | Identity is the repository short name | Accepted | Implemented |
-| [ADR-009](ADR-009-on-demand-surface-no-always-on-window.md) | On-demand surface; no always-on window in v1 | Accepted | Partial — the on-demand half is built; the live dashboard is not |
+| [ADR-009](ADR-009-on-demand-surface-no-always-on-window.md) | On-demand surface; no always-on *visible* surface in v1 | Accepted, amended by ADR-012 | Partial — the on-demand half is built; the live dashboard and the card are not |
 | [ADR-010](ADR-010-delivery-failure-is-never-silent.md) | Delivery failure is never silent | Accepted | Implemented; not yet observed live |
 | [ADR-011](ADR-011-settle-dashboard-design-before-connectors.md) | Settle the dashboard design with a static prototype before connector work | Accepted | Fulfilled — the ordering held and the review approved |
+| [ADR-012](ADR-012-surface-is-rendered-by-agent-ping.md) | The notification surface is rendered by agent-ping, not by the platform | Accepted | Not started — the platform notifiers still exist and are removed by NT-8 |
 
 ## Status vocabulary
 
@@ -76,6 +80,9 @@ is the main way this directory could mislead a reader.
 - [docs/IDEA.md](../IDEA.md) — idea of record, preserved unchanged.
 - [docs/PRD.md](../PRD.md) — product requirements, traceability matrix, open questions.
 - [docs/features/](../features/) — the eight canonical feature documents.
+- [docs/research/electron-surface-preflight.json](../research/electron-surface-preflight.json)
+  — the live probe ADR-012's decision rests on, including the Chromium sandbox
+  finding that NT-6 must decide.
 
 There is no `CHANGELOG.md` and no release-notes directory, because there is no
 release. Those artifacts are created by the first tagged release, not before.

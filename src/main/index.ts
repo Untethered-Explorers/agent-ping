@@ -16,6 +16,14 @@
 //   8. the restart replay, with the socket bound and the port published
 //   9. the desktop shell: the tray icon, then the hub reporting `running`
 //
+// One step sits earlier than its neighbours and is deliberately so: the notification
+// surface host (4a, NT-6) is created before the delivery policy rather than beside the
+// tray, because NT-FR-04 says a desktop that refuses the card window must leave every
+// delivery recorded as `not-wired`, and a notifier wired before the refusal was known
+// could not be unwired again. It takes the live origin as a thunk for the same reason -
+// the port is not known until step 6 - so the window exists from the hub's start and the
+// card document is loaded with the first card.
+//
 // Each step exists so a later step cannot run in a half-started hub. If the store
 // will not open, nothing is listening and no file claims a port. If the port
 // cannot be bound, the runtime file is released rather than left advertising a hub
@@ -50,6 +58,16 @@
 // src/tray/badge.ts, its menu is two rows and has no suppression control in it, and its
 // click resolves the deep link the notifier builds. The icon goes down first in the
 // shutdown, because it reads the log this file closes.
+// The card surface is wired as well (NT-6): a frameless, transparent, always-on-top,
+// taskbar-skipping, unfocusable window, created here with `show: false` so it draws
+// nothing until a card exists, positioned inside the display *work area* rather than the
+// screen rectangle, and shown with `showInactive` so a card cannot take the keystroke the
+// developer is typing. The window is destroyed first in the shutdown, before the tray and
+// before the listener closes, because a card outliving the hub is a screen advertising a
+// block whose deep link can no longer be resolved. `electron` is a real dependency of
+// this package as of NT-6, and the Chromium process-sandbox launch policy is applied
+// explicitly before the app is ready rather than inherited from a default that aborts at
+// startup on a per-user install (src/notify/surface/electron-host.ts).
 // What remains deliberately absent is any route that can spawn, steer, interrupt, prompt
 // or approve anything inside a harness (APX-CON-08): the mutating set in
 // src/hub/server.ts is exactly two signatures, the append-only ingest route and the ack
@@ -132,6 +150,20 @@ import {
   type NotifierResolution,
 } from '../notify/registry.js'
 import {
+  applyChromiumLaunchPolicy,
+  createElectronSurfaceHost,
+  launchPolicyApplied,
+  surfaceDocumentUrl,
+  type BrowserWindowLike,
+  type ScreenLike,
+} from '../notify/surface/electron-host.js'
+import {
+  SurfaceWindowRefusedError,
+  type NotificationSurfaceHost,
+  type SurfaceHostBridge,
+} from '../notify/surface/host.js'
+import { DEFAULT_SURFACE_CORNER } from '../notify/surface/position.js'
+import {
   createDashboardRoute,
   startServer,
   DEFAULT_HUB_PORT,
@@ -183,6 +215,29 @@ export interface DesktopBridge {
    * cannot make (which session a click focuses, and when a badge is redrawn).
    */
   readonly tray?: TrayBridge
+  /**
+   * The platform's window surface, and the only way this product can draw a card
+   * (NT-6, NT-FR-04, ADR-012).
+   *
+   * Absent in a headless run, exactly as `tray` is, and the two are answered the same
+   * way: the hub runs without a card surface, which is a supported run rather than a
+   * degraded one, and nothing pretends a window is on a desktop. `agent-ping status`, a
+   * test and a verification script all read the loopback origin this process serves.
+   *
+   * Present, the composition root creates the host here rather than asking the desktop
+   * to mount it, for the same reason it builds the tray: the option set, the placement,
+   * the click-through direction and the load are decisions no platform gets to make, and
+   * the desktop's whole contribution is one window.
+   *
+   * It is mounted *before* the delivery policy is built rather than beside the tray,
+   * which is a deliberate ordering and the only ordering that makes NT-FR-04's last
+   * clause true: a desktop that refuses the window must leave every delivery recorded as
+   * `not-wired`, and a notifier wired before the refusal was known could not be unwired
+   * again. The host takes the live origin as a thunk for the same reason - the loopback
+   * port is not known until the socket is bound, and the card document is loaded with
+   * the first card rather than at mount.
+   */
+  readonly surface?: SurfaceHostBridge
   /** The origin the hub published, once it is serving. */
   onHubReady?(hub: RunningHub): void
 }
@@ -371,6 +426,24 @@ export interface RunningHub {
    */
   readonly tray: HubTray | null
   /**
+   * The notification surface host, once its window is created (NT-FR-04, NT-FR-10,
+   * ADR-012): the always-on-top, frameless, transparent, unfocusable window a card is
+   * painted into.
+   *
+   * Null in two different situations, and both are honest rather than stubbed. On a
+   * headless run there is no desktop to create a window on, which is a supported run: the
+   * tests, the CLI and the verification scripts read this hub's loopback origin without
+   * ever needing a card. And on a run whose desktop *refused* the window, where the
+   * diagnostic above says so and every delivery is recorded as `not-wired` - a missing
+   * card surface is never a lost block and never a delivery somebody was told about.
+   *
+   * Exposed for `doctor`, for NT-8's surface notifier and for NT-9's probe, and because
+   * the hub's own ordered shutdown has to destroy the window before the listener closes.
+   * Holding it grants nothing beyond showing and hiding a card: it cannot be moved, made
+   * audible, or pointed at anything but this hub (APX-CON-08).
+   */
+  readonly surface: NotificationSurfaceHost | null
+  /**
    * The security boundary: this install's write token, the header it travels in, and
    * where the token file is. In-process only - the token is on no read route, in no
    * response body and in no served asset (HC-FR-06).
@@ -420,6 +493,11 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
   // catch below runs, and the honest reading is a function whose return type the
   // checker cannot narrow.
   const mountedTray = (): HubTray | null => tray
+  // The notification surface host (NT-6), declared here for the same reason the tray is:
+  // both shutdown paths - the ordered one below and the catch for a start that failed
+  // after it was created - have to be able to destroy the window.
+  let surface: NotificationSurfaceHost | null = null
+  const mountedSurface = (): NotificationSurfaceHost | null => surface
 
   // The lifecycle exists before anything is opened, because a termination signal can
   // arrive at any point in this function. What it calls before the hub exists is the
@@ -491,6 +569,41 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
     stream = createChangeFeed(options.stream)
     const watching = withChangeFeed(withPendingSnapshot(store, localMetrics), stream)
 
+    // 4a. The notification surface host (NT-6, NT-FR-04), before the delivery policy and
+    //     therefore before any notifier is wired. The order is the requirement, not a
+    //     habit: NT-FR-04 says a desktop that refuses the window leaves every delivery
+    //     recorded as `not-wired`, and a notifier wired before the refusal was known could
+    //     not be unwired again. The window itself is created here, with `show: false`, so
+    //     it draws nothing and occupies no screen space until a card exists (NT-FR-10).
+    //
+    //     The live origin is a thunk rather than a string because the bind below has not
+    //     happened yet; the card document is loaded with the first card, by which time
+    //     `server.origin` is the port this hub actually took.
+    //
+    //     A refusal is a supported run, not a crash, and it is answered the way the tray
+    //     answers one: a line, a hub that keeps serving, and no stub pretending a window
+    //     is on a desktop.
+    if (options.desktop?.surface !== undefined) {
+      try {
+        surface = options.desktop.surface.create({
+          origin: (): string => server?.origin ?? '',
+          corner: DEFAULT_SURFACE_CORNER,
+        })
+      } catch (cause) {
+        // The refusal's own sentence reaches the operator, and `SurfaceWindowRefusedError`
+        // is an Error, so this covers both it and an unforeseen fault.
+        diagnostic(
+          'agent-ping could not create its notification surface window, so this run can show no ' +
+            'card. The pending set, the log and the tray badge are unaffected, and every delivery ' +
+            'is recorded as not-wired rather than as something somebody saw (NT-FR-04, APX-FR-02). ' +
+            (cause instanceof Error ? cause.message : String(cause)),
+        )
+      }
+    }
+    // Asked for and not created. Distinct from "not asked for", which is the headless run
+    // and is not a refusal - see the note on the notifier below.
+    const surfaceRefused = options.desktop?.surface !== undefined && surface === null
+
     // 4b. The delivery policy (HC-FR-07), over the same wrapped store and before the
     //     ingest pipeline, because the pipeline's port *is* this policy. Built here
     //     and nowhere else: the composition root is the single place a collaborator is
@@ -507,6 +620,16 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
     //     health and the ingest pipeline counts as `not-wired`, so "nobody was told" is
     //     visible from both ends rather than being papered over with a no-op notifier
     //     that always succeeds (APX-FR-02).
+    //
+    //     A refused surface withholds it too, which is the same honest answer one step
+    //     further along: from ADR-012 the surface is this product's delivery substrate, a
+    //     desktop that refused it is a desktop this run cannot reach, and handing out a
+    //     delivery path that is about to be deleted would report a notification as shown
+    //     to a place that has already been decided against. NT-8 removes the platform
+    //     notifier entirely and the rule becomes the only rule; until then it is an
+    //     interim that can only make the answer more honest, never less. A *headless* run
+    //     is deliberately not in this branch: no desktop bridge means no refusal, and the
+    //     tests, the CLI and the verification scripts keep the wiring they already have.
     const platformNotifier = createPlatformNotifier({ onDiagnostic: diagnostic })
     if (!platformNotifier.supported) {
       // A line, because a hub that cannot notify anybody is degraded in a way an
@@ -519,6 +642,7 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
           'notification leaves this machine',
       )
     }
+    const notifierUnwired = !platformNotifier.supported || surfaceRefused
     delivery = createDeliveryPolicy({
       store: watching,
       // The live origin, read per request rather than captured: the bind below is what
@@ -531,7 +655,7 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
       // throw the policy records as a failure, with the reason beside it (APX-FR-02,
       // ADR-010). An `fyi` is refused by the class policy before any platform notifier
       // is reached and never becomes a command (NT-FR-02).
-      ...(platformNotifier.notifier === null
+      ...(notifierUnwired || platformNotifier.notifier === null
         ? {}
         : { notifier: toNotifierPort(platformNotifier.notifier, { onDiagnostic: diagnostic }) }),
       onDiagnostic: diagnostic,
@@ -717,6 +841,15 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
         return mountedTray()
       },
       /**
+       * The surface host, behind a getter for the same reason `tray` is one: it is
+       * mounted before this object is built but replaced on a refusal. Null on a headless
+       * run and on a run whose desktop refused the window; never a stub that answers as
+       * though a card surface were on a desktop (NT-FR-04).
+       */
+      get surface(): NotificationSurfaceHost | null {
+        return mountedSurface()
+      },
+      /**
        * The security boundary: this install's write token, the header it travels in
        * and where the token file is. In-process only - the token is on no read route,
        * in no response and in no served asset (HC-FR-06).
@@ -739,14 +872,25 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
         // Beginning the shutdown also removes the signal handlers, so a second Ctrl-C
         // is the operating system's answer rather than a second ordered close.
         lifecycle.begin('close')
-        // The order a shutdown has to have: take the icon down, refuse new deliveries,
-        // stop accepting events, end the live streams, stop answering, fold the
-        // counters into the file, close the log, then give the runtime file back. The
-        // delivery drain goes second and the feed fourth; every placement is
-        // deliberate.
+        // The order a shutdown has to have: destroy the card surface, take the icon down,
+        // refuse new deliveries, stop accepting events, end the live streams, stop
+        // answering, fold the counters into the file, close the log, then give the
+        // runtime file back. The delivery drain goes second and the feed fourth; every
+        // placement is deliberate.
         //
-        // The tray goes first of all, and before the feed, and the two are the same
-        // decision (NT-FR-05): the icon reads this hub's pending set through the change
+        // The surface goes first of all, before the tray and before the listener, and
+        // that is NT-FR-04's "destroyed in the ordered shutdown" made load-bearing rather
+        // than chronological. A card is the only thing this product puts on a developer's
+        // screen without being asked, so a card that outlives the hub is a screen
+        // advertising a block nobody can acknowledge, retry, or open a dashboard for: the
+        // deep link in it resolves against a listener that has already closed. It is
+        // destroyed first because there is no state it needs that outlives the next step,
+        // and because a transparent frameless window that a compositor is still holding
+        // while this process tears down is the shape of an application that did not shut
+        // down cleanly (APX-FR-02, ADR-010).
+        //
+        // The tray follows, and before the feed, and the two are the same decision
+        // (NT-FR-05): the icon reads this hub's pending set through the change
         // feed's transitions, so a tray that outlived the feed or the log is an icon
         // advertising a hub that no longer answers - and, on the way out, either a read
         // failure or a redraw of a number nobody can act on any more. Taking it down
@@ -775,9 +919,14 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
         // feed throws, which is why the refusal steps have to come before this call.
         let firstError: unknown
         try {
-          mountedTray()?.close()
+          mountedSurface()?.destroy()
         } catch (cause) {
           firstError = cause
+        }
+        try {
+          mountedTray()?.close()
+        } catch (cause) {
+          firstError ??= cause
         }
         try {
           await delivery?.close()
@@ -919,6 +1068,14 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
     // process that has just reported a failure must not be listening for a signal that
     // would run a shutdown against a hub that was never built.
     lifecycle.dispose()
+    try {
+      // The surface before the tray here too, for the reason the ordered shutdown does
+      // it in that order: a window created by a start that then failed must not be left
+      // on the developer's screen by a process that is about to report the failure.
+      mountedSurface()?.destroy()
+    } catch {
+      // The failure being reported is the one that caused this cleanup.
+    }
     try {
       mountedTray()?.close()
     } catch {
@@ -1063,6 +1220,11 @@ interface ElectronAppLike {
   whenReady(): Promise<void>
   on(event: string, listener: (...args: never[]) => void): unknown
   quit(): void
+  /**
+   * Chromium's command line, which the launch policy is appended to before the
+   * application is ready (src/notify/surface/electron-host.ts, CHROMIUM_LAUNCH_POLICY).
+   */
+  commandLine: import('../notify/surface/electron-host.js').CommandLineLike
 }
 
 /**
@@ -1092,11 +1254,33 @@ interface ElectronNativeImageLike {
   ): unknown
 }
 
+/**
+ * The slice of `screen` the surface bridge uses.
+ *
+ * One method, returning one display's *work area* - the usable rectangle, not
+ * `bounds`. `bounds` is the screen rectangle, and a taskbar, a dock or a top panel lives
+ * between the two; placing a card against `bounds` is the defect NT-FR-04 forbids
+ * (docs/research/electron-surface-preflight.json recorded a 32px top inset on the
+ * authoring machine, which is exactly the kind of thing an assumption gets wrong).
+ */
+interface ElectronScreenLike {
+  getPrimaryDisplay(): { readonly workArea: { x: number; y: number; width: number; height: number } }
+}
+
 interface ElectronModuleLike {
   readonly app?: ElectronAppLike
   readonly Tray?: new (icon: unknown) => ElectronTrayLike
   readonly Menu?: { buildFromTemplate(template: readonly unknown[]): unknown }
-  readonly BrowserWindow?: new (options: unknown) => { loadURL(url: string): Promise<void>; destroy(): void }
+  readonly BrowserWindow?: new (options: unknown) => {
+    loadURL(url: string): Promise<void>
+    destroy(): void
+    showInactive(): void
+    hide(): void
+    isDestroyed(): boolean
+    setBounds(bounds: { x: number; y: number; width: number; height: number }): void
+    setIgnoreMouseEvents(ignore: boolean, options?: { forward?: boolean }): void
+  }
+  readonly screen?: ElectronScreenLike
   readonly nativeImage?: ElectronNativeImageLike
 }
 
@@ -1236,21 +1420,74 @@ function electronTrayBridge(electron: ElectronModuleLike): TrayBridge {
 }
 
 /**
+ * The Electron window surface, as this product's one operation.
+ *
+ * The counterpart to `electronTrayBridge`, and shaped the same way on purpose: the
+ * desktop supplies the platform object and this product supplies every decision about
+ * it. Everything Electron-specific about a notification card is in the one call below -
+ * the `BrowserWindow` option set (which is data in
+ * src/notify/surface/electron-host.ts, and is asserted rather than restated), the
+ * `workArea` read that keeps a card off the taskbar, and `showInactive`, which is the
+ * difference between a notification and an interruption. The composition root decides
+ * when a card exists and what corner it goes in, because those are this product's
+ * decisions (src/notify/surface/host.ts).
+ *
+ * The origin arrives as a thunk because the host is mounted before the loopback socket
+ * is bound, and the card document must be loaded from the port this hub actually took
+ * rather than the one it preferred (HC-FR-01). `surfaceDocumentUrl` is applied here, at
+ * the boundary, so the loopback guarantee is a property of how the bridge is built and
+ * not of every future caller.
+ *
+ * VERIFICATION STATE: the window primitives this bridge uses were proved by the
+ * pre-flight on the authoring machine, and the host itself is unit-tested against a
+ * structural Electron stub. What has never been run is *this composition*: a real
+ * Electron process mounting a real hub's surface. NT-9's script is where that happens
+ * (NT-FR-03, APX-CON-06).
+ */
+function electronSurfaceBridge(electron: ElectronModuleLike): SurfaceHostBridge {
+  return {
+    create: (options): NotificationSurfaceHost => {
+      const needed = <T,>(what: string, available: T | undefined): T => {
+        if (available === undefined) {
+          throw new SurfaceWindowRefusedError(
+            `the Electron runtime did not provide \`${what}\`. The hub is unaffected and every ` +
+              'delivery is recorded as not-wired rather than as a card somebody saw (NT-FR-04).',
+          )
+        }
+        return available
+      }
+      return createElectronSurfaceHost({
+        BrowserWindow: needed('BrowserWindow', electron.BrowserWindow) as unknown as new (
+          options: unknown,
+        ) => BrowserWindowLike,
+        screen: needed('screen', electron.screen) as ScreenLike,
+        documentUrl: (): string => surfaceDocumentUrl(options.origin()),
+        onDiagnostic: (message: string): void => {
+          process.stderr.write(`${message}\n`)
+        },
+        ...(options.corner === undefined ? {} : { corner: options.corner }),
+      })
+    },
+  }
+}
+
+/**
  * Start the hub as an Electron main process.
  *
  * The application lock is taken first, because Electron's is the one that knows
  * about the window; then the hub takes its own, because that is the one the
  * adapters and the CLI read. Both or neither.
  *
- * No window is opened here. The dashboard is an on-demand surface (ADR-009), and
- * the only thing this function opens is the window a tray click asks for - the tray
- * is the persistent surface and the page is pulled up when it is used. The tray
- * itself is mounted inside `startHub` (NT-3), over the bridge built here, so the
- * mounted tray is the same object a plain `startHub` produces and there is one
- * implementation of the badge, the menu and the click. The notifier the hub is
- * started with is likewise the one a plain `startHub` gets, because it is resolved
- * inside `startHub` (NT-1) rather than here: an Electron process and a plain Node
- * process on the same machine must notify the same way.
+ * Two windows exist, and only one of them is a document. The card surface host is
+ * mounted inside `startHub` (NT-6), beside the tray and before the delivery policy, over
+ * the bridge built here. The dashboard is an on-demand surface (ADR-009), and the only
+ * other thing this function opens is the window a tray click asks for. The tray itself is
+ * mounted inside `startHub` (NT-3) over the bridge built here, so the mounted tray is
+ * the same object a plain `startHub` produces and there is one implementation of the
+ * badge, the menu and the click. The notifier the hub is started with is likewise the one
+ * a plain `startHub` gets, because it is resolved inside `startHub` (NT-1) rather than
+ * here: an Electron process and a plain Node process on the same machine must notify the
+ * same way.
  */
 export async function startElectronMain(): Promise<RunningHub | null> {
   const electron = (await importModule('electron')) as ElectronModuleLike
@@ -1261,6 +1498,22 @@ export async function startElectronMain(): Promise<RunningHub | null> {
         'point is the Electron main process; a plain Node process should call startHub() instead.',
     )
   }
+
+  // Before the application is ready, and therefore before any window exists, so every
+  // Chromium child this process starts inherits the switch. This is the part of the
+  // launch policy a running process can still affect and it is NOT what prevents the
+  // abort: Chromium reads its command line and decides about the sandbox before any
+  // JavaScript in this package runs, which was confirmed on the authoring machine (an
+  // `app.commandLine.appendSwitch` from this line still died of the helper SIGTRAP). So
+  // the gap between "the policy is decided" and "the policy reached the process" is
+  // reported rather than assumed away - a readable line is the difference between an
+  // operator who knows to add `--no-sandbox` and one holding a SIGTRAP with no message.
+  // See CHROMIUM_LAUNCH_POLICY in src/notify/surface/electron-host.ts (NT-FR-04).
+  const launchGap = launchPolicyApplied(process.argv, process.env)
+  if (launchGap !== null) {
+    process.stderr.write(`agent-ping: ${launchGap}\n`)
+  }
+  applyChromiumLaunchPolicy(app.commandLine)
 
   const isPrimaryInstance = app.requestSingleInstanceLock()
   if (!isPrimaryInstance) {
@@ -1278,7 +1531,14 @@ export async function startElectronMain(): Promise<RunningHub | null> {
   // second `before-quit` is a no-op because `shutdown` is idempotent, which matters
   // because a quit can be requested twice (a tray click and a session logout, say).
   const hub = await startHub({
-    desktop: { isPrimaryInstance: true, tray: electronTrayBridge(electron) },
+    desktop: {
+      isPrimaryInstance: true,
+      tray: electronTrayBridge(electron),
+      // The card surface, mounted beside the tray and before the delivery policy (NT-6).
+      // A desktop that refuses the window leaves the hub serving with a diagnostic and
+      // every delivery recorded as `not-wired` (NT-FR-04, APX-FR-02).
+      surface: electronSurfaceBridge(electron),
+    },
     lifecycle: { exit: (): void => app.quit() },
   })
 

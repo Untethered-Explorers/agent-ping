@@ -2,9 +2,9 @@
 
 ## Current State
 **Phase**: NOTIFICATION-AND-TRAY-PRESENCE-3
-**Status**: Paused
-**Validation Gaps**: 61 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-26T23:36:30.036Z
+**Status**: In Progress
+**Validation Gaps**: 66 unverified check(s) - see "Validation Gaps"
+**Last Updated**: 2026-09-27T08:11:09.549Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -46,8 +46,8 @@
   - Files: src/notify/macos.ts, src/notify/windows.ts, tests/notify/macos.test.ts, tests/notify/windows.test.ts, docs/runbooks/notify-platforms.md, src/main/index.ts, src/notify/linux.ts, src/notify/registry.ts, src/notify/types.ts, tests/notify/registry-selection.test.ts, src/notify/command.ts
 - [x] Phase NOTIFICATION-AND-TRAY-PRESENCE-2, Task NT-3: Add the tray icon with its pending-count badge (@notification-engineer)
   - Files: src/hub/tray.ts, src/tray/badge.ts, src/main/index.ts, tests/hub/tray.test.ts, tests/tray/badge.test.ts, src/hub/metrics.ts
-- [x] Phase NOTIFICATION-AND-TRAY-PRESENCE-3, Task NT-4: Verify real toasts and the badge on Linux
-  - Files: docs/reviews/notification-linux.json
+- [x] Phase NOTIFICATION-AND-TRAY-PRESENCE-3, Task NT-6: Make the Electron host real and mount the overlay window (@notification-engineer)
+  - Files: package.json, package-lock.json, src/notify/surface/host.ts, src/notify/surface/electron-host.ts, src/notify/surface/position.ts, src/main/index.ts, tests/notify/surface-host.test.ts, tests/notify/surface-position.test.ts
 - [x] Phase OPENCODE-PLUGIN-ADAPTER-1, Task OA-1: Translate opencode events into the normalized envelope (@connector-engineer)
   - Files: src/plugin/opencode/index.ts, src/plugin/opencode/translate.ts, src/plugin/opencode/work-signal.ts, tests/plugin/opencode-translate.test.ts, tests/plugin/opencode-work-signal.test.ts, docs/engine-config.json
 - [x] Phase OPENCODE-PLUGIN-ADAPTER-1, Task OA-2: Deliver events to the hub and leave a breadcrumb on failure (@connector-engineer)
@@ -61,7 +61,7 @@
 - None currently running
 
 ## Remaining
-- [ ] Phase NOTIFICATION-AND-TRAY-PRESENCE-3: Phase 3: Live notification gates
+- [ ] Phase NOTIFICATION-AND-TRAY-PRESENCE-3: Phase 3: The self-rendered surface
 - [ ] Phase OPENCODE-PLUGIN-ADAPTER-2: Phase 2: Polling fallback and live verification
 - [ ] Phase OPENCODE-PLUGIN-ADAPTER-3: Phase 3: Live adapter gate
 - [ ] Phase LIVE-DASHBOARD-1: Phase 1: Live state on the approved layout
@@ -74,7 +74,9 @@
 - [ ] Phase COPILOT-CLI-ACP-SPIKE-2: Phase 2: Gate decision and authorised outcome
 
 ## Blockers
-- None
+- Manifest reconciliation added 4 pending task(s): NT-6, NT-7, NT-8, NT-9
+- Manifest reconciliation removed 2 task(s): NT-4, NT-5
+- Manifest reconciliation changed 16 existing task(s): NT-1, NT-2, NT-3, OA-5, OA-6, LD-1, LD-2, LD-3, LD-4, LD-5, IO-1, IO-2, IO-3, IO-4, IO-5, CP-4
 
 ## Validation Gaps
 - Task DP-1: No product, dashboard, store, hub or CLI source exists yet, so npm run build reports its tsc and Vite steps as skipped rather than compiling anything; the build wiring itself is exercised only as far as the empty source set allows.
@@ -123,6 +125,11 @@
 - Task NT-3: The claim 'the tray is mounted before the hub reports running' is asserted against the composition root's source order rather than observed at runtime: the mount is synchronous and holds the event loop, so a health request cannot be answered during it and the two orders answer it identically. The observable half - the icon is on the desktop before the desktop is told the hub is ready - is asserted behaviourally.
 - Task NT-3: The badge above ninety-nine is driven on a mounted tray with a synthetic hundred-and-one-item pending set rather than a hundred and one real ingests, because the rule is the count's and not the store's; the store's real transitions are driven through the entry point at counts 0, 1 and 2 and compared against a real GET /api/pending each time.
 - Task NT-3: The tray's sound and telemetry properties are asserted by reading both modules' source with their prose stripped, so the check is about the values and the calls rather than the sentences; it would not see a capability reached through a computed property name.
+- Task NT-6: The unit suite starts no Electron process and displays no window. The Electron half is a structural stub, so the option set, placement, load, click-through direction, show, hide, destroy and shutdown order are proven as this product's decisions, and nothing is proven about any desktop's compositing.
+- Task NT-6: The Electron layers were checked by hand on this machine (Ubuntu 24.04, X11 :1, Electron 44.4.5, Chrome 152.0.7977.130) with a script kept outside the repository in /tmp. NT-9 turns it into scripts/verify-notification-surface.mjs; that script is qa-engineer's output and is not part of this task.
+- Task NT-6: No claim is made about macOS or Windows window behaviour. Nothing was run on either platform, the launch policy is applied unconditionally rather than per platform, and the transparency compositing that differs between the three desktops is unobserved.
+- Task NT-6: The live check drove this product's option set and placement but not this product's own host code end to end: the check transcribes the option object and the placement rather than importing them, because the built entry point's card document does not exist yet. The host itself is proven against the stub, and NT-9's probe is what closes that gap.
+- Task NT-6: A GPU zygote fork failure is visible on this machine under software rendering. The application still reaches ready without a workaround, and the failure is recorded rather than worked around, so no measurement here says anything about GPU behaviour on a normal desktop.
 - Task OA-1: No live opencode session was run. The payload shapes are the 1.18.32 type declarations, not a capture from a running harness; proving the harness delivers them is OA-5's script and OA-6's gate, not this task.
 - Task OA-1: The one-envelope and block-lifecycle tests use the real ingest pipeline and the real SQLite log but drive it from fixtures rather than from a harness's event stream.
 - Task OA-1: The plugin was not loaded by opencode itself. Its structural plugin and client types mirror the 1.18.32 declarations rather than importing @opencode-ai/plugin, which is deliberate (the adapter must load with no dependency), so a signature change upstream would not be caught by a compile error here - the OA-3 install and OA-5 live run are where that surfaces.

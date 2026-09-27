@@ -2,17 +2,21 @@
 
 - **Status:** Accepted
 - **Date:** 2026-09-26
+- **Amended:** 2026-09-27 by [ADR-012](ADR-012-surface-is-rendered-by-agent-ping.md) — the
+  notification command is no longer one of the spawn sites, because the surface is
+  rendered by this product and spawns nothing
 - **Decision owners:** Project author (settled with the user via `forge-grill-idea`)
 - **Implementation state:** Implemented, and structural rather than policed.
   Nothing under `src/` names a harness or agent process as something to start,
-  signal or attach to. The three places that do spawn a process are the toast
-  command (`src/notify/command.ts`, which kills only its own child), the plugin
-  installer's verification child
-  (`src/plugin/install/global-plugin.ts`), and `process.kill(pid, 0)` in
-  `src/hub/runtime-file.ts`, which is a liveness probe on a previous *hub* pid,
-  not a signal. A killed hub is reclaimed and restarted against the same log
-  (`tests/hub/delivery.test.ts` does this with a real `SIGKILL` of a real child
-  process).
+  signal or attach to. After ADR-012 the product spawns a process in exactly
+  one place: the plugin installer's verification child
+  (`src/plugin/install/global-plugin.ts`). The toast command
+  (`src/notify/command.ts`) is removed by NT-8, and the notification path
+  spawns nothing at all — a card is drawn, not delegated. The remaining
+  `process.kill(pid, 0)` in `src/hub/runtime-file.ts` is a liveness probe on a
+  previous *hub* pid, not a signal. A killed hub is reclaimed and restarted
+  against the same log (`tests/hub/delivery.test.ts` does this with a real
+  `SIGKILL` of a real child process).
 
 ## Context
 

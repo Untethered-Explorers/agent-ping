@@ -40,7 +40,7 @@
 
 | ID | As a... | I want to... | So that... | Priority |
 |----|---------|-------------|-----------|----------|
-| LD-US-01 | developer returning from a toast | see which repository is asking for me first | so that I know where to go before I read anything | Must |
+| LD-US-01 | developer returning from a notification card | see which repository is asking for me first | so that I know where to go before I read anything | Must |
 | LD-US-02 | developer who has already dealt with it | clear a pending item without leaving the page | so that the badge and the page never disagree | Must |
 | LD-US-03 | keyboard or screen reader user | get the same information and the same actions as a mouse user sees | so that the canvas is not a dead end | Must |
 
@@ -61,7 +61,7 @@
 ```
 
 ```forge-requirement
-{"id":"LD-FR-04","kind":"requirement","text":"The pending count is displayed on the page and always equals the tray badge for the same hub state."}
+{"id":"LD-FR-04","kind":"requirement","text":"The pending count is displayed on the page and always equals the hub's unacknowledged pending count, which is the same number the tray badge draws for the same state."}
 ```
 
 ```forge-requirement
@@ -69,7 +69,7 @@
 ```
 
 ```forge-requirement
-{"id":"LD-FR-06","kind":"requirement","text":"Opening a toast deep link focuses and highlights that specific session, and the focus survives a later live update."}
+{"id":"LD-FR-06","kind":"requirement","text":"Opening a notification deep link focuses and highlights that specific session, and the focus survives a later live update."}
 ```
 
 ```forge-requirement
@@ -108,7 +108,7 @@ Task review table, kept outside the phase contracts as authoring evidence.
 
 | ID | Outcome | Owner | Needs | Files | Checks | Excluded |
 |---|---|---|---|---|---|---|
-| LD-1 | The page renders live hub state grouped by repository and shows staleness | dashboard-engineer | DP-2 mount entry, HC-2 stream, HC-1 reads | src/dashboard/index.html, main.ts, live/stream-client.ts, live/session-list.ts, tests/dashboard/session-list.test.ts, tests/dashboard/stream-client.test.ts | stream and grouping tests through the entry point | No acknowledgement, no history, no tray |
+| LD-1 | The page renders live hub state grouped by repository and shows staleness | dashboard-engineer | DP-2 mount entry, HC-2 stream, HC-1 reads | src/dashboard/index.html, main.ts, live/stream-client.ts, live/session-list.ts, tests/dashboard/session-list.test.ts, tests/dashboard/stream-client.test.ts | stream and grouping tests through the entry point | No acknowledgement, no history, no tray, no notification surface |
 | LD-2 | Every row is reachable and legible without a mouse or colour | dashboard-engineer | LD-1, DP-3 mirror pattern | src/dashboard/main.ts, a11y/dom-mirror.ts, a11y/keyboard-nav.ts, tests/dashboard/live-dom-mirror.test.ts | mirror and keyboard tests on live data | No styling beyond state and contrast |
 | LD-3 | Ack, deep-link focus, handoff and history work against the real API | dashboard-engineer | LD-1, HC-4 ack | src/dashboard/live/ack.ts, deeplink.ts, handoff.ts, history.ts, src/dashboard/main.ts, tests/dashboard/live-interactions.test.ts | interaction tests including refused ack | No agent control of any kind |
 | LD-4 | A browser-driven journey proves the page against the running hub | qa-engineer | LD-2, LD-3, HC-1 | playwright.config.ts, tests/e2e/dashboard.spec.ts, scripts/verify-dashboard-e2e.mjs | end-to-end journey run | No human judgement |
@@ -176,7 +176,7 @@ Task review table, kept outside the phase contracts as authoring evidence.
 {
   "id": "LD-3",
   "title": "Add acknowledgement, deep-link focus, handoff and history",
-  "description": "Add the page's interactions against the real hub API. Acknowledgement posts to the single write route, updates the row optimistically, and reverts to the server's state when the acknowledgement is refused, with the refusal visible rather than swallowed. Deep links resolve to a specific session, focus and highlight it, and the focus survives later live updates. Handoff reveals the attach command for a session as text to copy, and the page must contain no control that sends a prompt, interrupts a session or approves anything. The history panel lists past events with class, repository, session, timestamp and acknowledgement or resolution state, and never renders conversation content. Mount all four from the live entry point and list it as an output. Add tests for a successful ack, a refused ack, deep-link focus, the absence of any agent-control control, and a history payload containing no content fields. Exclude the tray and the notifier.",
+  "description": "Add the page's interactions against the real hub API. Acknowledgement posts to the single write route, updates the row optimistically, and reverts to the server's state when the acknowledgement is refused, with the refusal visible rather than swallowed. Deep links resolve to a specific session, focus and highlight it, and the focus survives later live updates. Handoff reveals the attach command for a session as text to copy, and the page must contain no control that sends a prompt, interrupts a session or approves anything. The history panel lists past events with class, repository, session, timestamp and acknowledgement or resolution state, and never renders conversation content. Mount all four from the live entry point and list it as an output. Add tests for a successful ack, a refused ack, deep-link focus, the absence of any agent-control control, and a history payload containing no content fields. Exclude the tray and the notification surface.",
   "ownerAgent": "dashboard-engineer",
   "dependencies": ["LD-1", "HC-4"],
   "expectedOutputs": ["src/dashboard/live/ack.ts", "src/dashboard/live/deeplink.ts", "src/dashboard/live/handoff.ts", "src/dashboard/live/history.ts", "src/dashboard/main.ts", "tests/dashboard/live-interactions.test.ts"],
@@ -193,7 +193,7 @@ Task review table, kept outside the phase contracts as authoring evidence.
       "A test asserts the rendered controls contain no send, interrupt or approve action and that handoff exposes the command as text",
       "A test asserts the history panel renders class, repository, session, timestamp and state and no content field"
     ],
-    "constraints": ["Exactly one mutating route exists, the ack route", "Information-only events appear inside the dashboard and never as a toast or a badge change"],
+    "constraints": ["Exactly one mutating route exists, the ack route", "Information-only events appear inside the dashboard and never as a card or a badge change"],
     "constraintRefs": ["docs/PRD.md#APX-CON-08"],
     "references": ["docs/features/live-dashboard.md#4. UI / Interaction Design", "docs/PRD.md#6.3 Key APIs / Interfaces", "docs/IDEA.md#Boundaries"]
   }
@@ -206,7 +206,7 @@ Task review table, kept outside the phase contracts as authoring evidence.
 {
   "id": "LD-4",
   "title": "Prove the dashboard journey in a real browser",
-  "description": "Add a browser-driven end-to-end suite that runs against the real hub rather than a mock server. Start the hub against a temporary state directory, serve the built dashboard, drive one needs-you event through the ingest route, and assert the new blocked row appears, the pending count increments, a keyboard-only path can reach and activate the row, the acknowledgement clears it, and the history panel then shows it. Assert the page reports a stale state when the stream is interrupted, and that a deep link opens the dashboard focused on the expected session. Fail on zero executed tests and print which journeys ran, so a green result cannot mean nothing was exercised. Add a repository script that installs the browser if needed and runs the suite, failing loudly when the browser cannot be obtained rather than skipping. Exclude human judgement.",
+  "description": "Add a browser-driven end-to-end suite that runs against the real hub rather than a mock server. Start the hub against a temporary state directory, serve the built dashboard, drive one needs-you event through the ingest route, and assert the new blocked row appears, the pending count increments, a keyboard-only path can reach and activate the row, the acknowledgement clears it, and the history panel then shows it. Assert the page reports a stale state when the stream is interrupted, and that a deep link built the way the notification card and the tray build it opens the dashboard focused on the expected session, so the two entry points into this page are proven to agree. Fail on zero executed tests and print which journeys ran, so a green result cannot mean nothing was exercised. Add a repository script that installs the browser if needed and runs the suite, failing loudly when the browser cannot be obtained rather than skipping. Exclude human judgement and the notification surface's own window.",
   "ownerAgent": "qa-engineer",
   "dependencies": ["LD-2", "LD-3", "HC-1"],
   "expectedOutputs": ["playwright.config.ts", "tests/e2e/dashboard.spec.ts", "scripts/verify-dashboard-e2e.mjs"],
@@ -233,8 +233,8 @@ Task review table, kept outside the phase contracts as authoring evidence.
 {
   "id": "LD-5",
   "title": "Review the primary dashboard journey",
-  "description": "Human review of the live dashboard as the surface the developer actually lands on. Complete the primary journey end to end against the running system with a real pending block: notice the badge or toast, open the dashboard from the tray, identify which repository is asking, read the blocked row, acknowledge it, and hand the session off to a terminal. Then repeat the journey with the keyboard only, and once more with a screen reader if available, and record what each pass could and could not reach. Judge whether the approved design survived contact with real data, including repositories with many sessions and a long history. Record every observation and the verdict in the review file, listing any required change rather than making it. Do not change code in this task.",
-  "dependencies": ["LD-4", "NT-4", "DP-4"],
+  "description": "Human review of the live dashboard as the surface the developer actually lands on. Complete the primary journey end to end against the running system with a real pending block: notice the card or the badge, open the dashboard from the card's deep link and again from the tray, identify which repository is asking, read the blocked row, acknowledge it, and hand the session off to a terminal. Confirm that the dashboard opened focused on the right session each time and that the pending count matched the badge throughout. Then repeat the journey with the keyboard only, and once more with a screen reader if available, and record what each pass could and could not reach. Judge whether the approved design survived contact with real data, including repositories with many sessions and a long history. Record every observation and the verdict in the review file, listing any required change rather than making it. Do not change code in this task.",
+  "dependencies": ["LD-4", "NT-9", "DP-4"],
   "expectedOutputs": [],
   "validationCommands": [],
   "contract": {
@@ -244,7 +244,7 @@ Task review table, kept outside the phase contracts as authoring evidence.
     "requirementRefs": ["docs/features/live-dashboard.md#LD-FR-01", "docs/features/live-dashboard.md#LD-FR-05", "docs/features/live-dashboard.md#LD-FR-09", "docs/features/live-dashboard.md#LD-FR-10"],
     "acceptanceCriteria": [
       "The reviewer performed the mouse journey, the keyboard-only journey and, where available, a screen-reader pass, and stated in the notes what each could reach",
-      "The reviewer confirmed the dashboard opened from the tray focused on the right session and that the pending count matched the badge throughout",
+      "The reviewer confirmed the dashboard opened from the notification card's deep link and from the tray, each focused on the right session, and that the pending count matched the badge throughout",
       "The reviewer exercised a repository with several sessions and a long history and recorded whether density still holds",
       "The reviewer recorded a verdict and every required change as an explicit list"
     ],

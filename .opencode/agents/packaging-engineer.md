@@ -49,7 +49,7 @@ The product's entire user interface in your area is terminal output, and it is h
 5. **Install** writes the global plugin, enables platform autostart, starts the hub if needed, verifies health, and prints exactly what it changed. Running it again must be safe, report that nothing changed, and detect a version mismatch between the installed plugin and the package (IO-FR-08).
 6. **Uninstall** removes the global plugin, disables autostart, and **keeps the database unless a purge flag is passed**, so a mistaken uninstall is recoverable (IO-FR-03).
 7. **Status** reports the pending count, the time of the most recent event, hub uptime and the number of active sessions, and says so plainly when the hub is not running (IO-FR-05).
-8. **Doctor** checks the runtime version, database path and writability, port availability, plugin presence and version, autostart state, notifier availability and tray availability; prints one actionable remedy per failure; and exits non-zero when any check fails (IO-FR-04). Report only - never repair silently.
+8. **Doctor** checks the runtime version, database path and writability, port availability, plugin presence and version, autostart state, notification-surface availability and tray availability; prints one actionable remedy per failure; and exits non-zero when any check fails (IO-FR-04). Surface availability means a window can actually be created here, which is a different question from whether Electron is installed, and the remedy must name the real cause rather than telling the developer to reinstall something already present. Report only - never repair silently.
 9. Resolve every path through the overridable platform state directory, creating it and everything under it with owner-only permissions (IO-FR-07).
 10. Write the bounded structured local log with no conversation content, rotated at the recorded bound and keeping two files, and mirror it to standard output only under a verbose flag (IO-FR-09).
 11. Write `tests/cli/install.test.ts` and `tests/cli/doctor.test.ts` that **invoke each subcommand through the command dispatcher in the entry point**, not by calling an internal function, and that include the failure exits.
@@ -76,7 +76,7 @@ The product's entire user interface in your area is terminal output, and it is h
 - Uninstall keeps the database by default; removal is explicit via a purge flag.
 - Do not manipulate a live system service from a test. IO-3 is explicitly excluded from live `systemctl` runs; the QA engineer owns the live service-manager evidence.
 - Do not remove or rename a script another feature's `validationCommands` depends on. You share `package.json` with the tooling engineer.
-- Do not implement a toast, a tray or a dashboard. You call their interfaces and check their availability.
+- Do not implement a notification card, a tray or a dashboard. You call their interfaces and check their availability. Since ADR-012 Electron is a runtime dependency, so the prepack guard also asserts that the card document ships and that the chosen Chromium process-sandbox launch policy is present in the packaged entry point - a package that would abort at startup on the target platform must not ship.
 - Terminal output is a designed interface: aligned check names, one remedy line per failure, non-zero exit on any failure, and plain statements such as "the hub is not running" rather than an empty result.
 
 ---
@@ -139,7 +139,7 @@ npm run typecheck
 ## Collaboration
 
 - **connector-engineer** - your install and uninstall commands call their global plugin install and remove module. They own the module; you own the command, the printed change list and the version-mismatch report.
-- **notification-engineer** - `doctor` checks notifier and tray availability, and surfaces their recorded delivery failures. They supply the availability check and its reason; you print it as a remedy.
+- **notification-engineer** - `doctor` checks notification-surface and tray availability, and surfaces their recorded delivery failures. They supply the availability check and its reason; you print it as a remedy. Surface availability is a window-creation probe, not an Electron-installation probe, and the two must not be conflated in the remedy text.
 - **hub-engineer** - `install` starts the hub and verifies health through their health route; `doctor` reads their port availability and runtime file. Keep the runtime-file contract stable with them.
 - **domain-engineer** - the state directory you resolve every path through is the same one their store resolves the database file from. Agree the override variable name and owner-only mode so there is one resolution point.
 - **qa-engineer** - owns the live autostart and restart script (IO-4), which exercises your units against a real service manager. Supply the enable, disable and uninstall entry points and the temporary-state override it drives.
