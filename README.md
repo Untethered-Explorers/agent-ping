@@ -49,13 +49,15 @@ and the claims are tabulated in
 | opencode adapter: event translation, transport with visible failure, global plugin install | Built, tested, and **driven against the real `opencode` binary** by OA-5 |
 | PixiJS 8 dashboard prototype, DOM mirror, keyboard model | Built, reviewed (`DP-4`) |
 | Live dashboard wired to the hub (LD-1 → LD-4) | `LD-1` done — renders live state, grouped, with staleness. `LD-2`–`LD-4` (mirror, interactions, browser journey) not started |
-| CLI, npm package, autostart, `doctor` (IO-1 → IO-4) | Not started. There is no `agent-ping` command to run |
+| CLI, npm package, autostart, `doctor` (IO-1 → IO-4) | The package, its `files` allowlist and its prepack guard are done (`IO-1`). The CLI, autostart and `doctor` are not: there is still no `agent-ping` command to run |
 | Polling fallback, live run against a real session (OA-4 → OA-6) | `OA-4` and `OA-5` done — real binary, real permission decision, real hub, breadcrumb when the hub is absent. **`OA-6` deferred**: the human journey was not performed |
 | GitHub Copilot CLI ACP spike (CP-1 → CP-2) | Done. `CP-3` **deferred** the adapter, and `CP-4` turned that into a runbook and a test. v1 ships opencode only |
 
 > [!IMPORTANT]
-> There is no `agent-ping` command to run yet, and no release. `package.json` carries
-> no `bin` entry, `src/cli` does not exist, and nothing has been installed globally.
+> There is no `agent-ping` command to run yet, and no release. `package.json` now
+> declares the `agent-ping` binary, a `files` allowlist and a `prepack` guard
+> ([`scripts/prepack-check.mjs`](scripts/prepack-check.mjs)), but `src/cli` does not
+> exist, so the guard refuses to publish and nothing has been installed globally.
 > [docs/PROGRESS.md](docs/PROGRESS.md) is the running build log, including every check
 > that is *not* yet verified against real software.
 
@@ -179,11 +181,10 @@ npm run build:dashboard                     # -> dist/dashboard/index.html
 ### The hub, by hand
 
 There is no CLI yet, so the hub is started programmatically. `tsc` emits JavaScript
-only, so copy the schema beside it first (POSIX shells):
+only, so the build copies the durable schema beside the emitted store itself:
 
 ```bash
 npm run build
-cp src/storage/schema.sql dist/main/storage/
 ```
 
 ```js

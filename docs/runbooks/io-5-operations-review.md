@@ -24,7 +24,7 @@ Already covered, so you do not rebuild it:
 
 | Covered by | What it proves |
 | --- | --- |
-| `IO-1` (pending) | The package publishes, the files allowlist is right, and a prepack check fails when a build artefact is missing |
+| `IO-1`, complete | The package publishes, the files allowlist is right, and a prepack check fails when a build artefact is missing |
 | `IO-2` (pending) | The four subcommands, unit-tested including the failure exits |
 | `IO-3` (pending) | Autostart units per platform, idempotent and reversible, against a temporary home |
 | `IO-4` (pending) | `scripts/verify-autostart-linux.mjs` — login, restart and pending survival on Linux |

@@ -1,10 +1,10 @@
 # Project Progress
 
 ## Current State
-**Phase**: LIVE-DASHBOARD-2
+**Phase**: INSTALL-AUTOSTART-AND-OPERATIONS-1
 **Status**: In Progress
-**Validation Gaps**: 130 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-27T22:17:14.528Z
+**Validation Gaps**: 133 unverified check(s) - see "Validation Gaps"
+**Last Updated**: 2026-09-27T22:58:18.670Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -80,6 +80,8 @@
   - Files: src/dashboard/main.ts, src/dashboard/a11y/dom-mirror.ts, src/dashboard/a11y/keyboard-nav.ts, tests/dashboard/live-dom-mirror.test.ts, src/dashboard/dashboard.css, tests/dashboard/live-harness.ts
 - [x] Phase LIVE-DASHBOARD-2, Task LD-3: Add acknowledgement, deep-link focus, handoff and history (@dashboard-engineer)
   - Files: src/dashboard/live/ack.ts, src/dashboard/live/deeplink.ts, src/dashboard/live/handoff.ts, src/dashboard/live/history.ts, src/dashboard/main.ts, tests/dashboard/live-interactions.test.ts, src/dashboard/dashboard.css, src/dashboard/index.html, src/dashboard/live/session-list.ts, tests/dashboard/live-harness.ts
+- [x] Phase INSTALL-AUTOSTART-AND-OPERATIONS-1, Task IO-1: Publish the package and guard its build artefacts (@packaging-engineer)
+  - Files: package.json, scripts/prepack-check.mjs, tests/packaging/package.test.ts, README.md, docs/runbooks/io-5-operations-review.md, scripts/build.mjs, tests/dashboard/card-document.test.ts
 - [x] Phase COPILOT-CLI-ACP-SPIKE-1, Task CP-1: Probe the real Copilot ACP surface (@connector-engineer)
   - Files: scripts/probe-copilot-acp.mjs, tests/scripts/probe-copilot-acp.test.ts, docs/research/copilot-acp-capture.json, tests/scripts/fixtures/copilot-acp-capture.json
 - [x] Phase COPILOT-CLI-ACP-SPIKE-1, Task CP-2: Probe the Copilot hook surface and write the report (@connector-engineer)
@@ -230,6 +232,9 @@
 - Task LD-3: The refusal the browser observed is a 401 driven by a deliberately wrong token, because that is the one refusal a page holding a token can provoke. A 404 and a 409 are covered by the committed jsdom suite and by the hub's own ack tests, but were not each driven through the browser.
 - Task LD-3: The deep-link browser observation used ?session=<id> on a live page; it does not cover the notification card's own click path, which is notification-engineer's surface and is asserted against the hub's published DEEP_LINK_QUERY_KEY literal rather than end to end.
 - Task LD-3: The ack control's availability was observed with the mirror clipped (the shipped view) and the mirror-height arithmetic was observed in the ?mirror=visible inspection view; a page both un-clipped and scrolled was not exercised.
+- Task IO-1: The npm pack comparison runs against the scratch tree, not the developer's dist/, and npm is invoked with --ignore-scripts so the observation does not depend on the answer it is compared against. The real-tree `npm pack --dry-run` was run by hand during development and agrees: 87 files, 0 source maps, 0 declarations, 0 tests, 0 docs, all three documents and the schema present.
+- Task IO-1: The dashboard asset sweep reads href and src attributes out of the built documents. It resolves relative references and skips absolute and protocol-relative ones; a build that emitted an asset under a different name than the document names is caught, and one that emitted an asset nothing references is not.
+- Task IO-1: The comment stripper used for the closure walk and the launch-policy read is this repository's hand-written kind: a backtick template is read as one string to its closing backtick, so a nested template inside a ${...} would end the scan early. No module or artefact these are pointed at contains one, and the test that compares the guard's derived closure against the product's own renderer would fail if a module were missed.
 - Task CP-1: The permission finding is from one run on one machine against one Copilot version. It is evidence, not a proof across versions, and the gate decision should cite the version alongside the claim.
 - Task CP-1: The hook surface is untouched: CP-2 owns the documented Copilot hook triggers and the consolidated report.
 - Task CP-1: The stub-binary deadline test executes a shebang script directly, so it assumes a POSIX-style platform, consistent with the existing tests/tooling/runner-convention.test.ts, which already spawns npm by bare name.

@@ -553,9 +553,26 @@ describe("the card entry is the product's own view, compiled from source", () =>
     expect(map.sources.some((source) => source.includes('notify/surface/card-view.ts'))).toBe(true)
     expect(map.sources.some((source) => source.includes('dist/'))).toBe(false)
 
-    // The build script has no step that could copy a compiled module into the dashboard,
-    // and the emitted chunk carries no node built-in for one to have smuggled in.
-    expect(readFileSync(repositoryPath('scripts/build.mjs'), 'utf8')).not.toMatch(/copyFile|cpSync|copyFileSync/)
+    // The build script's only copy is the durable schema, which IO-1 added because the
+    // store loads `schema.sql` relative to its own emitted module: a hand-written SQL
+    // file bound for `dist/main/storage/`, and nothing near the dashboard. So the claim
+    // this assertion makes is unchanged - no compiled module is copied into a renderer
+    // bundle - and it is now stated about what the build does rather than about a
+    // spelling. It used to be a blanket ban on the words `copyFile` and `cpSync`, which
+    // is a ban on a word: the first thing it caught was a copy of a `.sql` file, and it
+    // would have caught a copy of `dist/main` just the same. Every copy the build
+    // performs is enumerated here instead.
+    const buildScript = readFileSync(repositoryPath('scripts/build.mjs'), 'utf8')
+    const copies = [...buildScript.matchAll(/\b(?:copyFileSync|cpSync|copyFile)\s*\(([^)]*)\)/g)].map(
+      (match) => match[1] ?? '',
+    )
+    expect(copies.length).toBeGreaterThan(0)
+    for (const call of copies) {
+      expect(call, `a build step copies something other than the durable schema: ${call}`).toMatch(
+        /schema/i,
+      )
+      expect(call, `a build step copies into the dashboard: ${call}`).not.toMatch(/dashboard/i)
+    }
     const built = readFileSync(emitted as string, 'utf8')
     expect(built).not.toContain('node:')
     expect(built).not.toMatch(/\bprocess\.env\b/)

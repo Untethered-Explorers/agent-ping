@@ -1,16 +1,18 @@
 #!/usr/bin/env node
-// One build command for the three build entry points in PRD 6.2 / ADR-007:
+// One build command for the three build entry points in PRD 6.2 / ADR-007, plus
+// the one file none of them can emit:
 //
 //   1. Electron main and the CLI via tsc        (tsconfig.build.json -> dist/main)
 //   2. Dashboard via Vite                        (vite build, config owned by dashboard-engineer)
 //   3. Plugin: no build step                     (loaded as directly loadable TypeScript)
+//   4. The durable schema, copied beside the emitted store
 //
 // Every step reports whether it built or was skipped, and a step that runs and
 // fails fails this command. A step whose inputs do not exist yet is reported as
 // skipped, never counted as a build, so a green `npm run build` on an empty
 // source set says exactly that: nothing to build.
 import { spawnSync } from 'node:child_process'
-import { existsSync, readdirSync, statSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -114,6 +116,49 @@ if (dashboardEntries.length === 0) {
 // 3. Plugin: no build step by design.
 steps.push({ name: 'plugin', outcome: 'no build step', detail: 'loaded directly as TypeScript' })
 
+// 4. The durable schema beside the emitted store.
+//
+// `tsc` emits JavaScript only, and src/storage/db.ts loads the schema with
+// `new URL('./schema.sql', import.meta.url)` - the file beside the module, not
+// one it names by path. So a hub started from this build could not open its own
+// log, and the reader was told to copy the file by hand (EL-1, recorded for
+// tooling-engineer under DP-1 and packaging-engineer under IO-1). It is here
+// because it is a build step: nothing about it is packaging metadata, and the
+// package `files` allowlist only has to let the result through.
+//
+// A copy rather than an emit, deliberately: the schema is a hand-written SQL file
+// and tsc has no way to carry it, so this is the only place its content can be
+// decided. It is copied byte for byte, and the step reports a failure rather than
+// letting a package be built with a store that cannot start.
+const schemaSource = path.join(repoRoot, 'src', 'storage', 'schema.sql')
+const schemaTarget = path.join(repoRoot, 'dist', 'main', 'storage', 'schema.sql')
+const stagedSchema = `${schemaTarget}.partial`
+if (!existsSync(schemaSource)) {
+  steps.push({
+    name: 'schema (copy)',
+    outcome: 'skipped',
+    detail: 'no src/storage/schema.sql in this checkout',
+  })
+} else {
+  let copied = false
+  let detail = 'src/storage/schema.sql -> dist/main/storage/schema.sql'
+  try {
+    mkdirSync(path.dirname(schemaTarget), { recursive: true })
+    // Staged and renamed rather than copied in place, so a reader in another process -
+    // a hub starting while this build runs, say - reads either the previous file or the
+    // whole new one and never a half-written schema. The same discipline the global
+    // plugin installer uses to publish its generated file.
+    copyFileSync(schemaSource, stagedSchema)
+    renameSync(stagedSchema, schemaTarget)
+    copied = true
+  } catch (cause) {
+    rmSync(stagedSchema, { force: true })
+    detail = `${detail} - ${cause.message}`
+    status = fail('the durable schema could not be copied into the build output')
+  }
+  steps.push({ name: 'schema (copy)', outcome: copied ? 'copied' : 'failed', detail })
+}
+
 function fail(message) {
   process.stderr.write(`\n[build] ${message}\n`)
   return 1
@@ -123,7 +168,7 @@ process.stdout.write('\n[build] summary\n')
 for (const step of steps) {
   process.stdout.write(`[build]   ${step.name}: ${step.outcome} (${step.detail})\n`)
 }
-const built = steps.filter((step) => step.outcome === 'built').length
+const built = steps.filter((step) => step.outcome === 'built' || step.outcome === 'copied').length
 process.stdout.write(`[build] ${built} built, ${steps.filter((s) => s.outcome === 'skipped').length} skipped, exit ${status}\n`)
 
 if (status === 0 && built === 0) {
