@@ -42,6 +42,7 @@ logs/
 
 # Forge pipeline
 docs/engine-run.log
+docs/engine.pid
 docs/artifacts/
 
 # Operating system cruft

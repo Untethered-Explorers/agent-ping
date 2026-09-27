@@ -1,12 +1,12 @@
 {
   "runId": "7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8",
   "startedAt": "2026-09-26T10:43:05.421Z",
-  "lastUpdatedAt": "2026-09-27T18:53:52.166Z",
+  "lastUpdatedAt": "2026-09-27T18:53:52.305Z",
   "manifestPath": "/home/mcfuzzysquirrel/Projects/agent-ping/docs/EXECUTION-MANIFEST.json",
   "manifestVersion": "1.0",
   "harness": "opencode",
-  "status": "running",
-  "currentPhase": "NOTIFICATION-AND-TRAY-PRESENCE-4",
+  "status": "paused",
+  "currentPhase": "OPENCODE-PLUGIN-ADAPTER-3",
   "tasks": {
     "DP-1": {
       "taskId": "DP-1",
@@ -1163,7 +1163,8 @@
       "taskId": "OA-6",
       "status": "pending",
       "attempt": 0,
-      "outputFiles": []
+      "outputFiles": [],
+      "errorMessage": "Human review required for 'OA-6'. Record operator evidence with workflow-engine approve-task, then resume. --yes does not approve human work."
     },
     "LD-1": {
       "taskId": "LD-1",
