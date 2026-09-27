@@ -1,14 +1,14 @@
 {
-  "taskId": "NT-9",
-  "evidenceVersion": 2,
+  "taskId": "NS-4",
+  "evidenceVersion": 3,
   "script": "verify-notification-surface",
   "producedBy": "scripts/verify-notification-surface.mjs",
-  "startedAt": "2026-09-27T11:08:53.580Z",
-  "finishedAt": "2026-09-27T11:09:13.305Z",
-  "finding": "a real card was drawn into a real window inside the display work area, held while its block was outstanding, and left the screen under this product own rules; the journeys were driven through the run-time harness, and shippedPosture records that the product as shipped still cannot show a card without it. See harness, assertions, journeys and requiredProductChanges",
+  "startedAt": "2026-09-27T18:50:22.684Z",
+  "finishedAt": "2026-09-27T18:50:43.114Z",
+  "finding": "the product as shipped, built by this repository and started by this run with no seam supplied, put a real card on a real display inside the work area, painted it with its own stylesheet fill for the class, held it while its block was outstanding, took it off the screen when the block was acknowledged through the product's own write route, expired a finished card on its own interval with nothing dismissing it, and showed nothing at all for a session that did no work. See shippedPosture, seams, assertions, journeys and productChanges",
   "observer": {
     "found": {
-      "windowId": "0x600222",
+      "windowId": "0x6006fe",
       "mapState": "IsViewable",
       "width": 388,
       "height": 226,
@@ -19,120 +19,60 @@
         "bitsPerPixel": 24,
         "bytesPerLine": 1552,
         "pixels": 87688,
-        "distinctValues": 1164,
-        "nonZeroPixels": 70874
+        "distinctValues": 1240,
+        "nonZeroPixels": 87688,
+        "dominant": {
+          "rgb": [
+            245,
+            245,
+            245
+          ],
+          "hex": "#f5f5f5",
+          "count": 49012,
+          "share": 0.5589362284463096
+        }
       }
     },
     "diagnostics": {
-      "windowsBefore": 127,
+      "windowsBefore": 135,
       "listError": null,
       "spawnError": null,
       "childOutput": "",
-      "windowsAfter": 133,
+      "windowsAfter": 141,
       "listErrorAfter": null
     },
-    "elapsedMs": 324
+    "elapsedMs": 384
   },
   "repository": {
     "builtEntryPoint": "dist/main/main/index.js",
     "builtDashboard": "dist/dashboard",
-    "cardDocumentPresent": false,
-    "cardDocumentSource": "src/dashboard/card.html, a second entry in the dashboard Vite build",
+    "builtCardDocument": "dist/dashboard/card.html",
+    "cardDocumentPresent": true,
+    "cardDocumentSource": "src/dashboard/card.html, the surface document entry of the dashboard build (NS-1)",
     "stateDirUsed": "a fresh temporary directory per run, so this run cannot touch a real installation"
   },
-  "harness": {
-    "whatThisIs": "the run-time harness that completes the three seams the product has not built, and only those. The card itself - its words, its attributes, its accessible name, its lifetime, its expiry and its removal - is the product own compiled code, imported from the build and served to the document by the hub itself (NT-FR-02, NT-FR-08, APX-FR-01)",
-    "seams": [
-      {
-        "seam": "the card document",
-        "productState": "src/dashboard/card.html does not exist and the dashboard build has one entry, so GET /card.html is a 404 on the shipped build",
-        "suppliedHere": "a run-time document, its stylesheet and its module entry, in a copy of the built dashboard",
-        "productCodeUsed": [
-          "dist/main/notify/surface/card-view.js",
-          "dist/main/notify/surface/card.js",
-          "dist/main/notify/surface/lifetime.js"
-        ]
-      },
-      {
-        "seam": "the main-to-renderer channel",
-        "productState": "the shipped bridge supplies no DesktopBridge.renderCard, and the renderer has contextIsolation, no nodeIntegration and sandbox: true with no preload, so nothing can carry a card model into a document",
-        "suppliedHere": "webContents.executeJavaScript on the product own BrowserWindow, which the harness holds only by wrapping the class so the instance can be reached",
-        "productCodeUsed": [
-          "src/notify/surface/electron-host.ts SURFACE_WINDOW_OPTIONS, unchanged"
-        ]
-      },
-      {
-        "seam": "the acknowledgement signal",
-        "productState": "POST /api/ack/:eventId has no notifier hook, and nothing takes the window down when a card ends",
-        "suppliedHere": "the hub own pending accessor watched by the harness, which then calls the product own card view remove(\"acknowledged\") and the product own host hide() - and only after the product own card view has reported an end the product own lifetime cell names",
-        "productCodeUsed": [
-          "src/notify/surface/card-view.ts remove",
-          "src/notify/surface/electron-host.ts hide"
-        ]
-      }
+  "seams": {
+    "count": 0,
+    "suppliedByThisRun": [],
+    "whatThisRunUsesInstead": "the product's own built entry point, the product's own built dashboard, the product's own preload, the product own static route, the product own loopback routes, and the X server and the product own runtime file for everything observed",
+    "whatItWouldHaveToWriteToSubstitute": [
+      "a card document",
+      "a card stylesheet",
+      "a card entry module",
+      "a renderer bridge that injects a card model into the window"
     ],
-    "manifest": {
-      "written": [
-        {
-          "file": "card.html",
-          "bytes": 281,
-          "origin": "this script"
-        },
-        {
-          "file": "card.css",
-          "bytes": 1521,
-          "origin": "this script"
-        },
-        {
-          "file": "card-entry.js",
-          "bytes": 2225,
-          "origin": "this script"
-        },
-        {
-          "file": "assets",
-          "bytes": 4096,
-          "origin": "the built dashboard, copied"
-        },
-        {
-          "file": "index.html",
-          "bytes": 1086,
-          "origin": "the built dashboard, copied"
-        }
-      ],
-      "productCardModules": [
-        {
-          "product": "dist/main/notify/surface/card-view.js",
-          "servedAs": "card-view.js",
-          "bytes": 16234,
-          "identicalToTheBuild": true
-        },
-        {
-          "product": "dist/main/notify/surface/card.js",
-          "servedAs": "card.js",
-          "bytes": 9192,
-          "identicalToTheBuild": true
-        },
-        {
-          "product": "dist/main/notify/surface/lifetime.js",
-          "servedAs": "lifetime.js",
-          "bytes": 9441,
-          "identicalToTheBuild": true
-        }
-      ],
-      "mainBytes": 9441
-    },
-    "dashboardRoot": "this run own directory, never the checkout"
+    "enforcedBy": "tests/scripts/verify-notification-surface.test.ts reads this file's own source and fails on all four, on the one file it is allowed to write, and on the one artefact it is allowed to start",
+    "whyThisMatters": "a verification script that has to substitute for any of those four is measuring the script, not the product, and a green run would say nothing about the card a developer sees (NT-FR-12)"
   },
   "shippedPosture": {
     "entryPoint": "dist/main/main/index.js",
-    "question": "what does the product as shipped do on this display today: can it show a card at all?",
-    "asserted": false,
-    "why": "a record and not an assertion. A shipped build that grew a card document or a renderer channel would make a passing assertion here a false alarm, and the runbook would be the stale artefact. It also runs against a state directory of its own, so a block stored here cannot be replayed into the journeys and put a card on the screen before the first journey has taken its baseline",
-    "startedAt": "2026-09-27T11:08:54.175Z",
-    "readyMs": 802,
+    "question": "can the product as shipped show a card on this display, with no seam supplied by a test?",
+    "asserted": true,
+    "whyItIsAnAssertionNow": "NT-9 recorded this instead of asserting it, on purpose, because the product could not do it and the run had substituted all three of the missing pieces itself. NS-1 built and served the card document, NS-2 opened the renderer channel and wired the card presenter and NS-3 took the card down when its block ends, so the withheld assertion became real. A run that still recorded it would now be the stale artefact, and the runbook section behind it is the thing that should be stale instead",
+    "artefacts": "in-the-build",
     "delivery": {
-      "status": "not-wired",
-      "wired": false,
+      "status": "ok",
+      "wired": true,
       "attempted": 0,
       "delivered": 0,
       "failed": 0,
@@ -144,64 +84,58 @@
       "lastAttemptAt": null,
       "lastFailure": null
     },
+    "wiredVerdict": "wired",
     "cardDocument": {
       "path": "/card.html",
-      "status": 404
+      "status": 200,
+      "servedIdentically": "served-identically",
+      "contentSecurityPolicy": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
+      "provedBy": "the hub served the card document the window loads, byte for byte under the product own policy"
     },
-    "toastDeliveries": 0,
+    "rendererOptionsReadFromTheBuild": {
+      "available": true,
+      "readFrom": "dist/main/notify/surface/electron-host.js, read as code",
+      "contextIsolation": "true",
+      "nodeIntegration": "false",
+      "sandbox": "true",
+      "webSecurity": null,
+      "preload": "CARD_PRELOAD_PATH",
+      "howThisWasRead": "the module as code, its comments stripped, and only the frozen option object. Its prose names the settings this product refuses to use, so a first-match sweep over commented source would record the opposite of the configuration",
+      "notObserved": "these are the values the built artefact carries. A run outside the process cannot read the live window's own options, so this is a record of the build and not a reading of the running window"
+    },
     "pendingAfterARealBlock": 1,
-    "cardWindowOnTheDisplay": "no-card-window",
+    "pendingAfterTheAcknowledgement": 0,
+    "toastDeliveries": 2,
+    "cardWindowOnTheDisplayAtTheEnd": "no-card-window",
     "diagnosticLines": [
-      "[2762270:0927/130855.084218:ERROR:content/common/zygote/zygote_communication_linux.cc:291] Failed to send GetTerminationStatus message to zygote",
-      "[2762270:0927/130855.086029:ERROR:content/browser/network_service_instance_impl.cc:650] Network service crashed or was terminated, restarting service.",
-      "[2762270:0927/130855.092479:ERROR:content/common/zygote/zygote_communication_linux.cc:291] Failed to send GetTerminationStatus message to zygote",
-      "[2762270:0927/130855.100154:ERROR:content/browser/gpu/gpu_process_host.cc:1029] GPU process launch failed: error_code=1002",
-      "[2762270:0927/130855.101012:ERROR:content/browser/gpu/gpu_process_host.cc:1029] GPU process launch failed: error_code=1002",
-      "[2762270:0927/130855.101562:ERROR:content/browser/gpu/gpu_process_host.cc:1029] GPU process launch failed: error_code=1002",
-      "[2762270:0927/130855.102220:ERROR:content/browser/gpu/gpu_process_host.cc:1029] GPU process launch failed: error_code=1002",
-      "[2762270:0927/130855.102931:ERROR:content/browser/gpu/gpu_process_host.cc:1029] GPU process launch failed: error_code=1002",
-      "[2762270:0927/130855.103877:ERROR:content/browser/gpu/gpu_process_host.cc:1029] GPU process launch failed: error_code=1002",
-      "[2762270:0927/130855.103892:FATAL:content/browser/gpu/gpu_data_manager_impl_private.cc:417] GPU process isn't usable. Goodbye."
+      "[3197498:0927/205040.782715:ERROR:content/common/zygote/zygote_communication_linux.cc:291] Failed to send GetTerminationStatus message to zygote",
+      "[3197498:0927/205040.784016:ERROR:content/common/zygote/zygote_communication_linux.cc:291] Failed to send GetTerminationStatus message to zygote",
+      "[3197498:0927/205040.789891:ERROR:content/browser/gpu/gpu_process_host.cc:1029] GPU process launch failed: error_code=1002",
+      "[3197498:0927/205040.790829:ERROR:content/browser/network_service_instance_impl.cc:650] Network service crashed or was terminated, restarting service.",
+      "[3197498:0927/205040.796430:ERROR:content/browser/gpu/gpu_process_host.cc:1029] GPU process launch failed: error_code=1002",
+      "[3197498:0927/205040.798336:ERROR:content/browser/gpu/gpu_process_host.cc:1029] GPU process launch failed: error_code=1002",
+      "[3197498:0927/205040.799242:ERROR:content/browser/gpu/gpu_process_host.cc:1029] GPU process launch failed: error_code=1002",
+      "[3197498:0927/205040.800098:ERROR:content/browser/gpu/gpu_process_host.cc:1029] GPU process launch failed: error_code=1002",
+      "[3197498:0927/205040.801613:ERROR:content/browser/gpu/gpu_process_host.cc:1029] GPU process launch failed: error_code=1002",
+      "[3197498:0927/205040.801634:FATAL:content/browser/gpu/gpu_data_manager_impl_private.cc:417] GPU process isn't usable. Goodbye."
     ],
     "productDiagnosticLines": [],
     "chromiumDiagnosticLines": [
-      "[2762270:0927/130855.084218:ERROR:content/common/zygote/zygote_communication_linux.cc:291] Failed to send GetTerminationStatus message to zygote",
-      "[2762270:0927/130855.086029:ERROR:content/browser/network_service_instance_impl.cc:650] Network service crashed or was terminated, restarting service.",
-      "[2762270:0927/130855.092479:ERROR:content/common/zygote/zygote_communication_linux.cc:291] Failed to send GetTerminationStatus message to zygote",
-      "[2762270:0927/130855.100154:ERROR:content/browser/gpu/gpu_process_host.cc:1029] GPU process launch failed: error_code=1002",
-      "[2762270:0927/130855.101012:ERROR:content/browser/gpu/gpu_process_host.cc:1029] GPU process launch failed: error_code=1002",
-      "[2762270:0927/130855.101562:ERROR:content/browser/gpu/gpu_process_host.cc:1029] GPU process launch failed: error_code=1002",
-      "[2762270:0927/130855.102220:ERROR:content/browser/gpu/gpu_process_host.cc:1029] GPU process launch failed: error_code=1002",
-      "[2762270:0927/130855.102931:ERROR:content/browser/gpu/gpu_process_host.cc:1029] GPU process launch failed: error_code=1002",
-      "[2762270:0927/130855.103877:ERROR:content/browser/gpu/gpu_process_host.cc:1029] GPU process launch failed: error_code=1002",
-      "[2762270:0927/130855.103892:FATAL:content/browser/gpu/gpu_data_manager_impl_private.cc:417] GPU process isn't usable. Goodbye."
+      "[3197498:0927/205040.782715:ERROR:content/common/zygote/zygote_communication_linux.cc:291] Failed to send GetTerminationStatus message to zygote",
+      "[3197498:0927/205040.784016:ERROR:content/common/zygote/zygote_communication_linux.cc:291] Failed to send GetTerminationStatus message to zygote",
+      "[3197498:0927/205040.789891:ERROR:content/browser/gpu/gpu_process_host.cc:1029] GPU process launch failed: error_code=1002",
+      "[3197498:0927/205040.790829:ERROR:content/browser/network_service_instance_impl.cc:650] Network service crashed or was terminated, restarting service.",
+      "[3197498:0927/205040.796430:ERROR:content/browser/gpu/gpu_process_host.cc:1029] GPU process launch failed: error_code=1002",
+      "[3197498:0927/205040.798336:ERROR:content/browser/gpu/gpu_process_host.cc:1029] GPU process launch failed: error_code=1002",
+      "[3197498:0927/205040.799242:ERROR:content/browser/gpu/gpu_process_host.cc:1029] GPU process launch failed: error_code=1002",
+      "[3197498:0927/205040.800098:ERROR:content/browser/gpu/gpu_process_host.cc:1029] GPU process launch failed: error_code=1002",
+      "[3197498:0927/205040.801613:ERROR:content/browser/gpu/gpu_process_host.cc:1029] GPU process launch failed: error_code=1002",
+      "[3197498:0927/205040.801634:FATAL:content/browser/gpu/gpu_data_manager_impl_private.cc:417] GPU process isn't usable. Goodbye."
     ],
     "productDiagnosticCount": 0,
     "chromiumDiagnosticCount": 10,
-    "diagnosticLinesNote": "the two populations are kept apart because one finding is about whether this product's own diagnostic reaches an operator, and a count that included Chromium teardown noise would answer a different question. Chromium writes its GPU and zygote lines while a process is being stopped on this desktop, so a nonzero chromium count beside a zero product count is the expected reading for a healthy hub and is not a fault",
-    "stopped": {
-      "alreadyExited": false,
-      "escalated": false
-    },
-    "cardWindowFacts": [
-      {
-        "id": "0x4400004",
-        "detail": {
-          "mapState": "IsUnMapped",
-          "width": 320,
-          "height": 96,
-          "x": 800,
-          "y": 508,
-          "depth": 32
-        },
-        "pid": 2762270,
-        "pixels": {
-          "ok": false,
-          "reason": "X Error of failed request:  BadMatch (invalid parameter attributes)\n  Major opcode of failed request:  73 (X_GetImage)\n  Serial number of failed request:  234\n  Current serial number in output stream:  234"
-        }
-      }
-    ],
-    "finishedAt": "2026-09-27T11:08:55.352Z"
+    "diagnosticLinesNote": "the two populations are kept apart because one open finding is about whether this product's own diagnostic reaches an operator, and a count that included Chromium teardown noise would answer a different question. Chromium writes its GPU and zygote lines while a process is being stopped on this desktop, so a nonzero chromium count beside a zero product count is the expected reading for a healthy hub and is not a fault",
+    "stateDirectory": "a directory of this run own, so a block stored here cannot be replayed into a later run"
   },
   "machine": {
     "platform": "linux x64",
@@ -222,7 +156,7 @@
         "ok": false,
         "exit": null,
         "signal": "SIGTRAP",
-        "firstStderrLine": "[2762403:0927/130855.611961:FATAL:sandbox/linux/suid/client/setuid_sandbox_host.cc:166] The SUID sandbox helper binary was found, but is not configured correctly. Rather than run without sandboxing I'm aborting now. You need to make sure that ~/Projects/agent-ping/node_modules/electron/dist/chrome-sandbox is owned by root and has mode 4755."
+        "firstStderrLine": "[3197532:0927/205023.739582:FATAL:sandbox/linux/suid/client/setuid_sandbox_host.cc:166] The SUID sandbox helper binary was found, but is not configured correctly. Rather than run without sandboxing I'm aborting now. You need to make sure that ~/Projects/agent-ping/node_modules/electron/dist/chrome-sandbox is owned by root and has mode 4755."
       },
       "why": "Chromium reads its command line and decides about the sandbox before any JavaScript in this package runs, so the switch has to reach the process rather than be appended from here. This run measured both halves (PRD 16 Open Question 13)"
     },
@@ -265,18 +199,72 @@
   },
   "journeys": [
     {
+      "journey": "shipped-build",
+      "artefacts": "in-the-build",
+      "builtCardDocument": {
+        "path": "dist/dashboard/card.html",
+        "present": true,
+        "bytes": 2957,
+        "entry": "dist/dashboard/assets/card-DzxB0b0H.js",
+        "stylesheet": "dist/dashboard/assets/card-D04caqDE.css",
+        "source": "src/dashboard/card.html, the surface document entry of the dashboard build (NS-1)"
+      },
+      "builtPreload": "dist/main/notify/surface/preload.cjs",
+      "cardFillsReadFromTheBuild": {
+        "needsYou": {
+          "rgb": [
+            58,
+            31,
+            36
+          ],
+          "hex": "#3a1f24"
+        },
+        "finished": {
+          "rgb": [
+            27,
+            43,
+            36
+          ],
+          "hex": "#1b2b24"
+        },
+        "default": {
+          "rgb": [
+            31,
+            36,
+            48
+          ],
+          "hex": "#1f2430"
+        }
+      },
+      "delivery": {
+        "status": "ok",
+        "wired": true,
+        "attempted": 0,
+        "delivered": 0,
+        "failed": 0,
+        "timedOut": 0,
+        "suppressed": 0,
+        "notWired": 0,
+        "replayed": 0,
+        "inFlight": 0,
+        "lastAttemptAt": null,
+        "lastFailure": null
+      },
+      "wiredVerdict": "wired"
+    },
+    {
       "journey": "needs-you",
       "eventClass": "needs-you",
-      "eventId": "44d2148c-66a9-409e-90b9-9a86ccf6857c",
+      "eventId": "3e5ce5c4-9229-4e23-8d2c-707bce16678e",
       "ingestOutcome": "pending-created",
       "pendingBefore": 0,
       "pendingAfterIngest": 1,
       "pendingAfterAck": 0,
       "cardWindowAppeared": true,
-      "cardAppearedAfterMs": 234,
+      "cardAppearedAfterMs": 726,
       "cardRectangles": [
         {
-          "windowId": "0x4400004",
+          "windowId": "0x5e00004",
           "x": 1584,
           "y": 48,
           "width": 320,
@@ -291,48 +279,53 @@
             "bitsPerPixel": 32,
             "bytesPerLine": 1280,
             "pixels": 30720,
-            "distinctValues": 772,
-            "nonZeroPixels": 30672
+            "distinctValues": 1127,
+            "nonZeroPixels": 30652,
+            "dominant": {
+              "rgb": [
+                62,
+                24,
+                35
+              ],
+              "hex": "#3e1823",
+              "count": 26975,
+              "share": 0.8780924479166666
+            }
           }
         }
       ],
       "cardSizeSource": "src/notify/surface/position.ts CARD_SIZE, the rectangle docs/research/electron-surface-preflight.json measured",
-      "cardViewReported": "rendered",
-      "cardElement": {
-        "attributes": [
-          "data-card",
-          "data-urgency",
-          "data-lifetime",
-          "data-deep-link",
-          "data-motion-state-arrival",
-          "role",
-          "aria-live",
-          "aria-label",
-          "tabindex",
-          "data-card-urgency-icon",
-          "aria-hidden",
-          "data-card-urgency-word",
-          "data-card-title",
-          "data-card-body"
-        ],
-        "elementCount": 5,
-        "inlineStyle": null,
-        "urgency": "critical",
-        "lifetime": "until-resolved",
-        "expiresIn": null,
-        "role": "status",
-        "ariaLive": "assertive",
-        "motion": "animated",
-        "hasDeepLink": true,
-        "ariaLabelLength": 81,
-        "titleLength": 17,
-        "bodyLength": 51
-      },
-      "ackStatus": 200,
-      "cardGoneAfterMs": 404,
-      "cardEndReportedByTheCardView": [
-        "acknowledged"
+      "cardFillVerdict": "needs-you-fill",
+      "cardFillReadings": [
+        {
+          "windowId": "0x5e00004",
+          "dominant": {
+            "hex": "#3e1823",
+            "rgb": [
+              62,
+              24,
+              35
+            ],
+            "count": 26975,
+            "share": 0.8780924479166666
+          },
+          "distances": {
+            "needs-you-fill": 7,
+            "finished-fill": 35
+          },
+          "best": {
+            "verdict": "needs-you-fill",
+            "distance": 7
+          },
+          "withinTolerance": true
+        }
       ],
+      "cardDocumentServed": "served-identically",
+      "cardDocumentStatus": 200,
+      "contentSecurityPolicy": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
+      "ackStatus": 200,
+      "cardGoneAfterMs": 55,
+      "cardGoneBecause": "no-card-window",
       "rejectedWindows": []
     },
     {
@@ -341,10 +334,10 @@
       "ingestOutcome": "stored",
       "finishedEvents": 1,
       "cardWindowAppeared": true,
-      "cardAppearedAfterMs": 38,
+      "cardAppearedAfterMs": 63,
       "cardRectangles": [
         {
-          "windowId": "0x4400004",
+          "windowId": "0x5e00004",
           "x": 1584,
           "y": 48,
           "width": 320,
@@ -357,17 +350,48 @@
             "bitsPerPixel": 32,
             "bytesPerLine": 1280,
             "pixels": 30720,
-            "distinctValues": 675,
-            "nonZeroPixels": 30672
+            "distinctValues": 993,
+            "nonZeroPixels": 30652,
+            "dominant": {
+              "rgb": [
+                21,
+                46,
+                36
+              ],
+              "hex": "#152e24",
+              "count": 27463,
+              "share": 0.8939778645833333
+            }
           }
         }
       ],
-      "cardGoneAfterTheInterval": true,
-      "cardEndReportedByTheCardView": [
-        "acknowledged",
-        "expired"
+      "cardFillVerdict": "finished-fill",
+      "cardFillReadings": [
+        {
+          "windowId": "0x5e00004",
+          "dominant": {
+            "hex": "#152e24",
+            "rgb": [
+              21,
+              46,
+              36
+            ],
+            "count": 27463,
+            "share": 0.8939778645833333
+          },
+          "distances": {
+            "needs-you-fill": 37,
+            "finished-fill": 6
+          },
+          "best": {
+            "verdict": "finished-fill",
+            "distance": 6
+          },
+          "withinTolerance": true
+        }
       ],
-      "cardEnd": null
+      "cardGoneAfterTheInterval": true,
+      "cardGoneBecause": "no-card-window"
     },
     {
       "journey": "greeting-and-close",
@@ -389,31 +413,33 @@
     }
   ],
   "timings": {
-    "hubReadyMs": 61,
+    "hubReadyMs": 599,
     "needs-you": {
-      "cardAppearedMs": 234,
-      "cardRenderedMs": 0,
-      "settleWaitMs": 4001,
-      "cardGoneMs": 404,
-      "startedAt": "2026-09-27T11:08:56.371Z",
-      "finishedAt": "2026-09-27T11:09:01.315Z",
-      "elapsedMs": 4944
+      "cardAppearedMs": 726,
+      "paintSettledAfterMs": 265,
+      "fillVerdictMs": 0,
+      "settleWaitMs": 4005,
+      "cardGoneMs": 55,
+      "startedAt": "2026-09-27T18:50:24.855Z",
+      "finishedAt": "2026-09-27T18:50:30.132Z",
+      "elapsedMs": 5277
     },
     "finished": {
-      "cardAppearedMs": 38,
-      "expiryWaitMs": 8003,
-      "startedAt": "2026-09-27T11:09:01.315Z",
-      "finishedAt": "2026-09-27T11:09:09.427Z",
-      "elapsedMs": 8112
+      "cardAppearedMs": 63,
+      "paintSettledAfterMs": 452,
+      "expiryWaitMs": 8004,
+      "startedAt": "2026-09-27T18:50:30.132Z",
+      "finishedAt": "2026-09-27T18:50:38.828Z",
+      "elapsedMs": 8696
     },
     "greeting-and-close": {
       "settleWaitMs": 1500,
-      "startedAt": "2026-09-27T11:09:09.427Z",
-      "finishedAt": "2026-09-27T11:09:11.046Z",
-      "elapsedMs": 1619
+      "startedAt": "2026-09-27T18:50:38.828Z",
+      "finishedAt": "2026-09-27T18:50:40.677Z",
+      "elapsedMs": 1849
     },
-    "totalMs": 19725,
-    "observerControlMs": 324
+    "totalMs": 20430,
+    "observerControlMs": 384
   },
   "delivery": {
     "status": "ok",
@@ -426,7 +452,7 @@
     "notWired": 0,
     "replayed": 0,
     "inFlight": 0,
-    "lastAttemptAt": "2026-09-27T11:09:01.366Z",
+    "lastAttemptAt": "2026-09-27T18:50:30.177Z",
     "lastFailure": null
   },
   "badge": {
@@ -445,351 +471,21 @@
     "observableFromOutside": false,
     "why": "an Electron Tray is a StatusNotifierItem and not an X window, so this run could not observe whether the icon mounted or what it carried"
   },
-  "cardReports": [
-    {
-      "seq": 1,
-      "at": 1790507336311,
-      "showsCard": false,
-      "ends": [],
-      "cardElement": null,
-      "cardEnd": null,
-      "harnessStarted": {
-        "origin": "http://127.0.0.1:43117",
-        "surfaceMounted": true,
-        "notifierSupported": true,
-        "notifierReason": "surface-notifier",
-        "windows": 1
-      },
-      "endState": null,
-      "ackState": null,
-      "presented": null,
-      "ackRemovals": null,
-      "error": null
-    },
-    {
-      "seq": 2,
-      "at": 1790507336709,
-      "showsCard": false,
-      "ends": [],
-      "cardElement": null,
-      "cardEnd": null,
-      "harnessStarted": null,
-      "endState": "no-new-end",
-      "ackState": "no-card-showing",
-      "presented": null,
-      "ackRemovals": 0,
-      "error": null
-    },
-    {
-      "seq": 3,
-      "at": 1790507336710,
-      "showsCard": false,
-      "ends": [],
-      "cardElement": null,
-      "cardEnd": null,
-      "harnessStarted": null,
-      "endState": null,
-      "ackState": null,
-      "presented": 1,
-      "ackRemovals": null,
-      "error": null
-    },
-    {
-      "seq": 4,
-      "at": 1790507336808,
-      "showsCard": true,
-      "ends": [],
-      "cardElement": {
-        "attributes": [
-          "data-card",
-          "data-urgency",
-          "data-lifetime",
-          "data-deep-link",
-          "data-motion-state-arrival",
-          "role",
-          "aria-live",
-          "aria-label",
-          "tabindex",
-          "data-card-urgency-icon",
-          "aria-hidden",
-          "data-card-urgency-word",
-          "data-card-title",
-          "data-card-body"
-        ],
-        "elementCount": 5,
-        "inlineStyle": null,
-        "urgency": "critical",
-        "lifetime": "until-resolved",
-        "expiresIn": null,
-        "role": "status",
-        "ariaLive": "assertive",
-        "motion": "animated",
-        "hasDeepLink": true,
-        "ariaLabelLength": 81,
-        "titleLength": 17,
-        "bodyLength": 51
-      },
-      "cardEnd": null,
-      "harnessStarted": null,
-      "endState": "no-new-end",
-      "ackState": "still-pending",
-      "presented": null,
-      "ackRemovals": 0,
-      "error": null
-    },
-    {
-      "seq": 5,
-      "at": 1790507341019,
-      "showsCard": true,
-      "ends": [],
-      "cardElement": {
-        "attributes": [
-          "data-card",
-          "data-urgency",
-          "data-lifetime",
-          "data-deep-link",
-          "data-motion-state-arrival",
-          "role",
-          "aria-live",
-          "aria-label",
-          "tabindex",
-          "data-card-urgency-icon",
-          "aria-hidden",
-          "data-card-urgency-word",
-          "data-card-title",
-          "data-card-body"
-        ],
-        "elementCount": 5,
-        "inlineStyle": null,
-        "urgency": "critical",
-        "lifetime": "until-resolved",
-        "expiresIn": null,
-        "role": "status",
-        "ariaLive": "assertive",
-        "motion": "animated",
-        "hasDeepLink": true,
-        "ariaLabelLength": 81,
-        "titleLength": 17,
-        "bodyLength": 51
-      },
-      "cardEnd": null,
-      "harnessStarted": null,
-      "endState": "no-new-end",
-      "ackState": "removing",
-      "presented": null,
-      "ackRemovals": 1,
-      "error": null
-    },
-    {
-      "seq": 6,
-      "at": 1790507341023,
-      "showsCard": true,
-      "ends": [],
-      "cardElement": {
-        "attributes": [
-          "data-card",
-          "data-urgency",
-          "data-lifetime",
-          "data-deep-link",
-          "data-motion-state-arrival",
-          "role",
-          "aria-live",
-          "aria-label",
-          "tabindex",
-          "data-card-urgency-icon",
-          "aria-hidden",
-          "data-card-urgency-word",
-          "data-card-title",
-          "data-card-body"
-        ],
-        "elementCount": 5,
-        "inlineStyle": null,
-        "urgency": "critical",
-        "lifetime": "until-resolved",
-        "expiresIn": null,
-        "role": "status",
-        "ariaLive": "assertive",
-        "motion": "animated",
-        "hasDeepLink": true,
-        "ariaLabelLength": 81,
-        "titleLength": 17,
-        "bodyLength": 51
-      },
-      "cardEnd": null,
-      "harnessStarted": null,
-      "endState": null,
-      "ackState": "removed",
-      "presented": null,
-      "ackRemovals": null,
-      "error": null
-    },
-    {
-      "seq": 7,
-      "at": 1790507341219,
-      "showsCard": false,
-      "ends": [
-        "acknowledged"
-      ],
-      "cardElement": null,
-      "cardEnd": {
-        "end": "acknowledged",
-        "at": 1790507341219,
-        "windowWasVisibleWhenTheCardEnded": true,
-        "hiddenBy": "this harness, standing in for the product hook that does not exist: nothing in the product takes the window down when a card ends, so the run records that gap and completes it here (NT-FR-10)"
-      },
-      "harnessStarted": null,
-      "endState": null,
-      "ackState": null,
-      "presented": null,
-      "ackRemovals": null,
-      "error": null
-    },
-    {
-      "seq": 8,
-      "at": 1790507341219,
-      "showsCard": false,
-      "ends": [
-        "acknowledged"
-      ],
-      "cardElement": null,
-      "cardEnd": null,
-      "harnessStarted": null,
-      "endState": "hid-the-window-for-acknowledged",
-      "ackState": "no-card-showing",
-      "presented": null,
-      "ackRemovals": 1,
-      "error": null
-    },
-    {
-      "seq": 9,
-      "at": 1790507341366,
-      "showsCard": false,
-      "ends": [
-        "acknowledged"
-      ],
-      "cardElement": null,
-      "cardEnd": null,
-      "harnessStarted": null,
-      "endState": null,
-      "ackState": null,
-      "presented": 2,
-      "ackRemovals": null,
-      "error": null
-    },
-    {
-      "seq": 10,
-      "at": 1790507341419,
-      "showsCard": true,
-      "ends": [
-        "acknowledged"
-      ],
-      "cardElement": {
-        "attributes": [
-          "data-card",
-          "data-urgency",
-          "data-lifetime",
-          "data-expires-in",
-          "data-deep-link",
-          "data-motion-state-arrival",
-          "role",
-          "aria-live",
-          "aria-label",
-          "tabindex",
-          "data-card-urgency-icon",
-          "aria-hidden",
-          "data-card-urgency-word",
-          "data-card-title",
-          "data-card-body"
-        ],
-        "elementCount": 5,
-        "inlineStyle": null,
-        "urgency": "normal",
-        "lifetime": "expires",
-        "expiresIn": "5000",
-        "role": "status",
-        "ariaLive": "polite",
-        "motion": "animated",
-        "hasDeepLink": true,
-        "ariaLabelLength": 62,
-        "titleLength": 17,
-        "bodyLength": 33
-      },
-      "cardEnd": null,
-      "harnessStarted": null,
-      "endState": "no-new-end",
-      "ackState": "not-a-block",
-      "presented": null,
-      "ackRemovals": 1,
-      "error": null
-    },
-    {
-      "seq": 11,
-      "at": 1790507346441,
-      "showsCard": false,
-      "ends": [
-        "acknowledged",
-        "expired"
-      ],
-      "cardElement": null,
-      "cardEnd": {
-        "end": "expired",
-        "at": 1790507346441,
-        "windowWasVisibleWhenTheCardEnded": true,
-        "hiddenBy": "this harness, standing in for the product hook that does not exist: nothing in the product takes the window down when a card ends, so the run records that gap and completes it here (NT-FR-10)"
-      },
-      "harnessStarted": null,
-      "endState": null,
-      "ackState": null,
-      "presented": null,
-      "ackRemovals": null,
-      "error": null
-    },
-    {
-      "seq": 12,
-      "at": 1790507346441,
-      "showsCard": false,
-      "ends": [
-        "acknowledged",
-        "expired"
-      ],
-      "cardElement": null,
-      "cardEnd": null,
-      "harnessStarted": null,
-      "endState": "hid-the-window-for-expired",
-      "ackState": "no-card-showing",
-      "presented": null,
-      "ackRemovals": 1,
-      "error": null
-    },
-    {
-      "seq": 13,
-      "at": 1790507346642,
-      "showsCard": false,
-      "ends": [
-        "acknowledged",
-        "expired"
-      ],
-      "cardElement": null,
-      "cardEnd": null,
-      "harnessStarted": null,
-      "endState": "no-new-end",
-      "ackState": "no-card-showing",
-      "presented": null,
-      "ackRemovals": 1,
-      "error": null
-    }
-  ],
   "childDiagnostics": {
     "stdoutLines": [],
     "stderrLines": [
-      "harness: origin=http://127.0.0.1:43117 surfaceMounted=true notifier={\"supported\":true,\"reason\":\"surface-notifier\"}",
-      "hub: agent-ping: stopping on signal:SIGTERM",
-      "[2762370:0927/130911.090270:ERROR:content/common/zygote/zygote_communication_linux.cc:291] Failed to send GetTerminationStatus message to zygote",
-      "[2762370:0927/130911.094176:ERROR:content/common/zygote/zygote_communication_linux.cc:291] Failed to send GetTerminationStatus message to zygote",
-      "[2762370:0927/130911.096807:ERROR:content/browser/network_service_instance_impl.cc:650] Network service crashed or was terminated, restarting service.",
-      "[2762370:0927/130911.102263:ERROR:content/browser/gpu/gpu_process_host.cc:1029] GPU process launch failed: error_code=1002"
+      "[3197498:0927/205040.782715:ERROR:content/common/zygote/zygote_communication_linux.cc:291] Failed to send GetTerminationStatus message to zygote",
+      "[3197498:0927/205040.784016:ERROR:content/common/zygote/zygote_communication_linux.cc:291] Failed to send GetTerminationStatus message to zygote",
+      "[3197498:0927/205040.789891:ERROR:content/browser/gpu/gpu_process_host.cc:1029] GPU process launch failed: error_code=1002",
+      "[3197498:0927/205040.790829:ERROR:content/browser/network_service_instance_impl.cc:650] Network service crashed or was terminated, restarting service.",
+      "[3197498:0927/205040.796430:ERROR:content/browser/gpu/gpu_process_host.cc:1029] GPU process launch failed: error_code=1002",
+      "[3197498:0927/205040.798336:ERROR:content/browser/gpu/gpu_process_host.cc:1029] GPU process launch failed: error_code=1002",
+      "[3197498:0927/205040.799242:ERROR:content/browser/gpu/gpu_process_host.cc:1029] GPU process launch failed: error_code=1002",
+      "[3197498:0927/205040.800098:ERROR:content/browser/gpu/gpu_process_host.cc:1029] GPU process launch failed: error_code=1002",
+      "[3197498:0927/205040.801613:ERROR:content/browser/gpu/gpu_process_host.cc:1029] GPU process launch failed: error_code=1002",
+      "[3197498:0927/205040.801634:FATAL:content/browser/gpu/gpu_data_manager_impl_private.cc:417] GPU process isn't usable. Goodbye."
     ],
-    "note": "bounded at 200 lines each, and the harness own card-report lines are kept out of them and recorded under cardReports instead. The shipped entry point, by contrast, passes no onDiagnostic into startHub, so its own not-wired reason is written nowhere - see shippedPosture"
+    "note": "bounded at 200 lines each. The shipped entry point passes no onDiagnostic into startHub, so a reason a run can show no card is written nowhere by the product itself - see productChanges.open"
   },
   "notificationCentre": {
     "question": "what did the operating system notification centre receive while agent-ping delivered?",
@@ -807,73 +503,89 @@
     "positiveControl": 2,
     "note": "an observation, not an assertion. Nothing in this product is permitted to raise a platform notification, and the source sweep in tests/notify/policy.test.ts is what enforces that; what this section reports is what the desktop could have seen. The D-Bus stream itself is not stored, because it carries the notification text (APX-FR-01)."
   },
-  "requiredProductChanges": [
-    {
-      "id": "card-document-entry",
-      "owner": "dashboard-engineer",
-      "required": "src/dashboard/card.html as a second entry in the dashboard Vite build, so GET /card.html serves a card document in the shipped artefacts, and a stylesheet that draws the attributes src/notify/surface/card-view.ts writes",
-      "observed": "the shipped build serves no card document: dist/dashboard/card.html does not exist, GET /card.html answers 404, and src/notify/surface/electron-host.ts refuses to show a card whose document will not load (document-unavailable). A window showing a Chromium error page is not a card (APX-FR-02)",
-      "suppliedByThisRun": "a run-time card document, a stylesheet and a module entry, written into a copy of the built dashboard. The card those two files show is mounted by the product own compiled card view, copied byte for byte out of dist/main/notify/surface/; the document is this script and the stylesheet is this script, because the product has neither"
-    },
-    {
-      "id": "card-renderer-channel",
-      "owner": "notification-engineer with dashboard-engineer",
-      "required": "a DesktopBridge.renderCard presenter on the shipped Electron bridge, and the main-to-renderer channel that carries a card model into a document running with contextIsolation, no nodeIntegration and sandbox: true. A preload with a context bridge, or a loopback route the document polls, are the two shapes that do not weaken the renderer; this run used neither, because choosing one is a decision about NT-6 own Electron surface",
-      "observed": "src/main/index.ts electronSurfaceBridge deliberately supplies no renderer, so resolveSurfaceNotifier answers no-card-renderer, the delivery policy is not wired, and every delivery on the shipped entry point is recorded not-wired with nothing delivered. The product own tests assert exactly this state",
-      "suppliedByThisRun": "a presenter on the run own DesktopBridge, carrying the model with webContents.executeJavaScript into the product own card view running in the product own window. The renderer options were not touched: contextIsolation, nodeIntegration and sandbox came from the product own frozen SURFACE_WINDOW_OPTIONS"
-    },
-    {
-      "id": "acknowledgement-does-not-reach-the-card",
-      "owner": "hub-engineer",
-      "required": "a notifier hook on POST /api/ack/:eventId, so the card surface is told a block was acknowledged and the card can be removed with the end `acknowledged` its own lifetime cell names",
-      "observed": "the lifetime table names `acknowledged` as an end and the card view removes on it, but no path calls it during a run. On the shipped entry point a needs-you card would leave the screen only when its window was destroyed at shutdown",
-      "suppliedByThisRun": "the harness watches the hub own pending accessor and calls the card view own remove(\"acknowledged\") - a product method on a product object - as soon as the acknowledged item is gone from the pending set"
-    },
-    {
-      "id": "nothing-takes-the-window-down-when-a-card-ends",
-      "owner": "notification-engineer with hub-engineer",
-      "required": "the card view own end must reach the host, so host.hide() runs when a card ends. NT-FR-10 promises the surface occupies no screen space and draws nothing when no card is showing, and a mapped transparent window that nothing takes down is neither",
-      "observed": "this run watched the host window at the moment a finished card expired: it was still mapped and visible, and its own drawable was empty. An empty mapped rectangle is not a card and nothing is painted, so the card itself had gone - but the window outliving its card is a real gap and it is why the run had to complete it",
-      "suppliedByThisRun": "the harness calls the product own host hide() only after the product own card view reported an end that the product own lifetime cell names, and only for the ends a cell lists. Nothing in this script takes a window down for any other reason"
-    },
-    {
-      "id": "not-wired-diagnostic-has-no-destination",
-      "owner": "hub-engineer",
-      "required": "startElectronMain should pass an onDiagnostic that writes to stderr, so the not-wired reason reaches the operator",
-      "observed": "this run captured the shipped entry point stdout and stderr across its whole life. 0 of those lines were written by this product, and 10 by the Electron runtime tearing itself down (zygote, network service and GPU), which this script separates by the shape of the line rather than counting as a diagnostic. startHub defaults onDiagnostic to a no-op and the Electron entry point supplies none, so the reason a run can show no card is never reported anywhere by the product itself (APX-FR-02, ADR-010)",
-      "suppliedByThisRun": "none on the shipped entry point. The run-time harness passes an onDiagnostic that writes to stderr, which is why its own line count is not zero and the shipped one is"
-    },
-    {
-      "id": "tray-is-not-observable-outside-the-process",
-      "owner": "notification-engineer",
-      "required": "a way for a verification run to observe the tray: a diagnostic on mount, or the badge number through a route that already exists",
-      "observed": "an Electron Tray is a StatusNotifierItem and not an X window, so this run could not see whether the icon mounted or what number it carried. The badge number was read from GET /api/pending, which is the accessor the badge itself reads",
-      "suppliedByThisRun": "none"
-    },
-    {
-      "id": "the-durable-schema-is-not-in-the-build",
-      "owner": "tooling-engineer, with packaging-engineer for the package allowlist",
-      "required": "a copy step in scripts/build.mjs for src/storage/schema.sql, and dist/main/storage/schema.sql in the package files allowlist",
-      "observed": "the tsc build emits JavaScript only, so a hub started from the build cannot find its schema and refuses to open its log. This run has to copy the file by hand before it can start anything at all",
-      "suppliedByThisRun": "none: the remedy is a command in the preflight, and it is the preflight and the runbook that say so"
-    }
-  ],
+  "productChanges": {
+    "closed": [
+      {
+        "id": "card-document-entry",
+        "closedBy": "NS-1",
+        "required": "src/dashboard/card.html as a third entry of the dashboard build, with its stylesheet and its entry bundle",
+        "observedBefore": "the shipped build served no card document: dist/dashboard/card.html did not exist, GET /card.html answered 404, and a window showing a Chromium error page is not a card (APX-FR-02)",
+        "observedNow": "the build carries dist/dashboard/card.html with the entry bundle and stylesheet it references, and the hub's own static route served those exact bytes, under the product's own content-security policy, for the path the surface window loads",
+        "howThisRunProvesIt": "the built artefacts carry the product own card document, its stylesheet, its entry bundle and the preload its window loads",
+        "suppliedByThisRun": "nothing. This run supplies no seam, writes no file but the evidence file, and starts no process but the product's own built entry point, so a green result cannot mean the run did the product's work again"
+      },
+      {
+        "id": "card-renderer-channel",
+        "closedBy": "NS-2",
+        "required": "a card presenter on the shipped Electron bridge and a main-to-renderer channel that leaves contextIsolation, nodeIntegration and the renderer sandbox in force",
+        "observedBefore": "the shipped bridge supplied no presenter, so resolveSurfaceNotifier answered no-card-renderer, the delivery policy was not wired, and every delivery on the shipped entry point was recorded not-wired",
+        "observedNow": "the shipped delivery policy answered wired, which the product only reports when a presenter is behind the surface, and a card then reached a real window on a real display and painted the product own fill",
+        "howThisRunProvesIt": "the shipped delivery policy is wired, so the card model crossed a channel the product owns; a card window appeared inside the display work area",
+        "notObservedHere": "the three renderer settings are recorded from the built artefact rather than read from the live window, and tests/notify/surface-host.test.ts is what asserts the option object itself",
+        "suppliedByThisRun": "nothing. This run supplies no seam, writes no file but the evidence file, and starts no process but the product's own built entry point, so a green result cannot mean the run did the product's work again"
+      },
+      {
+        "id": "acknowledgement-does-not-reach-the-card",
+        "closedBy": "NS-3",
+        "required": "a notifier hook on POST /api/ack/:eventId, so the card can be removed with the end its own lifetime cell names",
+        "observedBefore": "the lifetime table named `acknowledged` as an end and the card view removed on it, but nothing called it during a run: a needs-you card left the screen only when its window was destroyed at shutdown",
+        "observedNow": "after a real POST /api/ack, the card window the hub owns was no longer viewable, nothing painted was on the display, and the pending count the badge reads fell to zero - with no dismissal from this script",
+        "howThisRunProvesIt": "the badge number fell when the item was acknowledged; the card was gone after the acknowledgement",
+        "suppliedByThisRun": "nothing. This run supplies no seam, writes no file but the evidence file, and starts no process but the product's own built entry point, so a green result cannot mean the run did the product's work again"
+      },
+      {
+        "id": "nothing-takes-the-window-down-when-a-card-ends",
+        "closedBy": "NS-3",
+        "required": "the card view's own end must reach the host, so host.hide() runs when a card ends. A mapped transparent window that nothing takes down is neither a card nor the quiet surface NT-FR-10 promises",
+        "observedBefore": "the host window was still mapped and visible when a finished card expired, and its drawable was empty, so the run had to complete the gap itself",
+        "observedNow": "the host window was unmapped after an acknowledged block and again after an expired finished card, and in both cases the map state is recorded so a reader can tell unmapped from merely empty",
+        "howThisRunProvesIt": "the card was gone after the acknowledgement; the finished card expired with nothing dismissing it",
+        "suppliedByThisRun": "nothing. This run supplies no seam, writes no file but the evidence file, and starts no process but the product's own built entry point, so a green result cannot mean the run did the product's work again"
+      }
+    ],
+    "open": [
+      {
+        "id": "not-wired-diagnostic-has-no-destination",
+        "owner": "hub-engineer",
+        "required": "startElectronMain should pass an onDiagnostic that writes to stderr, so the not-wired reason reaches the operator",
+        "observed": "this run captured the shipped entry point's stdout and stderr across its whole life. 0 of those lines were written by this product, and 10 by the Electron runtime tearing itself down (zygote, network service and GPU), which this script separates by the shape of the line rather than counting as a diagnostic. startHub defaults onDiagnostic to a no-op and the Electron entry point supplies none, so on a desktop where the surface refuses the reason a run can show no card is never reported by the product itself (APX-FR-02, ADR-010)",
+        "suppliedByThisRun": "none, and there is nothing to supply: the surface was wired on this run, so nothing refused"
+      },
+      {
+        "id": "tray-is-not-observable-outside-the-process",
+        "owner": "notification-engineer",
+        "required": "a way for a verification run to observe the tray: a diagnostic on mount, or the badge number through a route that already exists",
+        "observed": "an Electron Tray is a StatusNotifierItem and not an X window, so this run could not see whether the icon mounted or what number it carried. The badge number was read from GET /api/pending, which is the accessor the badge itself reads",
+        "suppliedByThisRun": "none"
+      },
+      {
+        "id": "the-durable-schema-is-not-in-the-build",
+        "owner": "tooling-engineer, with packaging-engineer for the package allowlist",
+        "required": "a copy step in scripts/build.mjs for src/storage/schema.sql, and dist/main/storage/schema.sql in the package files allowlist",
+        "observed": "the tsc build emits JavaScript only, so a hub started from the build cannot find its schema and refuses to open its log. This run has to copy the file by hand before it can start anything at all",
+        "suppliedByThisRun": "none: the remedy is a command in the preflight, and it is the preflight and the runbook that say so"
+      }
+    ]
+  },
   "notVerified": [
     "anything at all about macOS or Windows: this run happened on one Linux desktop and no statement in this file is evidence about another platform (APX-CON-06)",
-    "whether the card text is legible at its real size: the pixel capture measures painted content and cannot read a word, and the stylesheet that drew the card in this run is the harness own, so legibility remains a manual per-platform step with the product own stylesheet",
+    "the contents of the card. Reading a renderer from outside the process would mean injecting code into it, which is the shape this run exists to prove the product does not need, so nothing here reads the card document. Its element tree, its attributes, its accessible name, its live-region role and its reduced-motion behaviour are held by tests/notify/surface-card-view.test.ts and tests/dashboard/card-document.test.ts rather than by this run (NT-FR-02, NT-FR-12)",
+    "whether the card text is legible at its real size: the pixel capture measures painted values and reads no word, and no human read a card off this run display. Legibility remains a manual per-platform step with the product own stylesheet (NT-FR-02)",
+    "the exact colour on the screen: the fill comparison is a per-channel tolerance, because the desktop colour-manages what it is handed. On this machine it moved the product own fill by at most 7 per channel, and every reading records the distance it found, but no claim is made that a given hexadecimal value reached the compositor (APX-CON-06)",
     "whether showInactive left the keyboard focus alone: the X server exposes no focus reading for a card window on this desktop, so this run observed visibility and not focus (NT-FR-04)",
-    "whether a pointer can reach the card: the surface is click-through until a pointer arrives, and no synthetic pointer was moved",
-    "whether the click-through switch and the release both work: they are asserted against this product own host interface in tests/notify/surface-host.test.ts, and no pointer was moved here",
+    "whether a pointer can reach the card, and whether the click-through switch and its release both work: the surface is click-through until a pointer arrives, no pointer was moved, and tests/notify/surface-host.test.ts is what asserts the switch itself",
     "whether the tray icon mounted and what number it carried: an Electron Tray is a StatusNotifierItem, not an X window. The number was read through the accessor the badge reads",
-    "that the product as shipped can show a card: it cannot, and shippedPosture is the record of that. The journeys were driven through the run-time harness described in the harness section"
+    "the renderer settings of the running window: contextIsolation, nodeIntegration, sandbox and webSecurity are recorded from the built artefact and attributed to tests/notify/surface-host.test.ts, because a run outside the process cannot read a live window's options (NT-FR-12)",
+    "an installation that is already running: the shipped entry point takes Electron's single-instance lock, so a second launch quits before it serves. This run therefore proves the build in a state directory of its own and cannot verify a hub that is in use on the same desktop",
+    "GPU behaviour: Chromium reported a failed GPU process launch on this machine under software rendering, both during the run and while it was being stopped. The application reached ready and served regardless, and the failure is recorded rather than worked around, so nothing in this file says anything about a machine with a working GPU (PRD 16 Open Question 13)"
   ],
-  "harnessStopped": {
+  "hubStopped": {
     "alreadyExited": false,
     "escalated": false
   },
   "verdict": "pass",
-  "assertionsExpected": 19,
-  "assertionsRun": 19,
+  "assertionsExpected": 22,
+  "assertionsRun": 22,
   "assertions": [
     {
       "journey": "observer",
@@ -882,7 +594,7 @@
       "actual": "found-and-painted",
       "measured": {
         "controlWindow": {
-          "windowId": "0x600222",
+          "windowId": "0x6006fe",
           "mapState": "IsViewable",
           "width": 388,
           "height": 226,
@@ -893,16 +605,26 @@
             "bitsPerPixel": 24,
             "bytesPerLine": 1552,
             "pixels": 87688,
-            "distinctValues": 1164,
-            "nonZeroPixels": 70874
+            "distinctValues": 1240,
+            "nonZeroPixels": 87688,
+            "dominant": {
+              "rgb": [
+                245,
+                245,
+                245
+              ],
+              "hex": "#f5f5f5",
+              "count": 49012,
+              "share": 0.5589362284463096
+            }
           }
         },
         "diagnostics": {
-          "windowsBefore": 127,
+          "windowsBefore": 135,
           "listError": null,
           "spawnError": null,
           "childOutput": "",
-          "windowsAfter": 133,
+          "windowsAfter": 141,
           "listErrorAfter": null
         }
       }
@@ -914,8 +636,8 @@
       "actual": "serving",
       "measured": {
         "host": "127.0.0.1",
-        "port": 43117,
-        "pid": 2762370
+        "port": 43120,
+        "pid": 3197498
       }
     },
     {
@@ -925,6 +647,86 @@
       "actual": "runtime-file-read",
       "measured": {
         "why": "43117 is a first-candidate preference and is not necessarily the bound port (HC-FR-01), so the port is read from hub-runtime.json in this run own temporary state directory and never assumed"
+      }
+    },
+    {
+      "journey": "shipped-build",
+      "name": "the built artefacts carry the product own card document, its stylesheet, its entry bundle and the preload its window loads",
+      "expected": "in-the-build",
+      "actual": "in-the-build",
+      "measured": {
+        "builtCardDocument": {
+          "path": "dist/dashboard/card.html",
+          "present": true,
+          "bytes": 2957,
+          "entry": "dist/dashboard/assets/card-DzxB0b0H.js",
+          "stylesheet": "dist/dashboard/assets/card-D04caqDE.css",
+          "source": "src/dashboard/card.html, the surface document entry of the dashboard build (NS-1)"
+        },
+        "builtPreload": "dist/main/notify/surface/preload.cjs",
+        "preloadPresent": true,
+        "builtEntryPoint": "dist/main/main/index.js",
+        "suppliedByThisRun": "nothing. This run writes one file, the evidence file, and this row is a failed run if any of the four artefacts is absent",
+        "fillsReadFromTheBuild": {
+          "needsYou": {
+            "rgb": [
+              58,
+              31,
+              36
+            ],
+            "hex": "#3a1f24"
+          },
+          "finished": {
+            "rgb": [
+              27,
+              43,
+              36
+            ],
+            "hex": "#1b2b24"
+          },
+          "default": {
+            "rgb": [
+              31,
+              36,
+              48
+            ],
+            "hex": "#1f2430"
+          }
+        }
+      }
+    },
+    {
+      "journey": "shipped-build",
+      "name": "the shipped delivery policy is wired, so the card model crossed a channel the product owns",
+      "expected": "wired",
+      "actual": "wired",
+      "measured": {
+        "delivery": {
+          "status": "ok",
+          "wired": true,
+          "attempted": 0,
+          "delivered": 0,
+          "failed": 0,
+          "timedOut": 0,
+          "suppressed": 0,
+          "notWired": 0,
+          "replayed": 0,
+          "inFlight": 0,
+          "lastAttemptAt": null,
+          "lastFailure": null
+        },
+        "whatThisMeans": "the product own resolveSurfaceNotifier refuses a surface with no card presenter, so a wired policy means the shipped Electron bridge carried one and a card model had a channel to cross. The renderer runs with the product own frozen options, which name its preload; nothing about them is set, widened or replaced by this run (NT-FR-12, APX-FR-01)",
+        "rendererOptionsReadFromTheBuild": {
+          "available": true,
+          "readFrom": "dist/main/notify/surface/electron-host.js, read as code",
+          "contextIsolation": "true",
+          "nodeIntegration": "false",
+          "sandbox": "true",
+          "webSecurity": null,
+          "preload": "CARD_PRELOAD_PATH",
+          "howThisWasRead": "the module as code, its comments stripped, and only the frozen option object. Its prose names the settings this product refuses to use, so a first-match sweep over commented source would record the opposite of the configuration",
+          "notObserved": "these are the values the built artefact carries. A run outside the process cannot read the live window's own options, so this is a record of the build and not a reading of the running window"
+        }
       }
     },
     {
@@ -954,12 +756,12 @@
           "height": 1048
         },
         "workAreaSource": "xprop -root _NET_WORKAREA, the display server own answer",
-        "waitedMs": 234,
-        "reads": 2,
+        "waitedMs": 726,
+        "reads": 4,
         "candidates": [
           {
-            "id": "0x4400004",
-            "ownerPid": 2762370,
+            "id": "0x5e00004",
+            "ownerPid": 3197498,
             "mapState": "IsViewable",
             "width": 320,
             "height": 96,
@@ -973,8 +775,18 @@
               "bitsPerPixel": 32,
               "bytesPerLine": 1280,
               "pixels": 30720,
-              "distinctValues": 772,
-              "nonZeroPixels": 30672
+              "distinctValues": 1127,
+              "nonZeroPixels": 30652,
+              "dominant": {
+                "rgb": [
+                  62,
+                  24,
+                  35
+                ],
+                "hex": "#3e1823",
+                "count": 26975,
+                "share": 0.8780924479166666
+              }
             },
             "emergedBecause": "shown-again (map state was IsUnMapped)"
           }
@@ -993,44 +805,65 @@
     },
     {
       "journey": "needs-you",
-      "name": "the product own card view rendered a card into the document that window loaded",
-      "expected": "rendered",
-      "actual": "rendered",
+      "name": "the painted fill is the product own stylesheet fill for a needs-you card",
+      "expected": "needs-you-fill",
+      "actual": "needs-you-fill",
       "measured": {
-        "readFrom": "the renderer inside the hub's own window, by the harness's channel; corroboration for what is IN the card, never the basis of whether anything is ON the screen",
-        "viewModule": "dist/main/notify/surface/card-view.js, the product own compiled card view",
-        "element": {
-          "attributes": [
-            "data-card",
-            "data-urgency",
-            "data-lifetime",
-            "data-deep-link",
-            "data-motion-state-arrival",
-            "role",
-            "aria-live",
-            "aria-label",
-            "tabindex",
-            "data-card-urgency-icon",
-            "aria-hidden",
-            "data-card-urgency-word",
-            "data-card-title",
-            "data-card-body"
-          ],
-          "elementCount": 5,
-          "inlineStyle": null,
-          "urgency": "critical",
-          "lifetime": "until-resolved",
-          "expiresIn": null,
-          "role": "status",
-          "ariaLive": "assertive",
-          "motion": "animated",
-          "hasDeepLink": true,
-          "ariaLabelLength": 81,
-          "titleLength": 17,
-          "bodyLength": 51
+        "whatThisReplaces": "NT-9 read the card element out of the renderer through a bridge this script had to build, and the run could therefore only prove the card machinery rather than the product. That reading is gone with the bridge: the colour is read out of the product own built stylesheet and compared with what the compositor actually put on the screen, which no substituted document could have faked (NT-FR-12)",
+        "fillsTheProductBuildCarries": {
+          "needsYou": {
+            "rgb": [
+              58,
+              31,
+              36
+            ],
+            "hex": "#3a1f24"
+          },
+          "finished": {
+            "rgb": [
+              27,
+              43,
+              36
+            ],
+            "hex": "#1b2b24"
+          },
+          "default": {
+            "rgb": [
+              31,
+              36,
+              48
+            ],
+            "hex": "#1f2430"
+          }
         },
-        "childElementCount": 1,
-        "harnessError": null
+        "tolerancePerChannel": 12,
+        "paintSettled": true,
+        "paintSettledAfterMs": 265,
+        "readings": [
+          {
+            "windowId": "0x5e00004",
+            "dominant": {
+              "hex": "#3e1823",
+              "rgb": [
+                62,
+                24,
+                35
+              ],
+              "count": 26975,
+              "share": 0.8780924479166666
+            },
+            "distances": {
+              "needs-you-fill": 7,
+              "finished-fill": 35
+            },
+            "best": {
+              "verdict": "needs-you-fill",
+              "distance": 7
+            },
+            "withinTolerance": true
+          }
+        ],
+        "whyATolerance": "the desktop colour-manages what it is handed. On this machine it moved the product own --card-block-fill by at most 7 per channel, and the two class fills are 35 apart in red from each other, so the tolerance separates the classes and says nothing about exact colour (APX-CON-06)"
       }
     },
     {
@@ -1044,8 +877,8 @@
         "why": "NT-FR-08: one needs-you card per block, never re-armed, so the only thing that can remove it in this window is the block being resolved or acknowledged - neither of which has happened yet",
         "candidates": [
           {
-            "id": "0x4400004",
-            "ownerPid": 2762370,
+            "id": "0x5e00004",
+            "ownerPid": 3197498,
             "mapState": "IsViewable",
             "width": 320,
             "height": 96,
@@ -1059,8 +892,18 @@
               "bitsPerPixel": 32,
               "bytesPerLine": 1280,
               "pixels": 30720,
-              "distinctValues": 772,
-              "nonZeroPixels": 30672
+              "distinctValues": 1127,
+              "nonZeroPixels": 30652,
+              "dominant": {
+                "rgb": [
+                  62,
+                  24,
+                  35
+                ],
+                "hex": "#3e1823",
+                "count": 26975,
+                "share": 0.8780924479166666
+              }
             },
             "emergedBecause": "shown-again (map state was IsUnMapped)"
           }
@@ -1085,21 +928,25 @@
           "notWired": 0,
           "replayed": 0,
           "inFlight": 0,
-          "lastAttemptAt": "2026-09-27T11:08:56.710Z",
+          "lastAttemptAt": "2026-09-27T18:50:25.029Z",
           "lastFailure": null
         },
-        "whatThisMeans": "the product own delivery policy recorded a delivered outcome, which it can only do when the product own notifier showed the product own window and the product own card view accepted the product own card model. A status of ok on its own would not be enough: a hub with a wired policy and a failed card answers ok too, so the counts are compared as well"
+        "whatThisMeans": "the product own delivery policy recorded a delivered outcome, which it can only do when the product own notifier showed the product own window and the product own channel accepted the product own card model. A status of ok on its own would not be enough: a hub with a wired policy and a failed card answers ok too, so the counts are compared as well"
       }
     },
     {
       "journey": "needs-you",
-      "name": "the hub served the card document the window loads",
-      "expected": "200",
-      "actual": "200",
+      "name": "the hub served the card document the window loads, byte for byte under the product own policy",
+      "expected": "served-identically",
+      "actual": "served-identically",
       "measured": {
         "path": "/card.html",
-        "servedFrom": "this run's own dashboard root: a copy of the built dashboard plus the card document this run wrote, because the product ships no card document",
-        "presentInTheProductBuild": false
+        "source": "src/dashboard/card.html, the surface document entry of the dashboard build (NS-1)",
+        "presentInTheProductBuild": true,
+        "bytesCompared": 2957,
+        "contentSecurityPolicy": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
+        "permissiveCrossOriginHeader": false,
+        "servedFrom": "the dashboard root the product resolved for itself, with no root supplied by this run"
       }
     },
     {
@@ -1120,15 +967,11 @@
       "expected": "gone",
       "actual": "gone",
       "measured": {
-        "waitedMs": 404,
+        "waitedMs": 55,
         "onScreenVerdict": "no-card-window",
-        "cardElementInTheDocument": "no-card-element",
-        "cardEndReportedByTheCardView": [
-          "acknowledged"
-        ],
-        "acknowledgementCompletedByTheHarness": "no-card-showing",
+        "windowUnmapped": true,
         "candidates": [],
-        "whoRemovedIt": "the product own card view removed the card element on an end its own lifetime cell names, and the product own host took the window down. Nothing in the product tells the surface that a block was acknowledged, so the harness supplied that signal - see requiredProductChanges"
+        "whoRemovedIt": "the product own ack route called the product own dismissal port after its 2xx, which ended the card with the end its own lifetime cell names and took the host's own window down. Nothing in this script did any of that, and there is no fallback dismissal here that could have hidden a product that had not done it (NT-FR-12 third clause, ADR-010)"
       }
     },
     {
@@ -1154,11 +997,11 @@
           "width": 1920,
           "height": 1048
         },
-        "waitedMs": 38,
+        "waitedMs": 63,
         "candidates": [
           {
-            "id": "0x4400004",
-            "ownerPid": 2762370,
+            "id": "0x5e00004",
+            "ownerPid": 3197498,
             "mapState": "IsViewable",
             "width": 320,
             "height": 96,
@@ -1172,14 +1015,86 @@
               "bitsPerPixel": 32,
               "bytesPerLine": 1280,
               "pixels": 30720,
-              "distinctValues": 675,
-              "nonZeroPixels": 30672
+              "distinctValues": 993,
+              "nonZeroPixels": 30652,
+              "dominant": {
+                "rgb": [
+                  21,
+                  46,
+                  36
+                ],
+                "hex": "#152e24",
+                "count": 27463,
+                "share": 0.8939778645833333
+              }
             },
             "emergedBecause": "shown-again (map state was IsUnMapped)"
           }
         ],
         "rejectedWindows": [],
         "cardWasPainted": true
+      }
+    },
+    {
+      "journey": "finished",
+      "name": "the painted fill is the product own stylesheet fill for a finished card",
+      "expected": "finished-fill",
+      "actual": "finished-fill",
+      "measured": {
+        "whyThisRow": "a needs-you card left on the screen would paint the block fill, so a reading of the block fill here is a card of the wrong class on the screen. Two cards of two classes, distinguished from the display server's own pixels rather than from a report the product wrote about itself (NT-FR-02)",
+        "fillsTheProductBuildCarries": {
+          "needsYou": {
+            "rgb": [
+              58,
+              31,
+              36
+            ],
+            "hex": "#3a1f24"
+          },
+          "finished": {
+            "rgb": [
+              27,
+              43,
+              36
+            ],
+            "hex": "#1b2b24"
+          },
+          "default": {
+            "rgb": [
+              31,
+              36,
+              48
+            ],
+            "hex": "#1f2430"
+          }
+        },
+        "tolerancePerChannel": 12,
+        "paintSettled": true,
+        "paintSettledAfterMs": 452,
+        "readings": [
+          {
+            "windowId": "0x5e00004",
+            "dominant": {
+              "hex": "#152e24",
+              "rgb": [
+                21,
+                46,
+                36
+              ],
+              "count": 27463,
+              "share": 0.8939778645833333
+            },
+            "distances": {
+              "needs-you-fill": 37,
+              "finished-fill": 6
+            },
+            "best": {
+              "verdict": "finished-fill",
+              "distance": 6
+            },
+            "withinTolerance": true
+          }
+        ]
       }
     },
     {
@@ -1192,15 +1107,10 @@
         "intervalSource": "src/notify/surface/lifetime.ts FINISHED_CARD_EXPIRES_IN_MS, the only cell in the table that expires",
         "waitedMs": 8000,
         "onScreenVerdict": "no-card-window",
-        "cardElementInTheDocument": "no-card-element",
-        "cardEndReportedByTheCardView": [
-          "acknowledged",
-          "expired"
-        ],
+        "windowUnmapped": true,
         "acknowledgedDuringTheWait": false,
         "dismissedByTheScript": false,
-        "howItLeft": "the product own card view armed the product own one interval for this class and removed the card element when it elapsed. Nothing was acknowledged, nothing was dismissed, and this script has no fallback dismissal that could have hidden an unimplemented expiry",
-        "windowStateWhenTheCardEnded": "the host window was not visible when the card ended"
+        "howItLeft": "the product own card view armed the product own one interval for this class and removed the card element when it elapsed, and the product own card channel took the host window down with it. Nothing was acknowledged, nothing was dismissed, and this script has no fallback dismissal that could have hidden an unimplemented expiry (NT-FR-08, NT-FR-10)"
       }
     },
     {
@@ -1238,8 +1148,8 @@
         "candidates": [],
         "rejectedWindows": [
           {
-            "id": "0x4400004",
-            "ownerPid": 2762370,
+            "id": "0x5e00004",
+            "ownerPid": 3197498,
             "mapState": "IsUnMapped",
             "width": 320,
             "height": 96,
@@ -1248,7 +1158,7 @@
             "depth": 32,
             "pixels": {
               "ok": false,
-              "reason": "X Error of failed request:  BadMatch (invalid parameter attributes)\n  Major opcode of failed request:  73 (X_GetImage)\n  Serial number of failed request:  217\n  Current serial number in output stream:  217"
+              "reason": "X Error of failed request:  BadColor (invalid Colormap parameter)\n  Major opcode of failed request:  91 (X_QueryColors)\n  Resource id in failed request:  0x0\n  Serial number of failed request:  242\n  Current serial number in output stream:  242"
             },
             "why": "map state is IsUnMapped"
           }
@@ -1267,7 +1177,7 @@
         "cardShapedWindowsOnTheDesktop": 1,
         "facts": [
           {
-            "id": "0x4400004",
+            "id": "0x5e00004",
             "detail": {
               "mapState": "IsUnMapped",
               "width": 320,
@@ -1276,10 +1186,10 @@
               "y": 48,
               "depth": 32
             },
-            "pid": 2762370,
+            "pid": 3197498,
             "pixels": {
               "ok": false,
-              "reason": "X Error of failed request:  BadMatch (invalid parameter attributes)\n  Major opcode of failed request:  73 (X_GetImage)\n  Serial number of failed request:  217\n  Current serial number in output stream:  217"
+              "reason": "X Error of failed request:  BadColor (invalid Colormap parameter)\n  Major opcode of failed request:  91 (X_QueryColors)\n  Resource id in failed request:  0x0\n  Serial number of failed request:  242\n  Current serial number in output stream:  242"
             }
           }
         ]

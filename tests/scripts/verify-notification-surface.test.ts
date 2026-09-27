@@ -1,20 +1,24 @@
-// Tests the notification-surface verification script (NT-9: NT-FR-02, NT-FR-04, NT-FR-08,
-// NT-FR-10, APX-CON-06, APX-CON-12).
+// Tests the notification-surface verification script (NS-4: NT-FR-02, NT-FR-04, NT-FR-08,
+// NT-FR-10, NT-FR-12, APX-CON-06, APX-CON-12, APX-FR-01, APX-FR-02).
 //
-// Two halves, and both matter:
+// Three halves, and all three matter:
 //
 //   - the decision logic and every parser are driven with injected values, so the
 //     judgement and every parse are verified on a machine with no display, no Electron
 //     binary and no X tools. This is the half that makes the script's pass/fail trustworthy
 //     rather than only ever exercised on a desk that happens to work.
-//   - the real script is spawned as a child process for the three properties that can only
-//     be established by running it: a missing display is a non-zero exit with a remedy and
-//     no evidence file, a bad command line is its own exit code, and the machine-readable
+//   - the script's own source is read and swept, so the claim that it supplies no part of
+//     the card path - no card document, no stylesheet, no entry module, no renderer bridge,
+//     no second process, and one file written - is a failing test rather than a promise in
+//     a comment. NT-9 had to substitute all four and could therefore only record what the
+//     product could not do; this is what stops a later change quietly bringing any of them
+//     back (NT-FR-12).
+//   - the real script is spawned as a child process for the properties that can only be
+//     established by running it: a missing display is a non-zero exit with a remedy and no
+//     evidence file, a bad command line is its own exit code, and the machine-readable
 //     summary on stdout is parseable on its own.
-//
-// The six acceptance criteria map to the describe blocks below by name.
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -31,6 +35,69 @@ const scratch = mkdtempSync(path.join(tmpdir(), 'agent-ping-surface-verify-test-
 afterAll(() => {
   rmSync(scratch, { recursive: true, force: true })
 })
+
+/**
+ * A source file with its comments removed and its strings kept.
+ *
+ * Comments go because a source-level check is about the calls a module makes, not about the
+ * sentences describing them - and this repository's prose names every forbidden shape it
+ * deliberately avoids, so keeping comments would make the sweep below fail on the script's
+ * own documentation of what it no longer does. Strings stay, because a forbidden *name* is
+ * most often only ever a string.
+ *
+ * Known limitation, stated rather than hidden: a backtick template is read as one string to
+ * its closing backtick, so a nested template inside a `${...}` would end the scan early. The
+ * one template in the script under test contains no `${` of its own inside another, and a
+ * missed token would still be caught by the same token in the value the code then uses.
+ */
+function readWithoutProse(source: string): string {
+  let out = ''
+  let index = 0
+  const blank = (length: number): void => {
+    for (let offset = 0; offset < length; offset += 1) out += source[index + offset] === '\n' ? '\n' : ' '
+  }
+  while (index < source.length) {
+    const pair = source.slice(index, index + 2)
+    if (pair === '//') {
+      let end = source.indexOf('\n', index)
+      if (end === -1) end = source.length
+      blank(end - index)
+      index = end
+      continue
+    }
+    if (pair === '/*') {
+      const found = source.indexOf('*/', index + 2)
+      const stop = found === -1 ? source.length : found + 2
+      blank(stop - index)
+      index = stop
+      continue
+    }
+    const character = source[index] ?? ''
+    if (character === "'" || character === '"' || character === '`') {
+      let cursor = index + 1
+      while (cursor < source.length) {
+        const inner = source[cursor]
+        if (inner === '\\') {
+          cursor += 2
+          continue
+        }
+        if (inner === character) {
+          cursor += 1
+          break
+        }
+        if (character !== '`' && inner === '\n') break
+        cursor += 1
+      }
+      // The delimiters are kept, so a forbidden *call* spanning them is still seen.
+      out += `${character}${source.slice(index + 1, cursor - 1)}${character}`
+      index = cursor
+      continue
+    }
+    out += character
+    index += 1
+  }
+  return out
+}
 
 /** Hard ceiling on a child run, so a wedged script fails this suite instead of hanging it. */
 const CHILD_TIMEOUT_MS = 60_000
@@ -149,8 +216,16 @@ function buildXwd(options: {
     for (let x = 0; x < options.width; x += 1) {
       const value = options.pixels(x, y)
       const at = dataOffset + y * bytesPerLine + x * step
-      for (let index = step - 1; index >= 0; index -= 1) {
-        buffer[at + index] = (value >> ((step - 1 - index) * 8)) & 0xff
+      // Two things, both of which had to be right before any test could read a colour out
+      // of a capture. `>>>`, because a 32-bit pixel value above 2^31 is negative as an
+      // int32 and an arithmetic shift sign-extends, which writes the wrong byte for every
+      // channel but the top one. And `index * 8`, because an XWD dump stores a pixel least
+      // significant byte first, which is the layout `parseXwdPixels` reads back. The
+      // previous fixture wrote the bytes most significant first, so every colour it
+      // produced was byte-reversed; no test noticed, because every test only counted
+      // distinct values.
+      for (let index = 0; index < step; index += 1) {
+        buffer[at + index] = (value >>> (index * 8)) & 0xff
       }
     }
   }
@@ -158,34 +233,52 @@ function buildXwd(options: {
 }
 
 describe('the assertion inventory cannot drift from the rows the journeys emit', () => {
-  it('the expected total is the sum of the four lists', () => {
-    const total =
-      surface.OPENING_ASSERTIONS.length +
-      surface.NEEDS_YOU_ASSERTIONS.length +
-      surface.FINISHED_ASSERTIONS.length +
-      surface.GREETING_ASSERTIONS.length
+  const lists = (): readonly (readonly string[])[] => [
+    surface.OPENING_ASSERTIONS,
+    surface.SHIPPED_ASSERTIONS,
+    surface.NEEDS_YOU_ASSERTIONS,
+    surface.FINISHED_ASSERTIONS,
+    surface.GREETING_ASSERTIONS,
+  ]
+
+  it('the expected total is the sum of the five lists', () => {
+    const total = lists().reduce((sum, list) => sum + list.length, 0)
     expect(total).toBe(surface.ASSERTIONS_EXPECTED)
   })
 
   it('no two assertions share a name, so a failure names exactly one thing', () => {
-    const names = [
-      ...surface.OPENING_ASSERTIONS,
-      ...surface.NEEDS_YOU_ASSERTIONS,
-      ...surface.FINISHED_ASSERTIONS,
-      ...surface.GREETING_ASSERTIONS,
-    ]
+    const names = lists().flatMap((list) => [...list])
     expect(new Set(names).size).toBe(names.length)
   })
 
   it('every list is frozen, because a journey that appends to one would change the count', () => {
-    for (const list of [
-      surface.OPENING_ASSERTIONS,
-      surface.NEEDS_YOU_ASSERTIONS,
-      surface.FINISHED_ASSERTIONS,
-      surface.GREETING_ASSERTIONS,
-    ]) {
-      expect(Object.isFrozen(list)).toBe(true)
-    }
+    for (const list of lists()) expect(Object.isFrozen(list)).toBe(true)
+  })
+
+  it('the shipped build owes its own rows, so what NT-9 could only record is now asserted', () => {
+    expect(surface.SHIPPED_ASSERTIONS).toHaveLength(2)
+    expect(surface.SHIPPED_ASSERTIONS.join('\n')).toMatch(/built artefacts/)
+    expect(surface.SHIPPED_ASSERTIONS.join('\n')).toMatch(/delivery policy is wired/)
+  })
+
+  it('the needs-you journey keeps its nine rows and no longer claims to have read the document', () => {
+    expect(surface.NEEDS_YOU_ASSERTIONS).toHaveLength(9)
+    const names = surface.NEEDS_YOU_ASSERTIONS.join('\n')
+    expect(names).not.toMatch(/card view rendered a card into the document/)
+    // The reading that replaced it is a comparison against the product's own built
+    // stylesheet, which is the only card-document claim a run outside the process can make.
+    expect(names).toMatch(/painted fill is the product own stylesheet fill/)
+    expect(names).toMatch(/byte for byte/)
+  })
+
+  it('the finished journey can tell a finished card from a needs-you one', () => {
+    expect(surface.FINISHED_ASSERTIONS).toHaveLength(4)
+    expect(surface.FINISHED_ASSERTIONS[2]).toMatch(/finished card/)
+  })
+
+  it('keeps the anti-noise journey whole, because it is the one that matters most', () => {
+    expect(surface.GREETING_ASSERTIONS).toHaveLength(4)
+    expect(surface.GREETING_ASSERTIONS.join('\n')).toMatch(/created no window/)
   })
 })
 
@@ -552,6 +645,149 @@ describe('parseXwdPixels(): a window own painted content', () => {
     if (parsed.ok !== false) return
     expect(parsed.reason).toMatch(/file version 6/)
   })
+
+  it('names the dominant painted value, which is how a class of card is read from outside', () => {
+    // The shape a real capture has on this desktop: a 32-bit dump of a card window whose
+    // fill covers most of the surface, with the alpha byte set.
+    const parsed = surface.parseXwdPixels(
+      buildXwd({ width: 10, height: 10, pixels: (x, y) => (x < 2 || y < 2 ? 0xffc1395e : 0xff3e1823) }),
+    )
+    expect(parsed.ok).toBe(true)
+    if (parsed.ok === false) return
+    // 64 of 100 pixels are the fill, so it is the dominant value, reduced to 24 bits: an
+    // opaque fill and a translucent one of the same colour are the same colour.
+    expect(parsed.dominant?.hex).toBe('#3e1823')
+    expect(parsed.dominant?.rgb).toEqual([62, 24, 35])
+    expect(parsed.dominant?.count).toBe(64)
+  })
+
+  it('has no dominant value for a window that drew nothing, rather than a black one', () => {
+    const parsed = surface.parseXwdPixels(buildXwd({ width: 6, height: 4, pixels: () => 0 }))
+    expect(parsed.ok).toBe(true)
+    if (parsed.ok === false) return
+    // Zero is what a transparent background is, so a dominant of #000000 would be a colour
+    // a card could be painted in. There is no colour here at all.
+    expect(parsed.dominant).toBeNull()
+  })
+})
+
+describe('whose card is it: the product own built stylesheet, read without opening a renderer', () => {
+  const PRODUCT_CSS = [
+    ':root{--card-fill:#1f2430;--card-border:#6b7c9c;--card-text:#f2f4f8;',
+    '--card-block-fill:#3a1f24;--card-block-border:#b55660;',
+    '--card-finished-fill:#1b2b24;--card-finished-border:#3f8a63}',
+  ].join('')
+  const fills = surface.readCardFillsFromCss(PRODUCT_CSS) as {
+    needsYou: { rgb: number[]; hex: string }
+    finished: { rgb: number[]; hex: string }
+    default: { rgb: number[]; hex: string } | null
+  }
+  // The values this machine's compositor actually handed over once each card had finished
+  // arriving, and therefore the shape a real reading has.
+  const aCard = (hex: string) => [
+    { id: '0x4400004', pixels: { ok: true, distinctValues: 1127, nonZeroPixels: 30_652, dominant: { hex, rgb: [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)], count: 26_975 } } },
+  ]
+
+  it('reads the two class fills out of the product own stylesheet, in either order', () => {
+    expect(fills.needsYou.hex).toBe('#3a1f24')
+    expect(fills.finished.hex).toBe('#1b2b24')
+    expect(fills.default?.hex).toBe('#1f2430')
+  })
+
+  it('reads a three-digit literal and a six-digit one the same way', () => {
+    expect(surface.parseHexColor('#fff')).toEqual({ rgb: [255, 255, 255], hex: '#ffffff' })
+    expect(surface.parseHexColor('#3a1f24')).toEqual({ rgb: [58, 31, 36], hex: '#3a1f24' })
+  })
+
+  it('refuses a literal that is not a colour, and a stylesheet missing a required fill', () => {
+    expect(surface.parseHexColor('rgb(1,2,3)')).toBeNull()
+    expect(surface.parseHexColor(undefined)).toBeNull()
+    expect(surface.readCardFillsFromCss(':root{--card-fill:#1f2430}')).toBeNull()
+    expect(surface.readCardFillsFromCss('not css at all')).toBeNull()
+  })
+
+  it('calls a needs-you card the product own needs-you card, on the reading this machine produced', () => {
+    expect(surface.cardFillVerdict(aCard('#3e1823'), fills)).toBe('needs-you-fill')
+  })
+
+  it('calls a finished card the product own finished card, and tells the two apart', () => {
+    expect(surface.cardFillVerdict(aCard('#152e24'), fills)).toBe('finished-fill')
+    // The same card cannot pass as the other class: this is the whole point of the
+    // comparison, because a needs-you card left on the screen would paint the block fill.
+    expect(surface.cardFillVerdict(aCard('#3e1823'), fills)).not.toBe('finished-fill')
+  })
+
+  it('records the distance it found, so a reader sees the number and not only the verdict', () => {
+    const readings = surface.cardFillReadings(aCard('#152e24'), fills)
+    expect(readings[0]?.distances['finished-fill']).toBe(6)
+    expect(readings[0]?.distances['needs-you-fill']).toBe(37)
+    expect(readings[0]?.best?.verdict).toBe('finished-fill')
+    expect(readings[0]?.withinTolerance).toBe(true)
+  })
+
+  it('is not a pass for a colour that is none of the product own, however painted it is', () => {
+    // A blank page, a different tool's window, or a card drawn in a colour the product's
+    // build does not name: none of them may read as this product's card.
+    for (const hex of ['#000000', '#ff0000', '#ffffff', '#7f7f7f']) {
+      expect(surface.cardFillVerdict(aCard(hex), fills)).toBe('no-card-fill')
+    }
+  })
+
+  it('reads the product own exact values as their own class, before any tolerance is needed', () => {
+    expect(surface.cardFillVerdict(aCard('#3a1f24'), fills)).toBe('needs-you-fill')
+    expect(surface.cardFillVerdict(aCard('#1b2b24'), fills)).toBe('finished-fill')
+  })
+
+  it('cannot separate the product own default fill from its finished fill, and says why that is safe', () => {
+    // The one pair the tolerance cannot tell apart: `--card-fill` and
+    // `--card-finished-fill` are 12 apart, which is the tolerance. The default cannot be
+    // painted on a card at all, because the view writes a `data-urgency` on every card and
+    // the stylesheet carries a fill rule for each of the two urgencies, so the default is
+    // only ever the value underneath one that has already replaced it. The test records the
+    // boundary rather than pretending the comparison is finer than it is.
+    expect(surface.channelDistance([31, 36, 48], [27, 43, 36])).toBe(12)
+    expect(surface.cardFillVerdict(aCard('#1f2430'), fills)).toBe('finished-fill')
+  })
+
+  it('is unreadable rather than a match when the capture failed or held no colour at all', () => {
+    expect(surface.cardFillVerdict([{ id: '0x1', pixels: { ok: false, reason: 'xwd failed' } }], fills)).toBe(
+      'unreadable',
+    )
+    expect(
+      surface.cardFillVerdict([{ id: '0x1', pixels: { ok: true, distinctValues: 1, dominant: null } }], fills),
+    ).toBe('unreadable')
+  })
+
+  it('has no verdict at all for no window, which a journey treats as a missing precondition', () => {
+    expect(surface.cardFillVerdict([], fills)).toBe('no-card-window')
+  })
+
+  it('refuses the comparison outright when the build carries no fills to compare against', () => {
+    expect(surface.cardFillVerdict(aCard('#3e1823'), null)).toBe('no-card-fill')
+  })
+
+  it('measures the largest per-channel distance, and says so rather than throwing', () => {
+    expect(surface.channelDistance([58, 31, 36], [62, 24, 35])).toBe(7)
+    expect(surface.channelDistance([0, 0, 0], [10, 10, 10])).toBe(10)
+    expect(surface.channelDistance(null, [1, 2, 3])).toBeNull()
+    expect(surface.channelDistance([1, 2], [1, 2, 3])).toBeNull()
+  })
+})
+
+describe('nothing painted is on the screen: two answers, one meaning', () => {
+  it('is true for an unmapped window and for a mapped one that drew nothing', () => {
+    // The distinction NT-FR-10 turns on, and the distinction the evidence file records:
+    // a card element removed out of a window nobody took down is a mapped empty
+    // rectangle, which is not a card either.
+    expect(surface.noCardOnScreen('no-card-window')).toBe(true)
+    expect(surface.noCardOnScreen('blank')).toBe(true)
+  })
+
+  it('is false for a painted card, an unreadable capture and no answer at all', () => {
+    expect(surface.noCardOnScreen('painted')).toBe(false)
+    expect(surface.noCardOnScreen('unreadable')).toBe(false)
+    expect(surface.noCardOnScreen(null)).toBe(false)
+  })
 })
 
 describe('countNotifications(): what the notification centre was asked for', () => {
@@ -612,13 +848,12 @@ describe("splitChildDiagnostics(): whose line is it", () => {
 
   it('is what keeps the not-wired finding from contradicting its own count', () => {
     const change = surface
-      .requiredProductChanges({
-        evidence: { repository: { cardDocumentPresent: true }, delivery: { wired: true, lastFailure: null } },
-        shipped: { delivery: { wired: true, status: 'ok', delivered: 1 } },
-        childLineCount: 0,
+      .productChanges({
+        shipped: { artefacts: 'in-the-build' },
+        productLineCount: 0,
         chromiumLineCount: 4,
       })
-      .find((entry: { id: string }) => entry.id === 'not-wired-diagnostic-has-no-destination')
+      .open.find((entry: { id: string }) => entry.id === 'not-wired-diagnostic-has-no-destination')
     expect(change?.observed).toMatch(/0 of those lines were written by this product/)
     expect(change?.observed).toMatch(/4 by the Electron runtime tearing itself down/)
     // A count of every captured line would have read "found 4 diagnostic line(s)" beside
@@ -742,100 +977,142 @@ describe('resolveOnPath(): a preflight that reports the desktop honestly', () =>
   })
 })
 
-describe('requiredProductChanges(): findings recorded, with what this run supplied in their place', () => {
-  const evidenceWith = (overrides: Record<string, unknown>): Record<string, unknown> => ({
-    repository: { cardDocumentPresent: true },
-    delivery: { wired: true, lastFailure: null },
-    ...overrides,
-  })
-  const shippedWith = (overrides: Record<string, unknown>): Record<string, unknown> => ({
-    delivery: { wired: true, status: 'ok', delivered: 1 },
-    ...overrides,
+describe('productChanges(): what is closed, by whom, and what is still open', () => {
+  const shipped = { artefacts: 'in-the-build' }
+  const changes = (overrides: Record<string, unknown> = {}): {
+    closed: Array<Record<string, unknown>>
+    open: Array<Record<string, unknown>>
+  } => surface.productChanges({ shipped, productLineCount: 0, chromiumLineCount: 0, ...overrides }) as never
+
+  it('closes the card document, the renderer channel and the acknowledgement hook, each with the task that closed it', () => {
+    const byTask = new Map(changes().closed.map((entry) => [String(entry.id), String(entry.closedBy)]))
+    // The three gaps NT-9 could only record because its own run had substituted all three.
+    expect(byTask.get('card-document-entry')).toBe('NS-1')
+    expect(byTask.get('card-renderer-channel')).toBe('NS-2')
+    expect(byTask.get('acknowledgement-does-not-reach-the-card')).toBe('NS-3')
   })
 
-  it('records the missing card document when the built artefacts do not have it', () => {
-    const changes = surface.requiredProductChanges({
-      evidence: evidenceWith({ repository: { cardDocumentPresent: false } }),
-      shipped: shippedWith({}),
-      childLineCount: 0,
-    })
-    const change = changes.find((entry: { id: string }) => entry.id === 'card-document-entry')
-    expect(change).toBeDefined()
-    expect(change?.owner).toBe('dashboard-engineer')
-    // The run completed this gap, so it says what it put there rather than claiming to
-    // have changed nothing: a reader must be able to tell the product's bytes from the
-    // harness's without reading the script.
-    expect(String(change?.suppliedByThisRun)).toMatch(/run-time card document/)
-    expect(String(change?.suppliedByThisRun)).toMatch(/product own compiled card view/)
-  })
-
-  it('records the missing renderer channel when the shipped entry point is not wired', () => {
-    const changes = surface.requiredProductChanges({
-      evidence: evidenceWith({}),
-      shipped: shippedWith({ delivery: { wired: false, status: 'not-wired', delivered: 0 } }),
-      childLineCount: 0,
-    })
-    const change = changes.find((entry: { id: string }) => entry.id === 'card-renderer-channel')
-    expect(change).toBeDefined()
-    expect(change?.required).toMatch(/renderCard/)
-    expect(String(change?.suppliedByThisRun)).toMatch(/executeJavaScript/)
-  })
-
-  it('does not claim a card document is missing when one is present', () => {
-    const changes = surface.requiredProductChanges({
-      evidence: evidenceWith({}),
-      shipped: shippedWith({}),
-      childLineCount: 0,
-    })
-    expect(changes.find((entry: { id: string }) => entry.id === 'card-document-entry')).toBeUndefined()
-  })
-
-  it('always records the acknowledgement gap, the window-down gap and the schema gap', () => {
-    const changes = surface.requiredProductChanges({
-      evidence: evidenceWith({}),
-      shipped: shippedWith({}),
-      childLineCount: 0,
-    })
-    const ids = changes.map((entry: { id: string }) => entry.id)
-    expect(ids).toContain('acknowledgement-does-not-reach-the-card')
-    expect(ids).toContain('nothing-takes-the-window-down-when-a-card-ends')
-    expect(ids).toContain('the-durable-schema-is-not-in-the-build')
-  })
-
-  it('always records that a not-wired run has nowhere to say so, and how many lines were seen', () => {
-    const changes = surface.requiredProductChanges({
-      evidence: evidenceWith({}),
-      shipped: shippedWith({}),
-      childLineCount: 0,
-      chromiumLineCount: 0,
-    })
-    const change = changes.find((entry: { id: string }) => entry.id === 'not-wired-diagnostic-has-no-destination')
-    expect(change?.observed).toMatch(/0 of those lines were written by this product/)
-  })
-
-  it('records that the tray is not observable from outside the process', () => {
-    const changes = surface.requiredProductChanges({
-      evidence: evidenceWith({}),
-      shipped: shippedWith({}),
-      childLineCount: 0,
-    })
-    expect(changes.map((entry: { id: string }) => entry.id)).toContain('tray-is-not-observable-outside-the-process')
-  })
-
-  it('names an owner and a required change for every finding, and never leaves one blank', () => {
-    const changes = surface.requiredProductChanges({
-      evidence: evidenceWith({ repository: { cardDocumentPresent: false } }),
-      shipped: shippedWith({ delivery: { wired: false, status: 'not-wired', delivered: 0 } }),
-      childLineCount: 3,
-    })
-    expect(changes.length).toBeGreaterThan(0)
-    for (const change of changes) {
-      expect(String(change.id)).not.toBe('')
-      expect(String(change.owner)).toMatch(/engineer/)
-      expect(String(change.required).length).toBeGreaterThan(20)
-      expect(String(change.observed).length).toBeGreaterThan(20)
-      expect(String(change.suppliedByThisRun).length).toBeGreaterThan(0)
+  it('names before and after on every closed gap, because a closure is a claim about a change', () => {
+    for (const entry of changes().closed) {
+      expect(String(entry.observedBefore).length).toBeGreaterThan(20)
+      expect(String(entry.observedNow).length).toBeGreaterThan(20)
+      // The assertion in this run that holds the closure up, by name, so a reader can
+      // find it in the assertions list rather than take the sentence's word for it.
+      expect(String(entry.howThisRunProvesIt).length).toBeGreaterThan(10)
     }
+  })
+
+  it('says on every entry that this run supplied nothing, because it supplies nothing', () => {
+    for (const entry of [...changes().closed, ...changes().open]) {
+      expect(String(entry.suppliedByThisRun).toLowerCase()).toMatch(/nothing|no |none/)
+    }
+  })
+
+  it('keeps the three findings that are genuinely still open', () => {
+    expect(changes().open.map((entry) => String(entry.id))).toEqual([
+      'not-wired-diagnostic-has-no-destination',
+      'tray-is-not-observable-outside-the-process',
+      'the-durable-schema-is-not-in-the-build',
+    ])
+  })
+
+  it('reports the diagnostic finding with the line counts it actually saw', () => {
+    const entry = changes({ productLineCount: 3, chromiumLineCount: 11 }).open.find(
+      (candidate) => String(candidate.id) === 'not-wired-diagnostic-has-no-destination',
+    )
+    expect(String(entry?.observed)).toMatch(/3 of those lines were written by this product/)
+    expect(String(entry?.observed)).toMatch(/11 by the Electron runtime/)
+  })
+
+  it('raises a missing built artefact as an open change rather than quietly passing', () => {
+    const missing = changes({ shipped: { artefacts: 'missing: the preload the surface window loads' } })
+    expect(missing.open[0]?.id).toBe('the-shipped-build-is-missing-a-card-artefact')
+    expect(String(missing.open[0]?.observed)).toMatch(/missing: the preload/)
+    // And it says why the run did not create it, which is the whole discipline.
+    expect(String(missing.open[0]?.suppliedByThisRun)).toMatch(/would prove itself/)
+  })
+
+  it('names an owner and something to do on every open change', () => {
+    for (const entry of changes().open) {
+      expect(String(entry.owner)).toMatch(/engineer/)
+      expect(String(entry.required).length).toBeGreaterThan(20)
+    }
+  })
+})
+
+describe('the shipped build: the two rows NT-9 recorded and this run asserts', () => {
+  const allPresent = { document: true, preload: true, entry: true, stylesheet: true }
+
+  it('accepts a build that carries all four of the artefacts the card needs', () => {
+    expect(surface.shippedArtefactsVerdict(allPresent)).toBe('in-the-build')
+  })
+
+  it('names each missing artefact, because a missing dependency is never a skip', () => {
+    expect(surface.shippedArtefactsVerdict({ ...allPresent, document: false })).toMatch(
+      /missing: the built card document/,
+    )
+    expect(surface.shippedArtefactsVerdict({ ...allPresent, preload: false })).toMatch(
+      /missing: the preload the surface window loads/,
+    )
+    expect(surface.shippedArtefactsVerdict({ ...allPresent, entry: false, stylesheet: false })).toMatch(
+      /the entry bundle the card document loads, the stylesheet the card document links/,
+    )
+    expect(surface.shippedArtefactsVerdict(null)).toMatch(/^missing:/)
+  })
+
+  it('reads the delivery policy own answer about whether a card presenter is wired', () => {
+    expect(surface.wiredVerdict({ wired: true, status: 'ok' })).toBe('wired')
+    // The product's own reason travels into the failure, so a red row says why.
+    expect(surface.wiredVerdict({ wired: false, status: 'not-wired' })).toBe('not-wired: not-wired')
+    expect(surface.wiredVerdict(null)).toBe('no-delivery-section')
+  })
+
+  it('accepts the document the build produced, byte for byte, under the product own policy', () => {
+    const html = '<!doctype html><div data-card-surface></div>'
+    expect(
+      surface.servedDocumentVerdict({
+        status: 200,
+        served: html,
+        built: html,
+        policy: "default-src 'self'",
+        permissiveHeader: false,
+      }),
+    ).toBe('served-identically')
+  })
+
+  it('refuses a body that is not the built document, which is what a substituted one looks like', () => {
+    // The exact shape NT-9 needed: a document that answers 200 and is not the product's.
+    expect(
+      surface.servedDocumentVerdict({
+        status: 200,
+        served: '<!doctype html><div data-card-surface></div><script type="module" src="/card-entry.js">',
+        built: '<!doctype html><div data-card-surface></div>',
+        policy: "default-src 'self'",
+        permissiveHeader: false,
+      }),
+    ).toBe('served-something-else: the body is not the built document')
+  })
+
+  it('refuses a document served with no policy, or with a permissive cross-origin header', () => {
+    const html = 'x'
+    expect(
+      surface.servedDocumentVerdict({ status: 200, served: html, built: html, policy: null, permissiveHeader: false }),
+    ).toBe('served-without-a-content-security-policy')
+    expect(
+      surface.servedDocumentVerdict({
+        status: 200,
+        served: html,
+        built: html,
+        policy: "default-src 'self'",
+        permissiveHeader: true,
+      }),
+    ).toMatch(/^served-with-a-permissive-header/)
+  })
+
+  it('refuses a document that was not served at all', () => {
+    expect(
+      surface.servedDocumentVerdict({ status: 404, served: null, built: 'x', policy: null, permissiveHeader: false }),
+    ).toBe('not-served: 404')
   })
 })
 
@@ -922,86 +1199,35 @@ describe('cardOnScreenVerdict(): painted, blank, absent and unreadable are four 
   })
 })
 
-describe('cardReportVerdict(): what the renderer says is in the card', () => {
-  const rendered = {
-    ready: true,
-    showing: true,
-    ends: [],
-    element: {
-      attributes: [...surface.CARD_ATTRIBUTES_EXPECTED, 'data-deep-link', 'aria-hidden'],
-      inlineStyle: null,
-      titleLength: 17,
-      bodyLength: 51,
-      ariaLabelLength: 81,
-    },
-  }
-
-  it('is rendered for a card with every attribute, both text lines and no inline style', () => {
-    expect(surface.cardReportVerdict(rendered)).toBe('rendered')
-  })
-
-  it('is never a pass without a report at all', () => {
-    expect(surface.cardReportVerdict(null)).toBe('no-report')
-    expect(surface.cardReportVerdict(undefined)).toBe('no-report')
-    expect(surface.cardReportVerdict({ ...rendered, error: 'the card document could not be read' })).toBe('no-report')
-  })
-
-  it('says the document is not ready rather than that there is no card, because those are different faults', () => {
-    expect(surface.cardReportVerdict({ ready: false })).toBe('document-not-ready')
-  })
-
-  it('is no-card-element for a loaded document with nothing in it, which is what an ended card looks like', () => {
-    expect(surface.cardReportVerdict({ ready: true, showing: false, ends: ['expired'], element: null })).toBe(
-      'no-card-element',
-    )
-  })
-
-  it('is inline-style when the card carries a style attribute, which the product own CSP would refuse to honour', () => {
-    const styled = { ...rendered, element: { ...rendered.element, inlineStyle: 'background: red' } }
-    expect(surface.cardReportVerdict(styled)).toBe('inline-style')
-  })
-
-  it('is incomplete for a missing attribute or an empty text line, and never a pass', () => {
-    const missing = {
-      ...rendered,
-      element: { ...rendered.element, attributes: rendered.element.attributes.slice(1) },
+describe('the readings this run gave up, and what it says instead of them', () => {
+  // These are gone, and this block is the record of why. A card's contents - its element
+  // tree, its attributes, its accessible name, its live-region role - were read through a
+  // bridge this script had to build, because the product had no way to hand a card model to
+  // a document. NS-2 gave the product its own channel and NS-1 gave it its own document, so
+  // the bridge went with them, and a run that rebuilt it would be back to measuring itself.
+  it('no longer exports anything that reads a renderer', () => {
+    const exports = Object.keys(surface)
+    for (const name of [
+      'cardReportVerdict',
+      'CARD_ATTRIBUTES_EXPECTED',
+      'parseHarnessReportLine',
+      'latestCardReport',
+      'CARD_REPORT_PREFIX',
+      'CARD_DOCUMENT_READY_TIMEOUT_MS',
+    ]) {
+      expect(exports).not.toContain(name)
     }
-    expect(surface.cardReportVerdict(missing)).toBe('incomplete')
-    const empty = { ...rendered, element: { ...rendered.element, titleLength: 0 } }
-    expect(surface.cardReportVerdict(empty)).toBe('incomplete')
-    const noName = { ...rendered, element: { ...rendered.element, ariaLabelLength: 0 } }
-    expect(surface.cardReportVerdict(noName)).toBe('incomplete')
   })
 
-  it('is incomplete when the view says it is showing but the document holds no element', () => {
-    expect(surface.cardReportVerdict({ ready: true, showing: true, ends: [], element: null })).toBe('incomplete')
-  })
-})
-
-describe('parseHarnessReportLine() and latestCardReport(): the harness own readings', () => {
-  it('reads a prefixed line and refuses anything else, so a diagnostic is never read as a reading', () => {
-    const line = `${surface.CARD_REPORT_PREFIX}${JSON.stringify({ seq: 3, showing: true, ends: [] })}`
-    expect(surface.parseHarnessReportLine(line)).toEqual({ seq: 3, showing: true, ends: [] })
-    expect(surface.parseHarnessReportLine('hub: something')).toBeNull()
-    expect(surface.parseHarnessReportLine(`${surface.CARD_REPORT_PREFIX}{oops`)).toBeNull()
-    expect(surface.parseHarnessReportLine(`${surface.CARD_REPORT_PREFIX}{"showing":true}`)).toBeNull()
-    expect(surface.parseHarnessReportLine(undefined)).toBeNull()
-  })
-
-  it('returns the newest report, and the end a journey is waiting for', () => {
-    const reports = [
-      { seq: 1, showing: true, ends: [] },
-      { seq: 2, showing: true, ends: ['replaced'] },
-      { seq: 3, showing: false, ends: ['replaced', 'expired'] },
-    ]
-    expect(surface.latestCardReport(reports).report?.seq).toBe(3)
-    expect(surface.latestCardReport(reports, 'expired').end).toBe('expired')
-    expect(surface.latestCardReport(reports, 'acknowledged').end).toBeNull()
-  })
-
-  it('is null rather than an empty reading when nothing was ever reported', () => {
-    expect(surface.latestCardReport([])).toEqual({ report: null, end: null })
-    expect(surface.latestCardReport(undefined)).toEqual({ report: null, end: null })
+  it('names the loss in the evidence file rather than quietly dropping the claim', () => {
+    const runbook = readFileSync(
+      path.join(repoRoot, 'docs', 'runbooks', 'notification-surface.md'),
+      'utf8',
+    )
+    // The runbook is where a human looks for what a run does not cover, and the card's
+    // contents are the biggest thing this run no longer covers.
+    expect(runbook).toMatch(/contents of the card/i)
+    expect(runbook).toMatch(/not[\s\S]{0,80}read/i)
   })
 })
 
@@ -1038,33 +1264,180 @@ describe('deliveryVerdict(): the claim, not the status string', () => {
   })
 })
 
-describe('the run-time harness source: the three seams this run completes, and nothing else', () => {
-  const main = surface.harnessMainSource({ productRoot: '/repo', dashboardRoot: '/tmp/dash' })
-  const document = surface.cardDocumentSource()
-  const entry = surface.cardEntrySource()
-  const everything = `${main}\n${entry}\n${Object.values(document).join('\n')}`
+describe('the window options the shipped build carries, and the prose that would have lied about them', () => {
+  // The shape of the real built module's header: the settings this product refuses to use
+  // are named in the prose, next to the object that does not use them. A reader that took
+  // the first match of either would have published the opposite of the configuration in an
+  // evidence file, which is the one thing a verification run exists to prevent.
+  const MODULE_WITH_MISLEADING_PROSE = [
+    '/**',
+    ' * NO webSecurity: `webSecurity: false` or `nodeIntegration: true` would trade the',
+    ' * boundary for convenience.',
+    ' */',
+    'export const SURFACE_WINDOW_OPTIONS = Object.freeze({',
+    '    width: CARD_SIZE.width,',
+    '    transparent: true,',
+    '    show: false,',
+    '    webPreferences: Object.freeze({',
+    '        contextIsolation: true,',
+    '        nodeIntegration: false,',
+    '        sandbox: true,',
+    '        preload: CARD_PRELOAD_PATH,',
+    '    }),',
+    '});',
+    '// webSecurity: false is deliberately absent from the object above.',
+  ].join('\n')
 
-  it('mounts the product own compiled card view rather than writing a card of its own', () => {
-    expect(entry).toMatch(/import \{ createCardView \} from '\/card-view\.js'/)
-    expect(entry).toMatch(/createCardView\(/)
-    // The model is handed in, never built here: a card assembled by the harness would be
-    // evidence about the harness.
-    expect(entry).not.toMatch(/needs-you|Needs you|pendingCount|deepLink:/)
+  it('reads the three settings the isolation claim rests on out of the option object', () => {
+    const options = surface.readSurfaceWindowOptions(MODULE_WITH_MISLEADING_PROSE)
+    expect(options.available).toBe(true)
+    expect(options.contextIsolation).toBe('true')
+    expect(options.nodeIntegration).toBe('false')
+    expect(options.sandbox).toBe('true')
+    expect(options.preload).toBe('CARD_PRELOAD_PATH')
   })
 
-  it('starts the product own built entry point, and never a second implementation of it', () => {
-    expect(main).toMatch(/dist\/main\/main\/index\.js/)
-    expect(main).toMatch(/createElectronSurfaceHost/)
-    expect(main).toMatch(/surfaceDocumentUrl/)
-    expect(main).toMatch(/startHub/)
+  it('never takes a setting from the prose that names the opposite, which is the whole point', () => {
+    const options = surface.readSurfaceWindowOptions(MODULE_WITH_MISLEADING_PROSE)
+    // Absent is the answer and null is the honest way to say it: the product does not widen
+    // it, so the key is not in the object at all.
+    expect(options.webSecurity).toBeNull()
+    expect(options.nodeIntegration).toBe('false')
   })
 
-  it('reads the card document and the product own host only through the window it was given', () => {
-    expect(main).toMatch(/executeJavaScript/)
-    expect(main).not.toMatch(/new BrowserWindow\(/)
+  it('says plainly that it read the build and not the running window', () => {
+    const options = surface.readSurfaceWindowOptions(MODULE_WITH_MISLEADING_PROSE)
+    expect(String(options.notObserved)).toMatch(/record of the build/)
+    expect(String(options.howThisWasRead)).toMatch(/comments stripped/)
   })
 
-  it('names no platform notification mechanism anywhere, because nothing may leave this machine but a card', () => {
+  it('reports a module with no option object rather than reading a setting out of nothing', () => {
+    expect(surface.readSurfaceWindowOptions('// nothing here').available).toBe(false)
+    expect(surface.readSurfaceWindowOptions('').available).toBe(false)
+  })
+
+  it('strips comments and keeps strings, which is what every source sweep in this repository does', () => {
+    // Blanking rather than deleting, so offsets and line numbers survive: the sweep has to
+    // point at a line as well as to find a token.
+    const stripped = surface.stripComments('a // gone\nb /* also gone */ c')
+    expect(stripped).toHaveLength('a // gone\nb /* also gone */ c'.length)
+    expect(stripped.split('\n')).toHaveLength(2)
+    expect(stripped).not.toMatch(/gone/)
+    expect(stripped.replace(/\s/g, '')).toBe('abc')
+    // A string that looks like a comment is a name, and a forbidden name is most often
+    // only ever a string.
+    expect(surface.stripComments("keep 'a // b' here")).toBe("keep 'a // b' here")
+    expect(surface.stripComments('block /* with newline */ after')).toContain('after')
+  })
+})
+
+describe('this script supplies no part of the card path, and the source proves it', () => {
+  // ── The reader ────────────────────────────────────────────────────────────
+  // One product source file with its comments removed and its strings kept.
+  //
+  // Comments go because a source-level check is about the calls a module makes, not about
+  // the sentences describing them - and this repository's prose names every forbidden
+  // shape it deliberately avoids, so keeping comments would make the check fail on its own
+  // documentation. Strings stay, because a forbidden *name* is most often only ever a
+  // string.
+  //
+  // Known limitation, stated rather than hidden: a backtick template is read as one string
+  // to its closing backtick, so a nested template inside a `${...}` would end the scan
+  // early. No template in this file contains one, and a missed token would still be caught
+  // by the same token in the value the code then uses.
+  const withoutProse = readWithoutProse(readFileSync(scriptPath, 'utf8'))
+  const exports = Object.keys(surface).sort()
+
+  it('contains no card document, because the product built and serves its own', () => {
+    // NT-9 generated a document into a prepared dashboard root so that a card window had
+    // something to load. Four tokens, one per thing a generated document contains.
+    for (const token of ['<!doctype html>', '<div data-card-surface', 'data-card-surface', '<link rel="stylesheet"']) {
+      expect(withoutProse).not.toContain(token)
+    }
+    expect(exports).not.toContain('cardDocumentSource')
+  })
+
+  it('contains no card stylesheet, because the product paint its own', () => {
+    // A stylesheet is a rule block keyed on the card's own attributes. The one attribute
+    // the product's view writes and this run has no business knowing about is the surface
+    // element; the rules that hang on the card's own attributes are the stylesheet's.
+    for (const token of [
+      "data-card-urgency-icon",
+      "data-card-urgency-word",
+      "[data-card][data-urgency",
+      "border-radius:",
+      "box-sizing: border-box",
+    ]) {
+      expect(withoutProse).not.toContain(token)
+    }
+  })
+
+  it('contains no card entry module, because the product ships its own', () => {
+    // The harness wrote card-entry.js and imported the product's compiled card view by
+    // the name the hub served it under. Neither the file name nor the import is left.
+    for (const token of ['card-entry.js', 'createCardView', 'card-view.js', 'GENERATED by']) {
+      expect(withoutProse).not.toContain(token)
+    }
+    expect(exports).not.toContain('cardEntrySource')
+    expect(exports).not.toContain('harnessMainSource')
+  })
+
+  it('contains no renderer bridge, because the product has a channel of its own', () => {
+    // The shape NT-9 used to carry a card model into a real renderer, and the shape this
+    // run exists to prove the product does not need. The whole token family goes.
+    for (const token of [
+      'executeJavaScript',
+      'webContents',
+      'exposeInMainWorld',
+      'ipcRenderer',
+      'contextBridge',
+      '__agentPingCardSurface',
+      '##CARD##',
+    ]) {
+      expect(withoutProse).not.toContain(token)
+    }
+    expect(exports).not.toContain('SHOW_CARD_CALL_PREFIX')
+    expect(exports).not.toContain('REMOVE_CARD_CALL_PREFIX')
+    expect(exports).not.toContain('READ_CARD_REPORT_JS')
+    expect(exports).not.toContain('CARD_SURFACE_GLOBAL')
+  })
+
+  it('points the hub at no root of its own, so the document it serves is the product own', () => {
+    // The override that would let a run serve its own dashboard. The state directory
+    // stays, because that is the product's own mechanism and a fresh one is what keeps a
+    // run from touching an installation.
+    expect(withoutProse).not.toContain('AGENT_PING_SURFACE_DASHBOARD_ROOT')
+    expect(withoutProse).not.toContain('dashboardRoot:')
+    expect(withoutProse).toContain('AGENT_PING_STATE_DIR')
+  })
+
+  it('writes exactly one file, and that file is the evidence', () => {
+    // The bluntest of the four checks and the one that cannot be evaded: no substituted
+    // document, no substituted stylesheet, no substituted module and no manifest of what
+    // was written, because the run writes nothing but its own report.
+    const writes = withoutProse.match(/writeFileSync\(/g) ?? []
+    expect(writes).toHaveLength(1)
+    expect(withoutProse).not.toContain('mkdirSync(path.join(rootDir')
+    expect(exports).not.toContain('prepareHarness')
+  })
+
+  it('starts the product own entry point and no second process', () => {
+    // One Electron launch, and it is the built entry point. There is no generated main
+    // process, so there is no second implementation of anything the product decides.
+    expect(exports).toContain('launchHub')
+    expect(exports).not.toContain('launchChild')
+    const spawns = withoutProse.match(/spawn\(/g) ?? []
+    expect(spawns).toHaveLength(3)
+    // Three, and each one is accounted for: the hub, the control window, the bus monitor.
+    expect(withoutProse).toContain('spawn(electronBinary')
+    expect(withoutProse).toContain('spawn(observer.tools.xmessage')
+    expect(withoutProse).toContain('spawn(dbusMonitor')
+  })
+
+  it('still refuses to name a platform notification mechanism anywhere', () => {
+    // Kept from NT-9 unchanged: the one `notify-send` in this file is a positive control
+    // and it is named only in a string, so the sweep below is about the code.
+    const calls = withoutProse.replace(/'[^']*'/g, "''").replace(/"[^"]*"/g, '""')
     for (const token of [
       'notify-send',
       'org.freedesktop.Notifications',
@@ -1073,67 +1446,61 @@ describe('the run-time harness source: the three seams this run completes, and n
       'osascript',
       'zenity',
       'powershell',
-      'plink',
-      'BurntToast',
       'terminal-notifier',
       'dbus-send',
     ]) {
-      expect(everything).not.toContain(token)
+      expect(calls).not.toContain(token)
     }
   })
 
-  it('starts no process and spawns nothing, because the surface is a window and not a command', () => {
-    expect(everything).not.toMatch(/child_process|spawn|execFile|execSync|exec\(/)
-  })
-
-  it('does not weaken the renderer the product itself configured', () => {
-    for (const token of [
-      'nodeIntegration: true',
-      'nodeIntegration:true',
-      'contextIsolation: false',
-      'sandbox: false',
-      'webSecurity: false',
-      'preload',
+  it('carries the new verdicts rather than the readings it gave up', () => {
+    // The exports are the contract, so a verifier that lost a claim says so here.
+    for (const name of [
+      'readCardFillsFromCss',
+      'cardFillVerdict',
+      'cardFillReadings',
+      'noCardOnScreen',
+      'shippedArtefactsVerdict',
+      'servedDocumentVerdict',
+      'wiredVerdict',
+      'cardPaintSignature',
+      'readBuiltCardDocument',
+      'productChanges',
     ]) {
-      expect(everything).not.toContain(token)
+      expect(exports).toContain(name)
+    }
+    // And the ones it no longer has: a card's contents are not readable from outside.
+    for (const name of [
+      'cardReportVerdict',
+      'CARD_ATTRIBUTES_EXPECTED',
+      'parseHarnessReportLine',
+      'latestCardReport',
+      'CARD_REPORT_PREFIX',
+      'requiredProductChanges',
+      'BUILT_CARD_MODULES',
+    ]) {
+      expect(exports).not.toContain(name)
     }
   })
 
-  it('writes the card document with no inline script and no inline style, because the hub CSP forbids both', () => {
-    expect(document['card.html']).not.toMatch(/style=/)
-    expect(document['card.html']).not.toMatch(/<script(?![^>]*src=)/)
-    expect(document['card.html']).toMatch(/<link rel="stylesheet" href="\/card\.css"/)
-    expect(document['card.html']).toMatch(/<script type="module" src="\/card-entry\.js">/)
-  })
-
-  it('reaches nothing off the loopback origin from the card document', () => {
-    for (const source of [entry, document['card.html'], document['card.css']]) {
-      expect(source).not.toMatch(/https?:\/\//)
-    }
-  })
-
-  it('carries the card model into the renderer as the product built it, with nothing added', () => {
-    const model = { title: 'sample-repository', body: 'A session is blocked.', urgency: 'critical', pendingCount: 1, deepLink: 'http://127.0.0.1:43117/?session=ses_1' }
-    const cell = { class: 'needs-you', rendered: true, lifetime: 'until-resolved', expiresInMs: null, ends: ['resolved', 'acknowledged'], repeat: 'never', reason: 'held-until-resolved' }
-    const call = surface.showCardCall(model, cell)
-    expect(call.startsWith(surface.SHOW_CARD_CALL_PREFIX)).toBe(true)
-    expect(call.endsWith(')')).toBe(true)
-    expect(call).toContain('"lifetime":"until-resolved"')
-    expect(surface.removeCardCall('acknowledged')).toBe(`${surface.REMOVE_CARD_CALL_PREFIX}"acknowledged")`)
-    // A model that cannot be serialised becomes a null argument rather than a throw, so a
-    // defect upstream is a failed delivery with a reason instead of a hung one.
-    expect(surface.showCardCall(undefined, undefined)).toContain('null, null')
-  })
-
-  it('has no top-level await in the Electron main entry, which hangs before app.whenReady()', () => {
-    const withoutFunctionBodies = main.replace(/function[^\n]*\{[\s\S]*?\n\}/g, '')
-    expect(withoutFunctionBodies).not.toMatch(/^await /m)
-  })
-
-  it('writes a card-report line and nothing else onto the harness stdout', () => {
-    expect(main).toMatch(/CARD_REPORT_PREFIX/)
-    expect(main).toMatch(/process\.stdout\.write/)
-    expect(main).not.toMatch(/console\.log/)
+  it('waits for a card to stop arriving before it compares the card with its own colour', () => {
+    // The arrival is the product's own animation, and a mid-flight capture reads a colour
+    // blended part way between the fill and nothing. The tolerance and the settle both come
+    // from that measurement, so both are named in one place.
+    expect(surface.CARD_FILL_TOLERANCE).toBe(12)
+    expect(surface.CARD_PAINT_STABLE_READS).toBe(2)
+    expect(surface.CARD_PAINT_STABLE_TIMEOUT_MS).toBe(3_000)
+    const hubPid = 99
+    const painted = (hex: string) => [
+      { id: '0x1', pid: hubPid, detail: { mapState: 'IsViewable', width: 320, height: 96 }, pixels: { ok: true, distinctValues: 2, nonZeroPixels: 10, dominant: { hex, rgb: [1, 2, 3], count: 8 } } },
+    ]
+    expect(surface.cardPaintSignature(painted('#3e1823'), hubPid)).toContain('0x1:#3e1823:2:10')
+    // A card that is still fading has a different signature each time, and an empty
+    // desktop has none, so neither is mistaken for a card at rest.
+    expect(surface.cardPaintSignature(painted('#3e1823'), hubPid)).not.toBe(
+      surface.cardPaintSignature(painted('#3b1721'), hubPid),
+    )
+    expect(surface.cardPaintSignature([], hubPid)).toBeNull()
   })
 })
 
@@ -1145,7 +1512,9 @@ describe('preflight(): every dependency a journey needs is named before any asse
     expect(names).toContain('the xwd X tool')
     expect(names).toContain('the built Electron main entry point')
     expect(names).toContain('the built dashboard')
-    expect(names).toContain("the product's own compiled card view")
+    // The card document and the preload are the product's own artefacts now, so a build
+    // without them is a failed dependency rather than something this run supplies.
+    expect(names).toContain("the product's own built card document and the preload its window loads")
   })
 
   it('gives every dependency a remedy, because a non-zero exit with no next action trains people to ignore it', () => {

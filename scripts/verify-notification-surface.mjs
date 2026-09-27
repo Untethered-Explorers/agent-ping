@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// Prove the notification card on the running system (NT-9: NT-FR-02, NT-FR-04,
-// NT-FR-08, NT-FR-10, APX-CON-06, APX-CON-12, APX-FR-02, PRD 16 Open Questions 13 and 14).
+// Prove the notification card on the running system (NS-4: NT-FR-02, NT-FR-04, NT-FR-08,
+// NT-FR-10, NT-FR-12, APX-CON-06, APX-CON-12, APX-FR-01, APX-FR-02, PRD 16 Open
+// Questions 13 and 14).
 //
 //   node scripts/verify-notification-surface.mjs
 //   node scripts/verify-notification-surface.mjs --out docs/reviews/notification-surface-evidence.json
@@ -8,12 +9,13 @@
 // THE CLAIM, IN THREE SENTENCES, BEFORE ANY CODE
 //
 //   positive   A real needs-you event, driven over the real loopback socket into the
-//              real built hub running as a real Electron main process on a real
-//              display, puts a real window on that display holding real painted content
-//              positioned inside the display's work area; the card is still there after
-//              a wait; acknowledging the item takes it off the screen and lowers the
-//              badge's own number. A real finished event's card leaves the screen on its
-//              own fixed interval with nothing dismissing it.
+//              product's SHIPPED built entry point running as a real Electron main
+//              process on a real display, puts a real window on that display holding
+//              real painted content positioned inside the display's work area; the card
+//              is still there after a wait; acknowledging the item through the product's
+//              own write route takes it off the screen and lowers the badge's own
+//              number. A real finished event's card leaves the screen on its own fixed
+//              interval with nothing dismissing it.
 //   negative   A session that opens, greets and closes produces no event, no window and
 //              no card, at any point in the run. This is the anti-noise proof and it is
 //              the one that matters most, because a card on a developer's screen for a
@@ -30,47 +32,48 @@
 // map state is read from the X server, and its painted pixels are read out of its own
 // drawable with `xwd`. The only thing taken from the product is a process id, and that
 // from the runtime file the hub itself published. A check the product grades itself is a
-// check that passes when the product is broken. The one exception is marked as such
-// everywhere it appears: the *contents* of the card document are read from the renderer
-// and recorded as corroboration, never as the basis of a visibility claim.
+// check that passes when the product is broken.
 //
 // WHAT IS THE PRODUCT'S AND WHAT IS THIS SCRIPT'S - READ THIS BEFORE THE EVIDENCE FILE
-// The product as shipped cannot draw a card, and NT-9 was told to record that rather
-// than change product code. Three seams are open, each one the product's own documented
-// injection point, and this script supplies all three so that the card machinery can be
-// observed on a real desktop:
+// The product as shipped draws its own card. There is no run-time harness, no
+// substituted document, no substituted stylesheet, no substituted entry module and no
+// substituted renderer bridge anywhere in this file, and there is no second Electron
+// main process: the one process this run starts is the product's own built entry point
+// at `dist/main/main/index.js`, started with the product's own state directory override
+// and nothing else, and the card document it loads is `dist/dashboard/card.html` served
+// by the product's own static route. This is the change from NT-9, which had to supply
+// all three of those itself and therefore could only report what the product as shipped
+// did. NS-1 built and served the card document, NS-2 opened the renderer channel and
+// wired the card presenter, and NS-3 took the card down when its block ends, so the
+// withheld assertion became real and is now asserted.
 //
-//   1. THE CARD DOCUMENT. `src/dashboard/card.html` does not exist and the dashboard's
-//      Vite build has one entry, so `GET /card.html` is a 404 on the shipped build.
-//      This script writes a run-time document into a prepared dashboard root, and the
-//      document mounts the PRODUCT'S OWN compiled card view - `card-view.js`, `card.js`
-//      and `lifetime.js` copied byte for byte out of `dist/main/notify/surface/` - so
-//      the element tree, the attributes, the accessible name, the live-region role, the
-//      expiry timer and the removal are all the product's code running in a real
-//      renderer. Only the page and its stylesheet are this script's.
-//   2. THE MAIN-TO-RENDERER CHANNEL. The renderer runs with `contextIsolation: true`,
-//      `nodeIntegration: false` and `sandbox: true` and there is no preload, so nothing
-//      can hand a card model to the document. The product's own `BrowserWindow` is
-//      wrapped so the harness can hold the instance, and the model is carried by
-//      `webContents.executeJavaScript` - a real call into a real renderer, chosen here
-//      only because a verification run cannot choose it for the product. It is recorded
-//      as a required product change with an owner, not adopted as the answer.
-//   3. THE ACKNOWLEDGEMENT SIGNAL. The ack route has no notifier hook, so nothing tells
-//      the card that its block was acknowledged. The harness watches the hub's own
-//      pending set and calls the card view's own `remove('acknowledged')` - a product
-//      method on a product object - and then the product's own host `hide()`.
+// Three things follow from that, and each one costs this script a claim it used to make:
 //
-// Everything else is the product's, unmodified and unstubbed: the real built
-// `startHub`, the real loopback server and every real route, the real ingest
-// classifier, the real class policy, the real card model, the real surface host with the
-// real `SURFACE_WINDOW_OPTIONS`, the real placement arithmetic, the real lifetime table,
-// the real card view and the real delivery policy and its ledger. The evidence file
-// names every one of those files, and its `harness` section names every one of the three
-// seams above. A green run here is evidence about the card machinery, and the run also
-// records, in `shippedPosture`, that the product as shipped still reports `not-wired` and
-// still serves no card document.
+//   1. The card's *contents* are no longer observable from outside the process. Reading a
+//      renderer from here would mean injecting code into it, and the shape this run
+//      exists to prove is that the product does not have to do that. So the evidence
+//      file no longer claims to have read the card's element tree, its attributes, its
+//      accessible name or its live-region role: `notVerified` names those, and says which
+//      suites hold them instead.
+//   2. What replaces that reading is stronger than a report from inside the process. The
+//      observer reads the product's own BUILT stylesheet for the fill it paints a card of
+//      each class with, and then asks the compositor whether that colour is on the screen.
+//      The pixels cannot come from anywhere else now, because there is nowhere else in
+//      this run for them to come from, and the comparison tells the two classes apart -
+//      which the old "painted" reading could not.
+//   3. The renderer options are recorded, not observed. `contextIsolation`,
+//      `nodeIntegration`, `sandbox` and `webSecurity` are read out of the built artefact
+//      and attributed to the suite that asserts them, because a run outside the process
+//      cannot read the live window's options and must not pretend to.
 //
-// FIVE PROPERTIES THIS SCRIPT MUST NEVER LOSE
+// Everything else is the product's, unmodified and unstubbed: the real built entry point,
+// the real loopback server and every real route, the real ingest classifier, the real
+// class policy, the real card model, the real surface host with the real
+// `SURFACE_WINDOW_OPTIONS`, the real preload, the real placement arithmetic, the real
+// lifetime table, the real card view, the real card channel and the real delivery policy
+// and its ledger.
+//
+// SIX PROPERTIES THIS SCRIPT MUST NEVER LOSE
 //
 //   1. Absence of a dependency is never a skip. A missing binary, a missing display, a
 //      missing X tool, a missing built product module and a missing control window each
@@ -89,42 +92,44 @@
 //      `notify-send` once, as a *positive control* for the notification-centre
 //      instrument. Nothing is uploaded; the evidence file is the artefact (APX-CON-12).
 //   5. No conversation content. The evidence file records event ids the log itself
-//      generates, class names, counts, rectangles, timings, versions, attribute names and
-//      closed reason tokens. Card *lengths* are recorded and card *words* are not, and it
-//      records no prompt, no tool name, no diff, no D-Bus payload, and no absolute path
-//      from the developer's machine (APX-FR-01).
+//      generates, class names, counts, rectangles, colours, timings, versions and closed
+//      reason tokens. Card *words* are not recorded anywhere - not even a length, because
+//      this run no longer reads the document - and it records no prompt, no tool name, no
+//      diff, no D-Bus payload, and no absolute path from the developer's machine
+//      (APX-FR-01).
+//   6. This run supplies no part of the card path, and that is enforced rather than
+//      promised. The only file it writes is the evidence file, the only artefact it
+//      starts is the product's own built entry point, and
+//      tests/scripts/verify-notification-surface.test.ts reads this file's own source and
+//      fails on the four implementations NT-9 used to substitute. A green result cannot
+//      mean the run did the work again (NT-FR-12).
 //
 // SHAPE, PER THE LIVE-VERIFICATION DISCIPLINE
 //
 //   scripts/verify-notification-surface.mjs              pure parsing and judgement,
-//                                                         exported, plus the run-time
-//                                                         harness source, plus a thin
-//                                                         shell that owns every side
-//                                                         effect
+//                                                         exported, plus a thin shell
+//                                                         that owns every side effect
 //   tests/scripts/verify-notification-surface.test.ts    drives `decide`, every parser
-//                                                         and every harness source with
-//                                                         injected values, so the
-//                                                         judgement and every parse are
-//                                                         verified with no display and
-//                                                         no Electron
+//                                                         and every verdict with injected
+//                                                         values, so the judgement and
+//                                                         every parse are verified with
+//                                                         no display and no Electron
 //
 // WHAT THIS SCRIPT DELIBERATELY DOES NOT DO
-// It does not touch a file under src/. It does not re-arm a card, acknowledge anything
-// it was not asked to, or fall back to dismissing a card that failed to expire. It does
-// not call a platform notification tool, and the one `notify-send` it ever runs is the
-// positive control for the notification-centre instrument, after the journeys. It does
-// not claim the card is legible: the pixel capture counts painted values and reads no
-// word. And it does not report a card it never saw as gone.
+// It does not touch a file under src/ or under dist/. It does not write a document, a
+// stylesheet, an entry module or a dashboard root for the product to serve, and it does
+// not point the hub at a root of its own. It does not re-arm a card, acknowledge
+// anything it was not asked to, or fall back to dismissing a card that failed to expire.
+// It does not call a platform notification tool, and the one `notify-send` it ever runs is
+// the positive control for the notification-centre instrument, after the journeys. It
+// does not claim the card is legible or that a word was read: the pixel capture measures
+// painted values and reads no text. And it does not report a card it never saw as gone.
 import { spawn, spawnSync } from 'node:child_process'
 import {
-  copyFileSync,
-  cpSync,
   existsSync,
   mkdirSync,
-  readdirSync,
   readFileSync,
   rmSync,
-  statSync,
   writeFileSync,
 } from 'node:fs'
 import http from 'node:http'
@@ -137,7 +142,7 @@ const SCRIPT_PATH = 'scripts/verify-notification-surface.mjs'
 
 export const SCRIPT_NAME = 'verify-notification-surface'
 /** Bumped when the evidence schema changes, so a later reader can tell the two apart. */
-export const EVIDENCE_VERSION = 2
+export const EVIDENCE_VERSION = 3
 export const DEFAULT_EVIDENCE_PATH = 'docs/reviews/notification-surface-evidence.json'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -179,8 +184,39 @@ export const FINISHED_EXPIRY_WAIT_MS = FINISHED_CARD_EXPIRES_IN_MS + 3_000
 export const CARD_APPEAR_TIMEOUT_MS = 8_000
 /** How long the observer waits for a card to reach the screen after it is dismissed. */
 export const CARD_END_TIMEOUT_MS = 8_000
-/** How long the harness waits for a card document to run its own entry point. */
-export const CARD_DOCUMENT_READY_TIMEOUT_MS = 5_000
+
+/**
+ * How far, per channel, the compositor's own value may sit from the product's own
+ * stylesheet value and still be called the product's colour.
+ *
+ * A tolerance, and a measured one rather than a guessed one. On this machine the
+ * desktop's colour management moved the product's `--card-block-fill: #3a1f24` to
+ * (62, 24, 35) and its `--card-finished-fill: #1b2b24` to (21, 46, 36) once each had
+ * finished arriving - errors of 7 and 6 per channel - while the two fills are 35 apart
+ * in red from each other. So a tolerance of 12 separates a card of each class from the
+ * other class, from the product's default fill, from a page background and from a blank
+ * window, with room to spare on this desktop, and every reading records the actual
+ * distance rather than only the verdict (APX-CON-06: a per-platform difference is
+ * documented, not asserted).
+ */
+export const CARD_FILL_TOLERANCE = 12
+
+/**
+ * How many consecutive identical readings count as a settled paint, and how long the run
+ * will wait for them.
+ *
+ * This is not politeness about the capture. A card arrives with an animation the product
+ * owns (`data-motion-state-arrival` in src/notify/surface/card-view.ts, and the transition
+ * it drives in src/dashboard/card.css), and a capture taken while the card is still
+ * arriving reads a colour blended part way between the fill and nothing: on this machine
+ * the finished card measured 13 per channel from its own fill mid-flight against 6 at
+ * rest, which is outside the tolerance above. So the run waits for the window's own
+ * drawable to stop changing and only then compares, and a paint that never settles within
+ * the deadline is compared anyway and fails - a card that is still moving is not a card at
+ * rest, and this run does not get to decide which moment of one is the real one.
+ */
+export const CARD_PAINT_STABLE_READS = 2
+export const CARD_PAINT_STABLE_TIMEOUT_MS = 3_000
 
 /** The D-Bus match rule for the notification interface. Read once, so a typo is one diff. */
 export const NOTIFICATION_MATCH_RULE = 'type=method_call,interface=org.freedesktop.Notifications'
@@ -196,16 +232,6 @@ export const REQUEST_TIMEOUT_MS = 10_000
 /** Lines of child stdout/stderr kept. Bounded: this process is not a log sink. */
 export const MAX_CHILD_OUTPUT_LINES = 200
 
-/**
- * The prefix on a card-report line the harness writes to its own stdout.
- *
- * The harness and the observer are two processes, so the harness's readings of the
- * renderer travel as lines rather than as a route: the card document must not have to
- * report anything, and the product's HTTP surface must stay exactly the surface the
- * product defines. `parseHarnessReportLine` is the only reader and it is pure.
- */
-export const CARD_REPORT_PREFIX = '##CARD## '
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Pure: the judgement. No process, no clock, no filesystem, no network, no display.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -219,7 +245,7 @@ export const CARD_REPORT_PREFIX = '##CARD## '
  * that cannot produce one of them produces a *failed* row with the reason attached,
  * never a missing one, so the count cannot drift with the product's behaviour.
  */
-export const ASSERTIONS_EXPECTED = 19
+export const ASSERTIONS_EXPECTED = 22
 
 /**
  * The three rows the observer and the hub contribute, named so the total above cannot
@@ -230,22 +256,33 @@ export const OPENING_ASSERTIONS = Object.freeze([
   'a built Electron main process started the real hub serving on loopback',
   'the hub published its own runtime file rather than being reached on an assumed port',
 ])
+/**
+ * The two rows the shipped build owes before any journey runs, and they are the rows
+ * NT-9 had to record instead of assert: the product's own artefacts, on disk, and the
+ * product's own delivery policy, wired. A product that grew neither would answer
+ * `missing` and `not-wired` here, and that is a failed run rather than a record.
+ */
+export const SHIPPED_ASSERTIONS = Object.freeze([
+  'the built artefacts carry the product own card document, its stylesheet, its entry bundle and the preload its window loads',
+  'the shipped delivery policy is wired, so the card model crossed a channel the product owns',
+])
 /** The nine rows journey 1 owes, whatever it managed to observe. */
 export const NEEDS_YOU_ASSERTIONS = Object.freeze([
   'a real needs-you event created exactly one pending item',
   'a card window appeared inside the display work area',
   'the card window held painted content',
-  'the product own card view rendered a card into the document that window loaded',
+  'the painted fill is the product own stylesheet fill for a needs-you card',
   'the card was still on screen after a wait',
   'the delivery outcome for the block was recorded as delivered',
-  'the hub served the card document the window loads',
+  'the hub served the card document the window loads, byte for byte under the product own policy',
   'the badge number fell when the item was acknowledged',
   'the card was gone after the acknowledgement',
 ])
-/** The three rows journey 2 owes. */
+/** The four rows journey 2 owes. */
 export const FINISHED_ASSERTIONS = Object.freeze([
   'a worked idle transition created exactly one finished event',
   'a card window appeared for the finished event',
+  'the painted fill is the product own stylesheet fill for a finished card',
   'the finished card expired with nothing dismissing it',
 ])
 /** The four rows journey 3 owes, and the four that matter most: the anti-noise proof. */
@@ -268,7 +305,7 @@ export const DependencyStatus = Object.freeze({
   BUILT_ENTRY: 'the built Electron main entry point',
   BUILT_SCHEMA: 'the built durable schema',
   BUILT_DASHBOARD: 'the built dashboard',
-  BUILT_CARD_VIEW: "the product's own compiled card view",
+  BUILT_CARD_DOCUMENT: "the product's own built card document and the preload its window loads",
   WORK_AREA: 'an advertised display work area',
 })
 
@@ -507,6 +544,15 @@ export function appearedWindowIds(before, after) {
  * no observation in this script claims that a particular sentence was legible. Legibility
  * is a manual, per-platform step and docs/runbooks/notification-surface.md says so.
  *
+ * The `dominant` reading is the one addition NT-9 did not need. With the run-time harness
+ * gone there is no report from inside the renderer to say what the card was, so the
+ * question "whose colour is this?" is answered by asking the compositor: the most
+ * frequent non-zero value in the window's own drawable, reduced to 24 bits so a 32-bit
+ * capture's alpha does not make an opaque fill and a translucent one look different.
+ * Compared against the product's own BUILT stylesheet with a stated per-channel
+ * tolerance, that is what tells a needs-you card from a finished one, and it can only
+ * come from the product's stylesheet because this run has no other one.
+ *
  * The XWD header is 25 big-endian CARD32s (100 bytes) followed by the window name and
  * then `ncolors` 12-byte colormap entries, so the pixel data starts at
  * `header_size + ncolors * 12`. Channel order is read as the dump states it and reduced
@@ -538,7 +584,7 @@ export function parseXwdPixels(buffer) {
     }
   }
   const step = bitsPerPixel / 8
-  const distinct = new Set()
+  const counts = new Map()
   let nonZero = 0
   for (let y = 0; y < height; y += 1) {
     const row = dataOffset + y * bytesPerLine
@@ -546,8 +592,18 @@ export function parseXwdPixels(buffer) {
       const at = row + x * step
       let value = 0
       for (let index = step - 1; index >= 0; index -= 1) value = value * 256 + buffer[at + index]
-      distinct.add(value)
+      const colour = value & 0xffffff
+      counts.set(colour, (counts.get(colour) ?? 0) + 1)
       if (value !== 0) nonZero += 1
+    }
+  }
+  let dominant = null
+  let best = 0
+  for (const [colour, count] of counts) {
+    if (colour === 0) continue
+    if (count > best) {
+      best = count
+      dominant = colour
     }
   }
   return {
@@ -557,9 +613,15 @@ export function parseXwdPixels(buffer) {
     bitsPerPixel,
     bytesPerLine,
     pixels: width * height,
-    distinctValues: distinct.size,
+    distinctValues: counts.size,
     nonZeroPixels: nonZero,
+    dominant: dominant === null ? null : { ...colourToRgb(dominant), count: best, share: best / (width * height) },
   }
+}
+
+/** One 24-bit value as `{ rgb, hex }`, the shape every colour in this script travels as. */
+export function colourToRgb(value) {
+  return { rgb: [(value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff], hex: `#${value.toString(16).padStart(6, '0')}` }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -778,68 +840,150 @@ export function cardOnScreenVerdict(after, hubPid) {
 }
 
 /**
- * The attributes a rendered card must carry, as a closed list.
+ * Whether nothing painted is on the screen in the hub's card window.
  *
- * Every entry is one the product's own view writes (src/notify/surface/card-view.ts):
- * the root marker a stylesheet hangs on, the urgency and lifetime tokens, the two
- * non-colour urgency channels, the two lines of text, the live-region role, the
- * politeness, the accessible name, the tab stop and the motion mode. The list is compared
- * against the attribute names the renderer reports, so "the card is a real element tree
- * with real semantics" is a reading rather than a claim.
+ * Two answers say yes and they are not the same event. `no-card-window` is the window
+ * itself being unmapped or gone, which is what the product's own dismissal does; `blank`
+ * is a window that is still mapped with an empty drawable, which is what a card whose
+ * element was removed out of a window nobody took down would leave. Neither is a card
+ * (NT-FR-10), so a journey waiting for a card to leave waits for both - and the
+ * assertion's `measured` block records which of the two it was, because the difference
+ * is worth knowing.
  */
-export const CARD_ATTRIBUTES_EXPECTED = Object.freeze([
-  'data-card',
-  'data-urgency',
-  'data-lifetime',
-  'data-card-urgency-icon',
-  'data-card-urgency-word',
-  'data-card-title',
-  'data-card-body',
-  'data-motion-state-arrival',
-  'role',
-  'aria-live',
-  'aria-label',
-  'tabindex',
-])
+export function noCardOnScreen(verdict) {
+  return verdict === 'no-card-window' || verdict === 'blank'
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pure: whose card is it
+//
+// With the run-time harness gone, the question the old renderer report answered - "is
+// the thing in that window a card, and which kind" - is answered from outside the
+// process instead: the observer reads the product's own BUILT stylesheet for the fill it
+// paints each class with, and then asks the compositor whether that colour is on the
+// screen. The comparison is a tolerance, and every reading records the distance it
+// found, so a reader sees the number rather than only the verdict.
+// ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * What the renderer's own report says about the card in it.
+ * One `#rgb`/`#rrggbb` literal as `{ rgb, hex }`, or null for anything else.
  *
- * Six answers, and each one names something that could be wrong:
- *
- *   'rendered'            the element is in the document, every expected attribute is on
- *                         it, both text lines are non-empty, and it carries no inline
- *                         style - which is what `style-src 'self'` with no
- *                         `unsafe-inline` requires (src/hub/security.ts).
- *   'incomplete'          the element is there and something is missing: an attribute, a
- *                         text line, or a reason a reader can look up.
- *   'inline-style'        the element carries a `style` attribute. Under the product's own
- *                         content-security policy the card would be drawn wrongly, and a
- *                         card that cannot be drawn is not a card.
- *   'no-card-element'     the document is loaded and running and there is no card in it.
- *                         That is the honest reading after a card ends.
- *   'document-not-ready'  the harness read the document before its entry point ran.
- *   'no-report'           nothing has been read at all, which is never a pass.
- *
- * The card's own words are deliberately not read: the report carries the *lengths* of the
- * two text lines and the length of the accessible name, so "the card said something" is a
- * fact and no content reaches the evidence file (APX-FR-01).
+ * Null rather than a throw, because a stylesheet that does not carry a value is a
+ * missing dependency this run reports by name, and an exception here would abort a
+ * journey instead of naming what was absent.
  */
-export function cardReportVerdict(report) {
-  if (report === null || report === undefined) return 'no-report'
-  if (report.error !== undefined && report.error !== null && report.error !== '') return 'no-report'
-  if (report.ready !== true) return 'document-not-ready'
-  const element = report.element ?? null
-  if (element === null || element === undefined) {
-    return report.showing === true ? 'incomplete' : 'no-card-element'
+export function parseHexColor(literal) {
+  if (typeof literal !== 'string') return null
+  const digits = literal.trim().replace(/^#/, '')
+  if (!/^[0-9a-fA-F]+$/.test(digits)) return null
+  const expanded = digits.length === 3 ? digits.split('').map((digit) => digit + digit).join('') : digits
+  if (expanded.length !== 6) return null
+  return {
+    rgb: [parseInt(expanded.slice(0, 2), 16), parseInt(expanded.slice(2, 4), 16), parseInt(expanded.slice(4, 6), 16)],
+    hex: `#${expanded.toLowerCase()}`,
   }
-  if (typeof element.inlineStyle === 'string' && element.inlineStyle !== '') return 'inline-style'
-  const attributes = Array.isArray(element.attributes) ? element.attributes : []
-  const missing = CARD_ATTRIBUTES_EXPECTED.filter((name) => !attributes.includes(name))
-  if (missing.length > 0) return 'incomplete'
-  if (!(Number(element.titleLength) > 0) || !(Number(element.bodyLength) > 0)) return 'incomplete'
-  if (!(Number(element.ariaLabelLength) > 0)) return 'incomplete'
-  return 'rendered'
+}
+
+/**
+ * The fill this product's own built card stylesheet paints each class with.
+ *
+ * Read out of the *built* artefact, not out of `src`, and not hardcoded here: the point
+ * is that the colour the observer looks for on the screen is the one the product's build
+ * carries, so the two cannot drift apart without the run noticing. Three names are
+ * looked for and two are required - the product writes a fill per class, and the default
+ * fill is recorded too so a reader can see all three of its values (NT-FR-02, NT-FR-08).
+ *
+ * null when a required name is absent, which the shipped-build journey reports as a
+ * missing artefact rather than as a colour that happened not to match.
+ */
+export function readCardFillsFromCss(css) {
+  if (typeof css !== 'string') return null
+  const read = (name) => {
+    const match = new RegExp(`--${name}\\s*:\\s*(#[0-9a-fA-F]{3,6})`).exec(css)
+    return match === null ? null : parseHexColor(match[1])
+  }
+  const needsYou = read('card-block-fill')
+  const finished = read('card-finished-fill')
+  if (needsYou === null || finished === null) return null
+  return { needsYou, finished, default: read('card-fill') }
+}
+
+/**
+ * The largest per-channel distance between two colours, or null when either is unknown.
+ *
+ * A maximum rather than a Euclidean distance on purpose: a tolerance stated in
+ * "how far may one channel be" is a tolerance an operator can picture, and it is the
+ * same number in the code and in the evidence file.
+ */
+export function channelDistance(one, other) {
+  if (!Array.isArray(one) || !Array.isArray(other) || one.length !== 3 || other.length !== 3) return null
+  if (![...one, ...other].every((value) => Number.isFinite(value))) return null
+  return Math.max(...one.map((value, index) => Math.abs(value - other[index])))
+}
+
+/**
+ * One reading per card-shaped window: the colour the compositor put there, and how far it
+ * sits from each of the product's own fills.
+ *
+ * The distances are the measurement; `cardFillVerdict` is the judgement over them. They
+ * are separate so the evidence file can record how far off the desktop actually put the
+ * colour rather than only whether it was inside the tolerance.
+ */
+export function cardFillReadings(cardWindows, fills, tolerance = CARD_FILL_TOLERANCE) {
+  const named = [
+    ['needs-you-fill', fills?.needsYou ?? null],
+    ['finished-fill', fills?.finished ?? null],
+  ]
+  return (cardWindows ?? []).map((window) => {
+    const dominant = window?.pixels?.dominant ?? null
+    const distances = {}
+    let best = null
+    for (const [verdict, fill] of named) {
+      const distance = channelDistance(dominant?.rgb ?? null, fill?.rgb ?? null)
+      distances[verdict] = distance
+      if (distance === null) continue
+      if (best === null || distance < best.distance) best = { verdict, distance }
+    }
+    return {
+      windowId: window?.id ?? null,
+      dominant: dominant === null ? null : { hex: dominant.hex, rgb: dominant.rgb, count: dominant.count, share: dominant.share },
+      distances,
+      best,
+      withinTolerance: best !== null && best.distance <= tolerance,
+    }
+  })
+}
+
+/**
+ * Which class of card the compositor is showing, as the product's own stylesheet names
+ * the classes.
+ *
+ * Five answers, and each one is a claim that could be wrong:
+ *
+ *   'needs-you-fill'   the dominant painted value is the product's own block fill.
+ *   'finished-fill'    the dominant painted value is the product's own finished fill.
+ *   'no-card-fill'     something is painted and it is none of the product's fills. That
+ *                      is a failed comparison rather than a pass, and it is how a card
+ *                      drawn by something other than this product's build is reported.
+ *   'unreadable'       the window's pixels could not be captured, or carried no non-zero
+ *                      value to compare. A broken `xwd` must never become a colour match.
+ *   'no-card-window'   no card-shaped window was offered at all, which a journey treats
+ *                      as a missing precondition rather than as a verdict.
+ *
+ * Every candidate must agree: two windows on the desktop with different fills is a
+ * desktop with two things on it, and the run reports the first one rather than picking
+ * the one that suits.
+ */
+export function cardFillVerdict(cardWindows, fills, tolerance = CARD_FILL_TOLERANCE) {
+  if (!Array.isArray(cardWindows) || cardWindows.length === 0) return 'no-card-window'
+  if (fills === null || fills === undefined) return 'no-card-fill'
+  const readings = cardFillReadings(cardWindows, fills, tolerance)
+  if (readings.some((reading) => reading.dominant === null)) return 'unreadable'
+  if (readings.some((reading) => !reading.withinTolerance)) return 'no-card-fill'
+  const first = readings[0]
+  if (first.best === null) return 'no-card-fill'
+  if (readings.some((reading) => reading.best.verdict !== first.best.verdict)) return 'no-card-fill'
+  return first.best.verdict
 }
 
 /**
@@ -864,40 +1008,62 @@ export function deliveryVerdict(delivery) {
 }
 
 /**
- * One card-report line, or null.
+ * Whether the shipped delivery policy is wired at all, which is the product's own answer
+ * to "is there a card presenter behind the surface".
  *
- * The harness writes one line per change to what its renderer holds, prefixed so it can
- * never be confused with a diagnostic. Anything that is not a prefixed line, or a prefixed
- * line that is not a JSON object with a `seq`, is `null` rather than a partial read: a
- * half-parsed report that looked like a card would be the worst possible failure here.
+ * Separate from `deliveryVerdict` because it answers a different question and is asked
+ * before anything has been delivered: `resolveSurfaceNotifier` refuses a host with no
+ * renderer, so a `not-wired` policy means the shipped bridge carried no presenter and no
+ * card could have been shown at all (NT-FR-12). The status string is carried into the
+ * failure so a reader gets the product's own reason.
  */
-export function parseHarnessReportLine(line) {
-  if (typeof line !== 'string' || !line.startsWith(CARD_REPORT_PREFIX)) return null
-  let parsed
-  try {
-    parsed = JSON.parse(line.slice(CARD_REPORT_PREFIX.length))
-  } catch {
-    return null
-  }
-  if (typeof parsed !== 'object' || parsed === null || !Number.isInteger(parsed.seq)) return null
-  return parsed
+export function wiredVerdict(delivery) {
+  if (delivery === null || delivery === undefined) return 'no-delivery-section'
+  return delivery.wired === true ? 'wired' : `not-wired: ${String(delivery.status)}`
 }
 
 /**
- * The newest report in a list, and the newest one that ends a card the way a caller is
- * waiting for.
+ * The product's own shipped artefacts, as this run found them on disk.
  *
- * Two questions, asked of the same immutable list, so a journey can wait for "a card is
- * gone" and "a card ended as `acknowledged`" without polling two channels. `end` is the
- * first end in the newest report's list that matches, or null.
+ * Pure, so the verdict is testable without a build: the caller reads the files and hands
+ * in what it found. Every path is one the product's own build produces and the surface's
+ * own window names, and none of them can be satisfied by anything this run writes - the
+ * run writes no file outside the evidence file.
+ *
+ *   'in-the-build'   the card document, the stylesheet and entry bundle it references,
+ *                    and the preload its window loads are all present.
+ *   otherwise       `missing: a, b`, naming what is absent, which is a failed run.
  */
-export function latestCardReport(reports, end = null) {
-  const list = Array.isArray(reports) ? reports : []
-  const newest = list.length === 0 ? null : list[list.length - 1]
-  if (newest === null || end === null) return { report: newest, end: null }
-  const ends = Array.isArray(newest.ends) ? newest.ends : []
-  return { report: newest, end: ends.find((value) => value === end) ?? null }
+export function shippedArtefactsVerdict(found) {
+  const wanted = [
+    ['the built card document', found?.document],
+    ['the preload the surface window loads', found?.preload],
+    ['the entry bundle the card document loads', found?.entry],
+    ['the stylesheet the card document links', found?.stylesheet],
+  ]
+  const missing = wanted.filter(([, present]) => present !== true).map(([what]) => what)
+  return missing.length === 0 ? 'in-the-build' : `missing: ${missing.join(', ')}`
 }
+
+/**
+ * Whether the card document the window loaded is the product's own built one.
+ *
+ * Three conditions, and the middle one is the one this run exists for: the bytes served
+ * must be the bytes the build produced. A status code alone would pass for any document
+ * that happens to answer 200 - including one this script had written itself, which is
+ * exactly what NT-9 had to do and exactly what must now be impossible. The policy header
+ * is compared too, because a document served without the product's own strict policy is
+ * a document that was allowed to do something this product forbids.
+ */
+export function servedDocumentVerdict({ status, served, built, policy, permissiveHeader }) {
+  if (status !== 200) return `not-served: ${String(status)}`
+  if (typeof served !== 'string' || typeof built !== 'string') return 'not-served: no body to compare'
+  if (served !== built) return 'served-something-else: the body is not the built document'
+  if (typeof policy !== 'string' || policy === '') return 'served-without-a-content-security-policy'
+  if (permissiveHeader === true) return `served-with-a-permissive-header: ${String(permissiveHeader)}`
+  return 'served-identically'
+}
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Pure: the arguments
@@ -905,15 +1071,16 @@ export function latestCardReport(reports, end = null) {
 
 export const USAGE = `usage: node ${SCRIPT_PATH} [--out <path>] [--keep-state] [--help]
 
-Starts the product's shipped Electron main entry point, records what it does on this display
-today, then starts the real built hub in a run-time harness that supplies the three seams the
-product has not built (the card document, the main-to-renderer channel, the acknowledgement
-signal), drives three real journeys over the real loopback socket, and observes the desktop
-from outside the product. One machine-readable JSON summary goes to stdout; progress goes to
-stderr. The evidence file names every file the harness wrote and every product file it used.
+Starts the product's shipped Electron main entry point against a state directory of this
+run's own, asserts that the build carries the product's own card document and a wired
+delivery policy, drives three real journeys over the real loopback socket, and observes the
+desktop from outside the product with the X server. One machine-readable JSON summary goes to
+stdout; progress goes to stderr. The run supplies no part of the card path: it writes no
+document, no stylesheet, no entry module and no dashboard root, it starts no second process,
+and the only file it writes is the evidence file.
 
   --out <path>   where to write the evidence file (default ${DEFAULT_EVIDENCE_PATH})
-  --keep-state   do not delete the temporary state and harness directories on exit
+  --keep-state   do not delete the temporary state directory on exit
   --help         this text
 
 Exit codes: 0 only when every assertion ran and matched. 1 on a failed assertion. 2 on a
@@ -954,497 +1121,21 @@ export class UsageError extends Error {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Pure: the run-time harness source
+// What is NOT here, and is not coming back
 //
-// The product ships no card document, no main-to-renderer channel and no
-// acknowledgement hook, and this task may not change product code. Those three seams are
-// generated here rather than written in the product, and the generated code is a string
-// so that it can be swept by a test in exactly the way tests/notify/policy.test.ts sweeps
-// src/notify: no platform notification mechanism, no subprocess, no weakened renderer
-// sandbox, no `nodeIntegration`.
+// NT-9 generated four things at run time and this file no longer contains any of them:
+// a card document, a card stylesheet, a card entry module, and a renderer bridge that
+// carried a card model into the window by injecting code into it. With NS-1 building and
+// serving the card document, NS-2 opening the product's own channel and wiring the card
+// presenter, and NS-3 taking the card down when its block ends, the product draws its own
+// card and a run that substituted any of those four would be measuring itself.
+//
+// The guarantee is not a promise in this comment. It is a source-level test: see
+// `describe('this script supplies no part of the card path')` in
+// tests/scripts/verify-notification-surface.test.ts, which reads this file's own source and
+// fails on the four implementations, on the one file it is allowed to write, and on the one
+// artefact it is allowed to start.
 // ─────────────────────────────────────────────────────────────────────────────
-
-/** The global the harness's card-document entry point mounts the product's view on. */
-export const CARD_SURFACE_GLOBAL = '__agentPingCardSurface'
-/** The prefix of the call that presents a card, so the name exists in exactly one place. */
-export const SHOW_CARD_CALL_PREFIX = `globalThis.${CARD_SURFACE_GLOBAL}.show(`
-/** The prefix of the call that ends a card, the same way. */
-export const REMOVE_CARD_CALL_PREFIX = `globalThis.${CARD_SURFACE_GLOBAL}.remove(`
-
-/** The expression a renderer is asked to evaluate to report what its document holds. */
-export const READ_CARD_REPORT_JS =
-  '(function () { const s = globalThis.' +
-  CARD_SURFACE_GLOBAL +
-  '; return s === undefined ? { ready: false } : s.report() })()'
-
-/**
- * The one call that puts a card into the document, as a string.
- *
- * Pure, and the JSON is the product's own `CardModel` and `CardLifetimeCell` exactly as
- * the notifier built them: nothing is added, renamed or defaulted on the way in. A model
- * that cannot be serialised is a null argument rather than a crash, so a defect upstream
- * becomes a failed delivery with a reason instead of a hung delivery.
- */
-export function showCardCall(model, cell) {
-  return `${SHOW_CARD_CALL_PREFIX}${JSON.stringify(model ?? null)}, ${JSON.stringify(cell ?? null)})`
-}
-
-/** The one call that takes a card off the document, naming the end the product's table allows. */
-export function removeCardCall(end) {
-  return `${REMOVE_CARD_CALL_PREFIX}${JSON.stringify(end)})`
-}
-
-/**
- * The card document's own entry point: the harness's mount, the product's view.
- *
- * The only thing this file does is hand the product's `createCardView` an element to put
- * cards inside and expose three calls. What a card *is*, how it is announced, when it
- * expires and how it leaves are all `dist/main/notify/surface/card-view.js` and
- * `dist/main/notify/surface/lifetime.js` - copied byte for byte out of the build and
- * imported here by the same URL the hub serves them from.
- *
- * The report is attribute names and character counts. No word of the card is read, so
- * nothing that reaches the evidence file can carry content (APX-FR-01).
- */
-export function cardEntrySource() {
-  return `// GENERATED by ${SCRIPT_PATH} on every run. Do not edit.
-// The card view this mounts is the product's own compiled module, served from this origin.
-import { createCardView } from '/card-view.js'
-
-const parent = document.querySelector('[data-card-surface]')
-const ends = []
-const view = createCardView({
-  parent: parent,
-  onEnd: function (end) { ends.push(end) },
-})
-
-const report = function () {
-  const element = document.querySelector('[data-card]')
-  if (element === null) {
-    return { ready: true, showing: view.showing, ends: ends.slice(), childElementCount: parent.childElementCount, element: null }
-  }
-  // The whole subtree, not the root: the urgency icon and word and the two text lines are
-  // child elements, and "a real element tree with real semantics" is a claim about all of
-  // them rather than about one node.
-  const attributes = []
-  for (const node of [element].concat(Array.prototype.slice.call(element.querySelectorAll('*')))) {
-    for (const name of node.getAttributeNames()) {
-      if (attributes.indexOf(name) === -1) attributes.push(name)
-    }
-  }
-  return {
-    ready: true,
-    showing: view.showing,
-    ends: ends.slice(),
-    childElementCount: parent.childElementCount,
-    element: {
-      attributes: attributes,
-      elementCount: element.querySelectorAll('*').length + 1,
-      inlineStyle: element.getAttribute('style'),
-      urgency: element.getAttribute('data-urgency'),
-      lifetime: element.getAttribute('data-lifetime'),
-      expiresIn: element.getAttribute('data-expires-in'),
-      role: element.getAttribute('role'),
-      ariaLive: element.getAttribute('aria-live'),
-      motion: element.getAttribute('data-motion-state-arrival'),
-      hasDeepLink: element.hasAttribute('data-deep-link'),
-      ariaLabelLength: (element.getAttribute('aria-label') || '').length,
-      titleLength: ((element.querySelector('[data-card-title]') || {}).textContent || '').length,
-      bodyLength: ((element.querySelector('[data-card-body]') || {}).textContent || '').length,
-    },
-  }
-}
-
-globalThis.${CARD_SURFACE_GLOBAL} = {
-  show: function (model, cell) { view.show(model, cell) },
-  remove: function (end) { view.remove(end) },
-  report: report,
-}
-`
-}
-
-/**
- * The card document, and the stylesheet that draws it.
- *
- * Both are the harness's, because the product's are dashboard-engineer's and do not exist
- * (see the header). The document declares no inline style and no inline script, because the
- * hub sends the dashboard a strict content-security policy with no `unsafe-inline` and no
- * `unsafe-eval` (src/hub/security.ts): a card that needed either would be a card this
- * product's own boundary refuses to run. The stylesheet is served as its own file for the
- * same reason - `style-src 'self'`.
- */
-export function cardDocumentSource() {
-  return {
-    'card.html': `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <title>agent-ping card</title>
-    <link rel="stylesheet" href="/card.css" />
-  </head>
-  <body>
-    <div data-card-surface></div>
-    <script type="module" src="/card-entry.js"></script>
-  </body>
-</html>
-`,
-    'card.css': `/* GENERATED by ${SCRIPT_PATH}. The product's own card stylesheet is
-   dashboard-engineer's and is not in the build; this one exists so the card document has
-   something to draw with, and it paints the product's attributes rather than inventing any
-   state of its own. No inline style, because the hub's policy carries no unsafe-inline. */
-html,
-body {
-  margin: 0;
-  padding: 0;
-  background: transparent;
-  font-family: system-ui, sans-serif;
-}
-
-[data-card-surface] {
-  width: 100%;
-  height: 100%;
-}
-
-[data-card] {
-  box-sizing: border-box;
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 1px 8px;
-  align-content: center;
-  width: 100%;
-  height: 100%;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid #3a4256;
-  background: #1f2430;
-  color: #f2f5fb;
-  font-size: 13px;
-  line-height: 1.25;
-}
-
-[data-card][data-urgency='critical'] {
-  background: #3a1f24;
-  border-color: #7d2b34;
-}
-
-[data-card][data-urgency='normal'] {
-  background: #1b2b24;
-  border-color: #2f5b46;
-}
-
-[data-card-urgency-icon,
-[data-card-urgency-word,
-[data-card-title],
-[data-card-body] {
-  margin: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-[data-card-urgency-icon {
-  grid-row: span 3;
-  align-self: center;
-  font-weight: 700;
-}
-
-[data-card-urgency-word {
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  opacity: 0.9;
-}
-
-[data-card-title] {
-  font-weight: 600;
-}
-
-[data-motion-state-arrival='instant'] {
-  transition: none;
-}
-`,
-  }
-}
-
-/**
- * The Electron main process this run launches, as a string.
- *
- * What it is: the smallest possible Electron main process that starts the PRODUCT'S OWN
- * built `startHub` and hands it the three collaborators the product documents as injected
- * seams - a `SurfaceHostBridge` built by the product's own `createElectronSurfaceHost` with
- * the product's own option set, a `CardPresenter`, and the run-time dashboard root. The
- * class policy, the classifier, the routes, the store, the policy, the placement arithmetic,
- * the card model, the lifetime table and the card view are all the product's, and none of
- * them is stubbed, replaced or wrapped.
- *
- * What it is not: a second product. It does not re-decide anything the product decides. It
- * does not re-arm a card, does not acknowledge anything, and does not take a window down
- * except in response to an end the product's own lifetime cell names - which is the
- * stand-in for the ack-route hook the product does not have, and is recorded as such in
- * every line it writes.
- *
- * No top-level await anywhere, because Chromium decides about the app before the module
- * graph finishes and a top-level await in an Electron main entry hangs before
- * `app.whenReady()` resolves (src/notify/surface/electron-host.ts records that measurement).
- */
-export function harnessMainSource({ productRoot, dashboardRoot }) {
-  return `// GENERATED by ${SCRIPT_PATH} on every run. Do not edit.
-// The verification harness: a real Electron main process that starts the real built hub.
-'use strict'
-const path = require('node:path')
-
-const PRODUCT_ROOT = ${JSON.stringify(productRoot)}
-const DASHBOARD_ROOT = ${JSON.stringify(dashboardRoot)}
-const CARD_REPORT_PREFIX = ${JSON.stringify(CARD_REPORT_PREFIX)}
-const READ_CARD_REPORT_JS = ${JSON.stringify(READ_CARD_REPORT_JS)}
-const SHOW_CALL_PREFIX = ${JSON.stringify(SHOW_CARD_CALL_PREFIX)}
-const REMOVE_CALL_PREFIX = ${JSON.stringify(REMOVE_CARD_CALL_PREFIX)}
-const READY_TIMEOUT_MS = ${String(CARD_DOCUMENT_READY_TIMEOUT_MS)}
-const POLL_MS = 200
-
-const windows = []
-const handled = new Set()
-let hub = null
-let electronApp = null
-let model = null
-let cell = null
-let presents = 0
-let ackRemovals = 0
-let seenEnds = 0
-let seq = 0
-let lastLine = null
-let polling = false
-let latest = { ready: false, showing: false, ends: [], element: null, error: null }
-let cardEnd = null
-
-const sleep = function (ms) { return new Promise(function (resolve) { setTimeout(resolve, ms) }) }
-
-function emit(extra) {
-  const body = Object.assign({}, latest, extra === undefined ? {} : extra)
-  // Compared without the clock, so a poll that changed nothing writes nothing: the report
-  // stream is a record of changes, and a line every 200 ms would bury the two that matter.
-  const comparable = JSON.stringify(body)
-  if (comparable === lastLine) return
-  lastLine = comparable
-  seq = seq + 1
-  process.stdout.write(
-    CARD_REPORT_PREFIX + JSON.stringify(Object.assign({ seq: seq, at: Date.now() }, body)) + '\\n',
-  )
-}
-
-function fail(reason) {
-  latest = Object.assign({}, latest, { error: reason })
-  emit()
-}
-
-function sessionFromDeepLink(link) {
-  if (typeof link !== 'string' || link === '') return null
-  const at = link.indexOf('session=')
-  if (at === -1) return null
-  const tail = link.slice(at + 'session='.length)
-  const end = tail.search(/[&#]/)
-  return decodeURIComponent(end === -1 ? tail : tail.slice(0, end))
-}
-
-// One end per card, taken off the screen when the CELL the product handed this harness
-// names that end. 'replaced' is in no cell's list, because a replacement is a new card in
-// the same window and the host has just re-shown it. 'destroyed' is the host's own.
-function actOnEnds(ends) {
-  if (!Array.isArray(ends)) return 'not-a-list'
-  if (ends.length <= seenEnds) return 'no-new-end'
-  const fresh = ends.slice(seenEnds)
-  seenEnds = ends.length
-  let state = 'no-cell-names-this-end'
-  for (const end of fresh) {
-    if (cell === null || !Array.isArray(cell.ends) || cell.ends.indexOf(end) === -1) continue
-    const window = windows[0]
-    const visibleWhenItEnded =
-      window !== undefined && !window.isDestroyed() ? window.isVisible() : null
-    const at = Date.now()
-    hub.surface.hide()
-    cardEnd = {
-      end: end,
-      at: at,
-      windowWasVisibleWhenTheCardEnded: visibleWhenItEnded,
-      hiddenBy:
-        'this harness, standing in for the product hook that does not exist: nothing in the ' +
-        'product takes the window down when a card ends, so the run records that gap and ' +
-        'completes it here (NT-FR-10)',
-    }
-    state = 'hid-the-window-for-' + end
-    emit({ cardEnd: cardEnd })
-  }
-  return state
-}
-
-// The acknowledgement the ack route cannot deliver. The route changed a record and said
-// nothing to the surface; the harness watches the hub's own pending accessor and calls the
-// card view's own remove('acknowledged'), which is a product method on a product object.
-//
-// Every answer is a closed token and every one of them is reported, because a harness that
-// silently did not complete the gap would leave the run asserting a card had gone for a
-// reason nobody could name - the failure mode this whole script exists to prevent.
-function watchForAcknowledgement() {
-  if (hub === null || latest.showing !== true) return 'no-card-showing'
-  if (cell === null || cell.lifetime !== 'until-resolved') return 'not-a-block'
-  const session = sessionFromDeepLink(model === null ? null : model.deepLink)
-  if (session === null) return 'no-session-on-the-card'
-  if (handled.has(session)) return 'already-handled'
-  const pending = hub.store.readPending()
-  for (const item of pending) {
-    if (item.sessionId === session) return 'still-pending'
-  }
-  handled.add(session)
-  ackRemovals = ackRemovals + 1
-  const window = windows[0]
-  void window.webContents
-    .executeJavaScript(REMOVE_CALL_PREFIX + JSON.stringify('acknowledged') + ')')
-    .then(function () {
-      emit({ ackState: 'removed' })
-    })
-    .catch(function (cause) {
-      fail(
-        'the card could not be told its block was acknowledged: ' +
-          (cause && cause.message ? cause.message : String(cause)),
-      )
-    })
-  return 'removing'
-}
-
-async function poll() {
-  if (hub === null || polling) return
-  const window = windows[0]
-  if (window === undefined || window.isDestroyed()) return
-  polling = true
-  try {
-    const value = await window.webContents.executeJavaScript(READ_CARD_REPORT_JS)
-    if (value === null || typeof value !== 'object') {
-      fail('the card document answered the report with ' + JSON.stringify(value))
-      return
-    }
-    latest = Object.assign({}, value, { error: null })
-    const endState = actOnEnds(value.ends)
-    const ackState = watchForAcknowledgement()
-    emit({ endState: endState, ackState: ackState, ackRemovals: ackRemovals })
-  } catch (cause) {
-    fail(
-      'the card document could not be read: ' +
-        (cause && cause.message ? cause.message : String(cause)),
-    )
-  } finally {
-    polling = false
-  }
-}
-
-async function main() {
-  const entry = await import(path.join(PRODUCT_ROOT, 'dist/main/main/index.js'))
-  const hostModule = await import(path.join(PRODUCT_ROOT, 'dist/main/notify/surface/electron-host.js'))
-  const imported = await import('electron')
-  const runtime = imported.default === undefined ? imported : imported.default
-  const { app, BrowserWindow, screen } = runtime
-  electronApp = app
-
-  // The real BrowserWindow, held. The product creates it with its own frozen option set
-  // and places it with its own arithmetic; this class only remembers the instance so a
-  // renderer can be talked to, which is the channel the product has not chosen yet.
-  class RecordingWindow extends BrowserWindow {
-    constructor(options) {
-      super(options)
-      windows.push(this)
-      if (windows.length > 1) {
-        fail('the product created more than one surface window: ' + String(windows.length))
-      }
-    }
-  }
-
-  const surface = {
-    create: function (options) {
-      return hostModule.createElectronSurfaceHost({
-        BrowserWindow: RecordingWindow,
-        screen: screen,
-        documentUrl: function () {
-          return hostModule.surfaceDocumentUrl(options.origin())
-        },
-        onDiagnostic: function (message) {
-          process.stderr.write('surface-host: ' + message + '\\n')
-        },
-      })
-    },
-  }
-
-  const renderCard = {
-    present: async function (nextModel, nextCell) {
-      model = nextModel
-      cell = nextCell
-      presents = presents + 1
-      const window = windows[0]
-      if (window === undefined) {
-        throw new Error(
-          'the product presented a card before it had created a surface window to present it into',
-        )
-      }
-      const deadline = Date.now() + READY_TIMEOUT_MS
-      for (;;) {
-        const ready = await window.webContents.executeJavaScript(
-          'typeof globalThis.' + ${JSON.stringify(CARD_SURFACE_GLOBAL)},
-        )
-        if (ready === 'object') break
-        if (Date.now() > deadline) {
-          throw new Error(
-            'the card document did not run its entry point within ' +
-              String(READY_TIMEOUT_MS) +
-              ' ms, so no card could be presented into it (a window with nothing in it is not a card)',
-          )
-        }
-        await sleep(50)
-      }
-      await window.webContents.executeJavaScript(
-        SHOW_CALL_PREFIX + JSON.stringify(nextModel) + ', ' + JSON.stringify(nextCell) + ')',
-      )
-      emit({ presented: presents, presentedAt: Date.now() })
-    },
-  }
-
-  await app.whenReady()
-  hub = await entry.startHub({
-    desktop: { isPrimaryInstance: true, surface: surface, renderCard: renderCard },
-    dashboardRoot: DASHBOARD_ROOT,
-    lifecycle: { exit: function () { app.quit() } },
-    onDiagnostic: function (message) {
-      process.stderr.write('hub: ' + message + '\\n')
-    },
-  })
-  process.stderr.write(
-    'harness: origin=' +
-      hub.origin +
-      ' surfaceMounted=' +
-      String(hub.surface !== null) +
-      ' notifier=' +
-      JSON.stringify({ supported: hub.notifier.supported, reason: hub.notifier.reason }) +
-      '\\n',
-  )
-  app.on('before-quit', function () { void hub.lifecycle.shutdown('electron-quit') })
-  setInterval(function () { void poll() }, POLL_MS)
-  emit({
-    harness: {
-      origin: hub.origin,
-      surfaceMounted: hub.surface !== null,
-      notifierSupported: hub.notifier.supported,
-      notifierReason: hub.notifier.reason,
-      windows: windows.length,
-    },
-  })
-}
-
-void main().catch(function (cause) {
-  process.stderr.write(
-    'harness: could not start: ' + (cause && cause.stack ? cause.stack : String(cause)) + '\\n',
-  )
-  process.exitCode = 1
-  if (electronApp !== null) electronApp.exit(1)
-})
-`
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Impure: the shell. Everything below owns a side effect.
@@ -1647,35 +1338,80 @@ const BUILT_ENTRY_POINT = 'dist/main/main/index.js'
 const BUILT_SCHEMA_FILE = 'dist/main/storage/schema.sql'
 
 /**
- * The product's own compiled card view, copied out of the build and served to the card
- * document.
+ * The card document this run asks the product's own static route for.
  *
- * Three files, and the closure is closed: `card-view.js` imports `./card.js` and
- * `./lifetime.js` and nothing else, and the two of those import no module at all once
- * their type-only imports are erased. So these three bytes are the whole of "what a card
- * is" and "how long it lives" as the product compiled them, and a card rendered from them
- * is the product's card.
+ * The path is the product's, not this script's: SURFACE_DOCUMENT_PATH in
+ * src/notify/surface/electron-host.ts is the string the surface window loads, and a run that
+ * asked for a different path would be asking about a document the window never opens.
  */
-export const BUILT_CARD_MODULES = Object.freeze([
-  'dist/main/notify/surface/card-view.js',
-  'dist/main/notify/surface/card.js',
-  'dist/main/notify/surface/lifetime.js',
-])
+export const CARD_DOCUMENT_PATH = '/card.html'
+
+/** The built card document, served from the dashboard root the product resolved. */
+export const BUILT_CARD_DOCUMENT = 'dist/dashboard/card.html'
+/** The preload the surface window loads, emitted as CommonJS beside its TypeScript source. */
+export const BUILT_CARD_PRELOAD = 'dist/main/notify/surface/preload.cjs'
 
 /**
- * Start a real Electron main process and keep everything it says.
+ * The card document the build produced, the two files it points at, and the two colours the
+ * card stylesheet paints the classes with.
  *
- * One launcher for both runs this script makes, because the difference between them is
- * the entry point and the extra environment and nothing else: the same binary, the same
- * Chromium launch policy, the same fresh temporary state directory, the same capture of
- * stdout and stderr, the same stop.
+ * Read out of the built artefacts rather than hardcoded, so the observer's expectation is
+ * the product's build and not this script's memory of it: the entry bundle and the
+ * stylesheet come from the document's own `src` and `href` attributes, and the two fills
+ * come from the stylesheet's own custom properties. A card this run did not paint could
+ * only match those values if the product's build had changed underneath it, and then the
+ * distances recorded in the evidence file are what says so (NT-FR-12).
  *
- * Card-report lines - the harness's readings of its own renderer - are separated out of
- * stdout as they arrive and kept in full, because they are data this run asserts on and a
- * ring buffer would drop exactly the ones a slow journey needs. They are still kept out of
- * the diagnostic lines, which stay a bounded ring: this process is not a log sink.
+ * Nothing here writes: a missing artefact is reported by name rather than created, which is
+ * the difference between a run that proves the product and one that supplies it.
  */
-function launchChild({ electronBinary, stateDir, entryPoint, env = {} }) {
+export function readBuiltCardDocument() {
+  const documentPath = path.join(repoRoot, BUILT_CARD_DOCUMENT)
+  const document = {
+    path: BUILT_CARD_DOCUMENT,
+    present: false,
+    bytes: 0,
+    entry: null,
+    stylesheet: null,
+    source: 'src/dashboard/card.html, the surface document entry of the dashboard build (NS-1)',
+  }
+  if (!existsSync(documentPath)) return { document, entry: null, stylesheet: null, fills: null }
+  const html = readFileSync(documentPath, 'utf8')
+  document.present = true
+  document.bytes = Buffer.byteLength(html)
+  // Relative, as a bundler writes them, and resolved against the document's own directory -
+  // which is how the browser that loads it resolves them.
+  const resolve = (reference) => {
+    if (reference === null) return null
+    const from = path.resolve(path.dirname(documentPath), reference)
+    return existsSync(from) ? from : null
+  }
+  const entryMatch = /<script[^>]+src="([^"]+)"/.exec(html)
+  const styleMatch = /<link[^>]+rel="stylesheet"[^>]+href="([^"]+)"/.exec(html)
+  const entry = resolve(entryMatch === null ? null : entryMatch[1])
+  const stylesheet = resolve(styleMatch === null ? null : styleMatch[1])
+  document.entry = entry === null ? null : path.relative(repoRoot, entry).split(path.sep).join('/')
+  document.stylesheet = stylesheet === null ? null : path.relative(repoRoot, stylesheet).split(path.sep).join('/')
+  const fills = stylesheet === null ? null : readCardFillsFromCss(readFileSync(stylesheet, 'utf8'))
+  return { document, entry, stylesheet, fills }
+}
+
+/**
+ * Start the product's shipped Electron main entry point, as shipped, and keep everything it
+ * says.
+ *
+ * The real binary rather than the `node_modules/.bin/electron` shim, the Chromium launch
+ * policy in its environment form, a fresh temporary state directory, and the product's own
+ * entry point with no other argument. The only environment this run adds beyond that is the
+ * state directory, and the only processes it starts besides this one are the X tools and a
+ * single `notify-send` used as a positive control after the journeys.
+ *
+ * The child's stdout and stderr are kept as a bounded ring rather than a log, and the two
+ * populations are separated before anything is counted: a run that says "the product
+ * reported nothing" has to be able to say how many of the lines it saw were the runtime's
+ * own teardown noise.
+ */
+function launchHub({ electronBinary, stateDir, entryPoint = BUILT_ENTRY_POINT, env = {} }) {
   const child = spawn(electronBinary, [entryPoint], {
     cwd: repoRoot,
     env: { ...process.env, ...CHROMIUM_LAUNCH_ENVIRONMENT, AGENT_PING_STATE_DIR: stateDir, ...env },
@@ -1687,7 +1423,6 @@ function launchChild({ electronBinary, stateDir, entryPoint, env = {} }) {
   })
   const stdout = []
   const stderr = []
-  const reports = []
   const keep = (lines, chunk) => {
     for (const line of String(chunk).split('\n')) {
       if (line.trim() === '') continue
@@ -1695,16 +1430,7 @@ function launchChild({ electronBinary, stateDir, entryPoint, env = {} }) {
       if (lines.length > MAX_CHILD_OUTPUT_LINES) lines.shift()
     }
   }
-  const takeReports = (chunk) => {
-    for (const line of String(chunk).split('\n')) {
-      const report = parseHarnessReportLine(line)
-      if (report !== null) reports.push(report)
-    }
-  }
-  child.stdout.on('data', (chunk) => {
-    takeReports(chunk)
-    keep(stdout, chunk)
-  })
+  child.stdout.on('data', (chunk) => keep(stdout, chunk))
   child.stderr.on('data', (chunk) => keep(stderr, chunk))
   /** Signal the whole group, and say whether there was anything left to signal. */
   const signalGroup = (signal) => {
@@ -1725,9 +1451,6 @@ function launchChild({ electronBinary, stateDir, entryPoint, env = {} }) {
     entryPoint,
     stdout,
     stderr,
-    reports,
-    /** The newest card report, or null when the harness has never sent one. */
-    latestReport: () => latestCardReport(reports).report,
     async stop() {
       if (child.exitCode !== null || child.signalCode !== null) return { alreadyExited: true, escalated: false }
       signalGroup('SIGTERM')
@@ -1744,81 +1467,6 @@ function launchChild({ electronBinary, stateDir, entryPoint, env = {} }) {
       }
       return { alreadyExited: false, escalated, stillRunning: true }
     },
-  }
-}
-
-/**
- * Start the product's shipped Electron main entry point, as shipped.
- *
- * Kept separate from the harness run because the claim it answers is a different one: not
- * "can a card be shown" but "what does the product do on a developer's machine today". The
- * evidence file records that separately, as `shippedPosture`, and it is not an assertion -
- * a shipped build that grew a card document tomorrow would make a passing assertion here a
- * false alarm, and the runbook would be the stale artefact instead.
- */
-function launchHub({ electronBinary, stateDir, entryPoint = BUILT_ENTRY_POINT }) {
-  return launchChild({ electronBinary, stateDir, entryPoint })
-}
-
-/**
- * Write the run-time harness: the card document, its stylesheet, its entry point, the
- * product's own compiled card modules beside it, and the Electron main that starts the hub.
- *
- * Everything goes into a directory of this run's own, never into the checkout, and the
- * directory is removed on the way out. The dashboard root is a *copy* of the built
- * dashboard rather than the build itself, so serving this run's document cannot alter what
- * the next `npm run build` produces or what a developer's running hub serves.
- *
- * The manifest it returns names every file it wrote and every product file it copied, and
- * that list is what the evidence file carries: a reader can see exactly which bytes were
- * the product's and which were this script's.
- */
-function prepareHarness(rootDir) {
-  const dashboardRoot = path.join(rootDir, 'dashboard')
-  const mainPath = path.join(rootDir, 'harness-main.cjs')
-  mkdirSync(dashboardRoot, { recursive: true })
-  const written = []
-  const write = (name, contents) => {
-    writeFileSync(path.join(dashboardRoot, name), contents)
-    written.push({ file: name, bytes: Buffer.byteLength(contents), origin: 'this script' })
-  }
-  for (const [name, contents] of Object.entries(cardDocumentSource())) write(name, contents)
-  write('card-entry.js', cardEntrySource())
-
-  // The real built dashboard, copied rather than referenced.
-  const builtDashboard = path.join(repoRoot, 'dist', 'dashboard')
-  for (const entry of readdirSync(builtDashboard, { withFileTypes: true })) {
-    const from = path.join(builtDashboard, entry.name)
-    const to = path.join(dashboardRoot, entry.name)
-    if (entry.isDirectory()) {
-      cpSync(from, to, { recursive: true })
-    } else {
-      copyFileSync(from, to)
-    }
-    written.push({ file: entry.name, bytes: statSync(to).size, origin: 'the built dashboard, copied' })
-  }
-
-  // The product's own compiled card view, byte for byte.
-  const copied = []
-  for (const relative of BUILT_CARD_MODULES) {
-    const from = path.join(repoRoot, relative)
-    const name = path.basename(relative)
-    copyFileSync(from, path.join(dashboardRoot, name))
-    copied.push({
-      product: relative,
-      servedAs: name,
-      bytes: statSync(path.join(dashboardRoot, name)).size,
-      identicalToTheBuild: readFileSync(from).equals(readFileSync(path.join(dashboardRoot, name))),
-    })
-  }
-
-  const main = harnessMainSource({ productRoot: repoRoot, dashboardRoot })
-  writeFileSync(mainPath, main)
-  return {
-    root: rootDir,
-    dashboardRoot,
-    mainPath,
-    manifest: { written, productCardModules: copied, mainBytes: Buffer.byteLength(main) },
   }
 }
 
@@ -1860,6 +1508,10 @@ export const MAX_RESPONSE_BYTES = 1_048_576
  * Never rejects. Every outcome is a resolved value, because the callers are building
  * observations and a rejected promise in the middle of a journey would leave the assertion
  * count short for no stated reason.
+ *
+ * The response's own `text` and `headers` travel with it, because the card document is not
+ * JSON and the claim about it is a byte-for-byte comparison under a named policy header -
+ * neither of which a parsed body can answer.
  */
 export function request(url, options = {}) {
   return new Promise((resolve) => {
@@ -1867,7 +1519,7 @@ export function request(url, options = {}) {
     try {
       target = new URL(url)
     } catch {
-      resolve({ ok: false, status: 0, body: null, error: `not a URL: ${url}` })
+      resolve({ ok: false, status: 0, body: null, text: null, headers: {}, error: `not a URL: ${url}` })
       return
     }
     if (target.hostname !== '127.0.0.1' && target.hostname !== 'localhost' && target.hostname !== '[::1]') {
@@ -1875,6 +1527,8 @@ export function request(url, options = {}) {
         ok: false,
         status: 0,
         body: null,
+        text: null,
+        headers: {},
         error: `refusing a request to ${target.hostname}: this script only ever talks to the loopback hub (APX-CON-12)`,
       })
       return
@@ -1900,11 +1554,12 @@ export function request(url, options = {}) {
           try {
             body = text === '' ? null : JSON.parse(text)
           } catch {
-            // Not JSON. A `GET /card.html` answers text/html and is measured by its status
-            // code, so a null body here is a normal outcome rather than a fault.
+            // Not JSON. A `GET /card.html` answers text/html and is compared as text against
+            // the built document byte for byte, so a null body here is a normal outcome rather
+            // than a fault.
           }
           const status = response.statusCode ?? 0
-          resolve({ ok: status >= 200 && status < 300, status, body })
+          resolve({ ok: status >= 200 && status < 300, status, body, text, headers: response.headers })
         })
       },
     )
@@ -1912,7 +1567,7 @@ export function request(url, options = {}) {
       outgoing.destroy(new Error(`the request exceeded ${REQUEST_TIMEOUT_MS} ms`))
     })
     outgoing.on('error', (cause) => {
-      resolve({ ok: false, status: 0, body: null, error: cause.message })
+      resolve({ ok: false, status: 0, body: null, text: null, headers: {}, error: cause.message })
     })
     if (typeof options.body === 'string') outgoing.write(options.body)
     outgoing.end()
@@ -2138,18 +1793,30 @@ function preflight() {
   add(
     DependencyStatus.BUILT_DASHBOARD,
     existsSync(path.join(repoRoot, 'dist', 'dashboard', 'index.html')),
-    'run `npm run build` so the dashboard is built; the run copies the built dashboard into its own run-time root and adds the card document to it',
+    'run `npm run build` so the dashboard is built. This run serves nothing of its own: the surface window loads the built card document from the dashboard root the product resolved',
     'dist/dashboard/index.html',
   )
-  const missingCardModules = BUILT_CARD_MODULES.filter(
-    (relative) => !existsSync(path.join(repoRoot, relative)),
-  )
+  const built = readBuiltCardDocument()
+  const preloadPresent = existsSync(path.join(repoRoot, BUILT_CARD_PRELOAD))
   add(
-    DependencyStatus.BUILT_CARD_VIEW,
-    missingCardModules.length === 0,
-    'run `npm run build` so dist/main/notify/surface/{card-view,card,lifetime}.js exist. This run serves the product own compiled card view to the card document rather than writing its own, so those three files are the card: ' +
-      missingCardModules.join(', '),
-    missingCardModules.length === 0 ? BUILT_CARD_MODULES.join(', ') : `missing ${missingCardModules.join(', ')}`,
+    DependencyStatus.BUILT_CARD_DOCUMENT,
+    shippedArtefactsVerdict({
+      document: built.document.present,
+      preload: preloadPresent,
+      entry: built.entry !== null,
+      stylesheet: built.stylesheet !== null,
+    }) === 'in-the-build',
+    'run `npm run build` so dist/dashboard/card.html exists as the dashboard build’s third entry, ' +
+      'together with the entry bundle and stylesheet it references, and so tsc emits ' +
+      `${BUILT_CARD_PRELOAD}, the preload the surface window loads. The surface window's own options ` +
+      'name that preload, so a build without it can show a card window that can never receive a card ' +
+      '(NS-1, NS-2, NT-FR-12)',
+    [
+      `${BUILT_CARD_DOCUMENT} (${built.document.present ? 'present' : 'absent'})`,
+      built.document.entry ?? 'the entry bundle the card document references (absent)',
+      built.document.stylesheet ?? 'the stylesheet the card document links (absent)',
+      `${BUILT_CARD_PRELOAD} (${preloadPresent ? 'present' : 'absent'})`,
+    ].join(', '),
   )
 
   const workArea = new DesktopObserver(tools).workArea()
@@ -2160,7 +1827,7 @@ function preflight() {
     workArea.workArea === null ? (workArea.error ?? 'xprop printed no _NET_WORKAREA') : JSON.stringify(workArea.workArea),
   )
 
-  return { tools, electronBinary, display, dependencies, workArea, located }
+  return { tools, electronBinary, display, dependencies, workArea, located, built }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2228,6 +1895,247 @@ const readCardWindowsNow = (observer, before, hubPid) => () => {
 }
 
 /**
+ * A one-line description of what is painted in the card window, or null when nothing is.
+ *
+ * Two identical signatures mean the window's own drawable did not change between two
+ * readings, which is the only evidence available from outside the process that a card has
+ * finished arriving. The signature carries the id, the dominant value and the two counts,
+ * so a card that is still fading - changing colour, changing how much of the surface it
+ * covers - produces a different signature each time and is not mistaken for a settled one.
+ */
+export function cardPaintSignature(facts, hubPid) {
+  const { candidates } = screenWindowFacts(facts ?? [], hubPid)
+  if (candidates.length === 0) return null
+  return candidates
+    .map((candidate) => {
+      const pixels = candidate.pixels
+      return [
+        candidate.id,
+        pixels?.dominant?.hex ?? 'none',
+        String(pixels?.distinctValues ?? 0),
+        String(pixels?.nonZeroPixels ?? 0),
+      ].join(':')
+    })
+    .join('|')
+}
+
+/**
+ * Wait for the card on the display to stop moving, and return the reading taken once it
+ * has.
+ *
+ * The product's card animates in, and a comparison against its own stylesheet taken while
+ * the animation is running measures the animation. The last reading is always returned,
+ * with `settled: false` when the deadline passed first, so a card that never comes to rest
+ * is compared as it was and fails rather than being quietly retried until it passes
+ * (CARD_PAINT_STABLE_READS).
+ */
+async function waitForSettledPaint(observer, baseline, hubPid) {
+  const startedAt = Date.now()
+  let reading = { facts: [], emerging: [], rejected: [] }
+  let previous = null
+  let stable = 0
+  while (Date.now() - startedAt < CARD_PAINT_STABLE_TIMEOUT_MS) {
+    reading = readCardWindowsNow(observer, baseline, hubPid)()
+    const signature = cardPaintSignature(reading.facts, hubPid)
+    if (signature !== null) {
+      stable = signature === previous ? stable + 1 : 1
+      previous = signature
+      if (stable >= CARD_PAINT_STABLE_READS) break
+    }
+    await sleep(150)
+  }
+  return { settled: stable >= CARD_PAINT_STABLE_READS, value: reading, elapsedMs: Date.now() - startedAt, stableReads: stable }
+}
+
+/**
+ * Journey 0: what the shipped build is, before any journey drives it.
+ *
+ * The two rows NT-9 had to record instead of assert. There is no run-time harness any
+ * more, so the question "can the product as shipped show a card" is no longer a matter of
+ * what this script supplies: it is answered by the product's own artefacts on disk and the
+ * product's own health payload, and a build that had neither would fail this run instead of
+ * producing a record of its own absence.
+ *
+ * It runs after the hub is serving, because one of the two rows is the hub's own answer
+ * about its delivery policy - and it runs before the first journey, so the window-facts
+ * baseline every journey takes is a reading of a desktop with no card on it.
+ */
+async function runShippedBuildJourney({ origin, built }) {
+  if (origin === null) {
+    return { observations: notServed('shipped-build', SHIPPED_ASSERTIONS), records: [], timings: {} }
+  }
+  const observations = []
+  const preloadPresent = existsSync(path.join(repoRoot, BUILT_CARD_PRELOAD))
+  const artefacts = shippedArtefactsVerdict({
+    document: built.document.present,
+    preload: preloadPresent,
+    entry: built.entry !== null,
+    stylesheet: built.stylesheet !== null,
+  })
+  observations.push(
+    observation('shipped-build', SHIPPED_ASSERTIONS[0], 'in-the-build', artefacts, {
+      builtCardDocument: built.document,
+      builtPreload: BUILT_CARD_PRELOAD,
+      preloadPresent,
+      builtEntryPoint: BUILT_ENTRY_POINT,
+      suppliedByThisRun: 'nothing. This run writes one file, the evidence file, and this row is a failed run if any of the four artefacts is absent',
+      fillsReadFromTheBuild: built.fills,
+    }),
+  )
+
+  const health = (await readHealth(origin)).health
+  observations.push(
+    observation('shipped-build', SHIPPED_ASSERTIONS[1], 'wired', wiredVerdict(health?.delivery), {
+      delivery: health?.delivery ?? null,
+      whatThisMeans:
+        'the product own resolveSurfaceNotifier refuses a surface with no card presenter, so a wired policy ' +
+        'means the shipped Electron bridge carried one and a card model had a channel to cross. The renderer ' +
+        'runs with the product own frozen options, which name its preload; nothing about them is set, ' +
+        'widened or replaced by this run (NT-FR-12, APX-FR-01)',
+      rendererOptionsReadFromTheBuild: readRendererOptionsFromBuild(),
+    }),
+  )
+
+  return {
+    observations,
+    timings: {},
+    records: [
+      {
+        journey: 'shipped-build',
+        artefacts,
+        builtCardDocument: built.document,
+        builtPreload: BUILT_CARD_PRELOAD,
+        cardFillsReadFromTheBuild: built.fills,
+        delivery: health?.delivery ?? null,
+        wiredVerdict: wiredVerdict(health?.delivery),
+      },
+    ],
+  }
+}
+
+/**
+ * The renderer options the shipped build carries, read out of the built artefact.
+ *
+ * A record and never an assertion, and the distinction matters: a run outside the process
+ * cannot read the live window's options, so a source-level reading of the built module is
+ * the only honest thing available, and tests/notify/surface-host.test.ts is what asserts the
+ * object itself. Recording it here means a reader can see the three settings the isolation
+ * claim rests on next to the card that was observed, with both provenance labels on them.
+ */
+function readRendererOptionsFromBuild() {
+  const file = path.join(repoRoot, 'dist', 'main', 'notify', 'surface', 'electron-host.js')
+  if (!existsSync(file)) {
+    return { available: false, reason: 'the built Electron surface module is absent', readFrom: file }
+  }
+  return { available: true, readFrom: 'dist/main/notify/surface/electron-host.js, read as code', ...readSurfaceWindowOptions(readFileSync(file, 'utf8')) }
+}
+
+/**
+ * The window options the shipped build creates its surface window with, read out of the
+ * built module.
+ *
+ * Two decisions, and both of them exist because of a way this could have lied:
+ *
+ *   - the module's comments are stripped first. Its prose names `webSecurity: false` and
+ *     `nodeIntegration: true` *while explaining why neither is done*, and a reader that took
+ *     the first match of either would have recorded the opposite of the product's
+ *     configuration in an evidence file. Publishing a false claim is the one thing this
+ *     run exists to prevent.
+ *   - only the frozen option object is read. A setting named anywhere else in the module
+ *     cannot then be mistaken for one the window was created with.
+ *
+ * `webSecurity` is expected to come back `null`, and `null` is the honest answer rather than
+ * a missing one: the product does not widen it, so the key is not in the object. A reader
+ * who needs the positive is pointed at the suite that asserts the object as a whole.
+ *
+ * Pure, so the shape that would have produced a false claim is a test rather than a
+ * surprise.
+ */
+export function readSurfaceWindowOptions(source) {
+  const code = stripComments(source)
+  const at = code.indexOf('SURFACE_WINDOW_OPTIONS')
+  if (at === -1) {
+    return { available: false, reason: 'the built surface module declares no frozen window option object' }
+  }
+  const block = code.slice(at, at + 2_000)
+  const read = (name) => {
+    const match = new RegExp(`\\b${name}:\\s*(true|false|'[^']*')`).exec(block)
+    return match === null ? null : match[1]
+  }
+  const preload = /\bpreload:\s*([^,\n]+)/.exec(block)
+  return {
+    available: true,
+    contextIsolation: read('contextIsolation'),
+    nodeIntegration: read('nodeIntegration'),
+    sandbox: read('sandbox'),
+    webSecurity: read('webSecurity'),
+    preload: preload === null ? null : preload[1].trim(),
+    howThisWasRead:
+      'the module as code, its comments stripped, and only the frozen option object. Its prose names the ' +
+      'settings this product refuses to use, so a first-match sweep over commented source would record the ' +
+      'opposite of the configuration',
+    notObserved:
+      "these are the values the built artefact carries. A run outside the process cannot read the live " +
+      "window's own options, so this is a record of the build and not a reading of the running window",
+  }
+}
+
+/**
+ * A source file with its comments removed, as the repository's own sweeps do.
+ *
+ * Line comments and block comments become spaces of the same length, so offsets and line
+ * numbers survive and a token that only ever appeared in prose is gone. String literals are
+ * left alone, because a forbidden *name* is most often only ever a string.
+ */
+export function stripComments(source) {
+  let out = ''
+  let index = 0
+  const blank = (length) => {
+    for (let offset = 0; offset < length; offset += 1) out += source[index + offset] === '\n' ? '\n' : ' '
+  }
+  while (index < source.length) {
+    const pair = source.slice(index, index + 2)
+    if (pair === '//') {
+      let end = source.indexOf('\n', index)
+      if (end === -1) end = source.length
+      blank(end - index)
+      index = end
+      continue
+    }
+    if (pair === '/*') {
+      const found = source.indexOf('*/', index + 2)
+      const stop = found === -1 ? source.length : found + 2
+      blank(stop - index)
+      index = stop
+      continue
+    }
+    const character = source[index]
+    if (character === "'" || character === '"' || character === '`') {
+      let cursor = index + 1
+      while (cursor < source.length) {
+        const inner = source[cursor]
+        if (inner === '\\') {
+          cursor += 2
+          continue
+        }
+        if (inner === character) {
+          cursor += 1
+          break
+        }
+        if (character !== '`' && inner === '\n') break
+        cursor += 1
+      }
+      out += source.slice(index, cursor)
+      index = cursor
+      continue
+    }
+    out += character
+    index += 1
+  }
+  return out
+}
+
+/**
  * Journey 1: a real block, a real card, a real acknowledgement.
  *
  * The whole positive path, and the order matters. The block is driven first so the
@@ -2237,11 +2145,13 @@ const readCardWindowsNow = (observer, before, hubPid) => () => {
  * the item acknowledged through the product's own write route, and only then are the
  * pending count - the badge's own source - and the desktop read again.
  *
- * Every visibility claim here is answered by the X server. The renderer's own report is
- * recorded beside each one and is never the basis of a visibility claim: it is what says
- * the card *inside* the window is the product's card view, which the pixels cannot.
+ * Every visibility claim here is answered by the X server, and every claim about *which*
+ * card is answered by comparing the compositor's own colour against the product's built
+ * stylesheet. There is no report from inside the renderer to corroborate them with any
+ * more, and there does not need to be one: this run has no card document and no renderer
+ * bridge to substitute, so the pixels on the screen came from the product's build.
  */
-async function runNeedsYouJourney({ observer, hub, origin, token, workArea, hubPid }) {
+async function runNeedsYouJourney({ observer, origin, token, workArea, hubPid, built, fills }) {
   if (origin === null || token === null) {
     return { observations: notServed('needs-you', NEEDS_YOU_ASSERTIONS), records: [], timings: {} }
   }
@@ -2282,8 +2192,12 @@ async function runNeedsYouJourney({ observer, hub, origin, token, workArea, hubP
     readCardWindowsNow(observer, baseline.facts, hubPid),
     (reading) => cardOnScreenVerdict(reading.facts, hubPid) === 'painted',
   )
-  const immediate = emerged.value ?? { facts: [], emerging: [], rejected: [] }
+  // Then wait for the card to stop arriving, so every reading below is of the card at rest
+  // rather than of its own entrance animation.
+  const rested = await waitForSettledPaint(observer, baseline.facts, hubPid)
+  const immediate = rested.value ?? { facts: [], emerging: [], rejected: [] }
   timings.cardAppearedMs = emerged.elapsedMs
+  timings.paintSettledAfterMs = rested.elapsedMs
   observations.push(
     observation('needs-you', NEEDS_YOU_ASSERTIONS[1], 'inside-the-work-area', cardWindowVerdict(immediate.emerging, workArea), {
       workArea,
@@ -2301,21 +2215,24 @@ async function runNeedsYouJourney({ observer, hub, origin, token, workArea, hubP
     }),
   )
 
-  const rendered = await settle(
-    CARD_END_TIMEOUT_MS,
-    async () => hub.latestReport(),
-    (report) => cardReportVerdict(report) === 'rendered',
-  )
-  timings.cardRenderedMs = rendered.elapsedMs
-  const cardReport = rendered.value ?? null
+  const fillReadings = cardFillReadings(immediate.emerging, fills)
+  timings.fillVerdictMs = 0
   observations.push(
-    observation('needs-you', NEEDS_YOU_ASSERTIONS[3], 'rendered', cardReportVerdict(cardReport), {
-      readFrom:
-        "the renderer inside the hub's own window, by the harness's channel; corroboration for what is IN the card, never the basis of whether anything is ON the screen",
-      viewModule: 'dist/main/notify/surface/card-view.js, the product own compiled card view',
-      element: cardReport?.element ?? null,
-      childElementCount: cardReport?.childElementCount ?? null,
-      harnessError: cardReport?.error ?? null,
+    observation('needs-you', NEEDS_YOU_ASSERTIONS[3], 'needs-you-fill', cardFillVerdict(immediate.emerging, fills), {
+      whatThisReplaces:
+        'NT-9 read the card element out of the renderer through a bridge this script had to build, and the ' +
+        'run could therefore only prove the card machinery rather than the product. That reading is gone with ' +
+        'the bridge: the colour is read out of the product own built stylesheet and compared with what the ' +
+        'compositor actually put on the screen, which no substituted document could have faked (NT-FR-12)',
+      fillsTheProductBuildCarries: fills,
+      tolerancePerChannel: CARD_FILL_TOLERANCE,
+      paintSettled: rested.settled,
+      paintSettledAfterMs: rested.elapsedMs,
+      readings: fillReadings,
+      whyATolerance:
+        'the desktop colour-manages what it is handed. On this machine it moved the product own ' +
+        '--card-block-fill by at most 7 per channel, and the two class fills are 35 apart in red from each ' +
+        'other, so the tolerance separates the classes and says nothing about exact colour (APX-CON-06)',
     }),
   )
 
@@ -2352,20 +2269,44 @@ async function runNeedsYouJourney({ observer, hub, origin, token, workArea, hubP
       delivery: health?.delivery ?? null,
       whatThisMeans:
         'the product own delivery policy recorded a delivered outcome, which it can only do when the ' +
-        'product own notifier showed the product own window and the product own card view accepted the ' +
+        'product own notifier showed the product own window and the product own channel accepted the ' +
         'product own card model. A status of ok on its own would not be enough: a hub with a wired policy ' +
         'and a failed card answers ok too, so the counts are compared as well',
     }),
   )
 
-  const cardDocument = await request(`${origin}/card.html`)
+  // The document the window loaded, compared as bytes with the one the build produced and
+  // under the policy header the product's own static route sends. A status code would
+  // answer this for any document that happens to answer 200, including one a run had
+  // written for itself - which is precisely what must now be impossible.
+  const cardDocument = await request(`${origin}${CARD_DOCUMENT_PATH}`)
+  const policy = cardDocument.headers?.['content-security-policy'] ?? null
+  const permissiveHeader =
+    cardDocument.headers?.['access-control-allow-origin'] !== undefined ||
+    cardDocument.headers?.['access-control-allow-headers'] !== undefined
+  const documentVerdict = servedDocumentVerdict({
+    status: cardDocument.status,
+    served: cardDocument.text,
+    built: built.document.present ? readFileSync(path.join(repoRoot, BUILT_CARD_DOCUMENT), 'utf8') : null,
+    policy,
+    permissiveHeader,
+  })
   observations.push(
-    observation('needs-you', NEEDS_YOU_ASSERTIONS[6], '200', String(cardDocument.status), {
-      path: '/card.html',
-      servedFrom:
-        "this run's own dashboard root: a copy of the built dashboard plus the card document this run wrote, because the product ships no card document",
-      presentInTheProductBuild: existsSync(path.join(repoRoot, 'dist', 'dashboard', 'card.html')),
-    }),
+    observation(
+      'needs-you',
+      NEEDS_YOU_ASSERTIONS[6],
+      'served-identically',
+      documentVerdict,
+      {
+        path: CARD_DOCUMENT_PATH,
+        source: built.document.source,
+        presentInTheProductBuild: built.document.present,
+        bytesCompared: built.document.bytes,
+        contentSecurityPolicy: policy,
+        permissiveCrossOriginHeader: permissiveHeader,
+        servedFrom: 'the dashboard root the product resolved for itself, with no root supplied by this run',
+      },
+    ),
   )
 
   const ack = eventId === null ? { status: 0, error: 'the block never produced an event id to acknowledge' } : await postAck(origin, token, eventId)
@@ -2389,32 +2330,31 @@ async function runNeedsYouJourney({ observer, hub, origin, token, workArea, hubP
   const gone = await settle(
     CARD_END_TIMEOUT_MS,
     readCardWindowsNow(observer, baseline.facts, hubPid),
-    (reading) => cardOnScreenVerdict(reading.facts, hubPid) === 'no-card-window',
+    (reading) => noCardOnScreen(cardOnScreenVerdict(reading.facts, hubPid)),
   )
   const afterAckWindows = gone.value ?? { facts: [], emerging: [], rejected: [] }
-  const afterAckReport = hub.latestReport()
   timings.cardGoneMs = gone.elapsedMs
+  const afterAckVerdict = cardOnScreenVerdict(afterAckWindows.facts, hubPid)
   observations.push(
     observation(
       'needs-you',
       NEEDS_YOU_ASSERTIONS[8],
       'gone',
-      cardOnScreenVerdict(afterAckWindows.facts, hubPid) === 'no-card-window'
+      noCardOnScreen(afterAckVerdict)
         ? cardOnScreenVerdict(immediate.facts, hubPid) === 'painted'
           ? 'gone'
           : 'not-observed: no card window was ever seen, so its disappearance proves nothing'
-        : `still-on-the-display: ${cardOnScreenVerdict(afterAckWindows.facts, hubPid)}`,
+        : `still-on-the-display: ${afterAckVerdict}`,
       {
         waitedMs: gone.elapsedMs,
-        onScreenVerdict: cardOnScreenVerdict(afterAckWindows.facts, hubPid),
-        cardElementInTheDocument: cardReportVerdict(afterAckReport),
-        cardEndReportedByTheCardView: afterAckReport?.ends ?? [],
-        acknowledgementCompletedByTheHarness: afterAckReport?.ackState ?? null,
+        onScreenVerdict: afterAckVerdict,
+        windowUnmapped: afterAckVerdict === 'no-card-window',
         candidates: afterAckWindows.emerging,
         whoRemovedIt:
-          'the product own card view removed the card element on an end its own lifetime cell names, and ' +
-          'the product own host took the window down. Nothing in the product tells the surface that a block ' +
-          'was acknowledged, so the harness supplied that signal - see requiredProductChanges',
+          'the product own ack route called the product own dismissal port after its 2xx, which ended the ' +
+          "card with the end its own lifetime cell names and took the host's own window down. Nothing in this " +
+          'script did any of that, and there is no fallback dismissal here that could have hidden a product that ' +
+          'had not done it (NT-FR-12 third clause, ADR-010)',
       },
     ),
   )
@@ -2445,11 +2385,14 @@ async function runNeedsYouJourney({ observer, hub, origin, token, workArea, hubP
           pixels: window.pixels,
         })),
         cardSizeSource: CARD_WINDOW_SIZE_SOURCE,
-        cardViewReported: cardReportVerdict(cardReport),
-        cardElement: cardReport?.element ?? null,
+        cardFillVerdict: cardFillVerdict(immediate.emerging, fills),
+        cardFillReadings: fillReadings,
+        cardDocumentServed: documentVerdict,
+        cardDocumentStatus: cardDocument.status,
+        contentSecurityPolicy: policy,
         ackStatus: ack.status,
         cardGoneAfterMs: gone.elapsedMs,
-        cardEndReportedByTheCardView: afterAckReport?.ends ?? [],
+        cardGoneBecause: afterAckVerdict,
         rejectedWindows: immediate.rejected,
       },
     ],
@@ -2469,7 +2412,7 @@ async function runNeedsYouJourney({ observer, hub, origin, token, workArea, hubP
  * card appearing here is that same window becoming viewable again - which is why emergence
  * is judged on a map-state transition and not on a window id.
  */
-async function runFinishedJourney({ observer, hub, origin, token, workArea, hubPid }) {
+async function runFinishedJourney({ observer, origin, token, workArea, hubPid, fills }) {
   if (origin === null || token === null) {
     return { observations: notServed('finished', FINISHED_ASSERTIONS), records: [], timings: {} }
   }
@@ -2501,8 +2444,13 @@ async function runFinishedJourney({ observer, hub, origin, token, workArea, hubP
     readCardWindowsNow(observer, baseline.facts, hubPid),
     (reading) => cardOnScreenVerdict(reading.facts, hubPid) === 'painted',
   )
-  const immediate = emerged.value ?? { facts: [], emerging: [], rejected: [] }
+  // As in journey 1: the card has to finish arriving before its colour is the colour the
+  // product's stylesheet names, and this card lives for 5 s, which is longer than the
+  // animation and than the wait for it.
+  const rested = await waitForSettledPaint(observer, baseline.facts, hubPid)
+  const immediate = rested.value ?? { facts: [], emerging: [], rejected: [] }
   timings.cardAppearedMs = emerged.elapsedMs
+  timings.paintSettledAfterMs = rested.elapsedMs
   observations.push(
     observation('finished', FINISHED_ASSERTIONS[1], 'inside-the-work-area', cardWindowVerdict(immediate.emerging, workArea), {
       workArea,
@@ -2513,17 +2461,31 @@ async function runFinishedJourney({ observer, hub, origin, token, workArea, hubP
     }),
   )
 
+  const fillReadings = cardFillReadings(immediate.emerging, fills)
+  observations.push(
+    observation('finished', FINISHED_ASSERTIONS[2], 'finished-fill', cardFillVerdict(immediate.emerging, fills), {
+      whyThisRow:
+        'a needs-you card left on the screen would paint the block fill, so a reading of the block fill here ' +
+        'is a card of the wrong class on the screen. Two cards of two classes, distinguished from the display ' +
+        "server's own pixels rather than from a report the product wrote about itself (NT-FR-02)",
+      fillsTheProductBuildCarries: fills,
+      tolerancePerChannel: CARD_FILL_TOLERANCE,
+      paintSettled: rested.settled,
+      paintSettledAfterMs: rested.elapsedMs,
+      readings: fillReadings,
+    }),
+  )
+
   const waitedAt = Date.now()
   await sleep(FINISHED_EXPIRY_WAIT_MS)
   timings.expiryWaitMs = Date.now() - waitedAt
   const afterwards = readCardWindowsNow(observer, baseline.facts, hubPid)()
   const expiryVerdict = cardOnScreenVerdict(afterwards.facts, hubPid)
   const wasPainted = cardOnScreenVerdict(immediate.facts, hubPid) === 'painted'
-  const reportAfterExpiry = hub.latestReport()
   observations.push(
     observation(
       'finished',
-      FINISHED_ASSERTIONS[2],
+      FINISHED_ASSERTIONS[3],
       'expired',
       wasPainted === false
         ? 'not-observed: no card window was ever seen, so it cannot be called expired'
@@ -2537,19 +2499,14 @@ async function runFinishedJourney({ observer, hub, origin, token, workArea, hubP
         intervalSource: FINISHED_CARD_EXPIRY_SOURCE,
         waitedMs: FINISHED_EXPIRY_WAIT_MS,
         onScreenVerdict: expiryVerdict,
-        cardElementInTheDocument: cardReportVerdict(reportAfterExpiry),
-        cardEndReportedByTheCardView: reportAfterExpiry?.ends ?? [],
+        windowUnmapped: expiryVerdict === 'no-card-window',
         acknowledgedDuringTheWait: false,
         dismissedByTheScript: false,
         howItLeft:
           'the product own card view armed the product own one interval for this class and removed the ' +
-          'card element when it elapsed. Nothing was acknowledged, nothing was dismissed, and this script ' +
-          'has no fallback dismissal that could have hidden an unimplemented expiry',
-        windowStateWhenTheCardEnded:
-          reportAfterExpiry?.cardEnd?.windowWasVisibleWhenTheCardEnded === true
-            ? 'the host window was still visible when the card ended, because nothing in the product takes ' +
-              'a window down when a card ends. The harness did, and that gap is a recorded product change'
-            : 'the host window was not visible when the card ended',
+          'card element when it elapsed, and the product own card channel took the host window down with it. ' +
+          'Nothing was acknowledged, nothing was dismissed, and this script has no fallback dismissal that ' +
+          'could have hidden an unimplemented expiry (NT-FR-08, NT-FR-10)',
       },
     ),
   )
@@ -2574,9 +2531,10 @@ async function runFinishedJourney({ observer, hub, origin, token, workArea, hubP
           emergedBecause: window.emergedBecause,
           pixels: window.pixels,
         })),
+        cardFillVerdict: cardFillVerdict(immediate.emerging, fills),
+        cardFillReadings: fillReadings,
         cardGoneAfterTheInterval: expiryVerdict !== 'painted' && wasPainted,
-        cardEndReportedByTheCardView: reportAfterExpiry?.ends ?? [],
-        cardEnd: reportAfterExpiry?.cardEnd ?? null,
+        cardGoneBecause: expiryVerdict,
       },
     ],
   }
@@ -2662,7 +2620,7 @@ async function runGreetingJourney({ observer, origin, token, workArea, hubPid })
       'greeting-and-close',
       GREETING_ASSERTIONS[3],
       'none',
-      stillUpVerdict === 'no-card-window' ? 'none' : `a-card-window: ${stillUpVerdict}`,
+      noCardOnScreen(stillUpVerdict) ? 'none' : `a-card-window: ${stillUpVerdict}`,
       {
         why:
           'NT-FR-10: the surface occupies no screen space and draws nothing when no card is showing and ' +
@@ -2764,97 +2722,131 @@ function writeEvidence(outPath, evidence) {
 const emitSummary = (summary) => process.stdout.write(`${JSON.stringify(scrubHomePaths(summary), null, 2)}\n`)
 
 /**
- * The product changes this run found, recorded rather than applied.
+ * What the product still has to do, and what it no longer has to do, as this run found it.
  *
- * Each one names what the product has to do, what was observed on the running system, and
- * - because this run completed the gap itself so that the card machinery could be observed
- * - exactly what this script supplied in its place. `suppliedByThisRun` is never empty for
- * the three gaps the harness completes, and saying so here is what keeps the evidence file
- * from reading as though the product had shipped them (APX-FR-02, ADR-010).
+ * Two lists, because the honest answer is two answers. NT-9 could only record the three
+ * gaps it had itself completed, because a run that substitutes the product's card document
+ * has no standing to say the product is missing one. This run supplies nothing, so what it
+ * observed about the shipped build is evidence, and the three gaps NS-1, NS-2 and NS-3
+ * closed are closed *with the tasks that closed them named* and with the assertion in this
+ * run that holds the closure up.
+ *
+ * Every entry on either list names an owner and what was observed. `suppliedByThisRun` is
+ * the same sentence on every one of them, and that is the point: there is nothing left for
+ * a verification run to put in a product's place (APX-FR-02, ADR-010).
  */
-function requiredProductChanges({ evidence, childLineCount = 0, chromiumLineCount = 0, shipped = null }) {
-  const changes = []
-  const delivery = evidence?.delivery ?? null
-  const shippedDelivery = shipped?.delivery ?? null
-  if (evidence?.repository?.cardDocumentPresent === false) {
-    changes.push({
+export function productChanges({ shipped = null, productLineCount = 0, chromiumLineCount = 0 }) {
+  const nothingSupplied =
+    'nothing. This run supplies no seam, writes no file but the evidence file, and starts no process but the ' +
+    "product's own built entry point, so a green result cannot mean the run did the product's work again"
+  const closed = [
+    {
       id: 'card-document-entry',
-      owner: 'dashboard-engineer',
-      required:
-        'src/dashboard/card.html as a second entry in the dashboard Vite build, so GET /card.html serves a card document in the shipped artefacts, and a stylesheet that draws the attributes src/notify/surface/card-view.ts writes',
-      observed:
-        'the shipped build serves no card document: dist/dashboard/card.html does not exist, GET /card.html answers 404, and src/notify/surface/electron-host.ts refuses to show a card whose document will not load (document-unavailable). A window showing a Chromium error page is not a card (APX-FR-02)',
-      suppliedByThisRun:
-        'a run-time card document, a stylesheet and a module entry, written into a copy of the built dashboard. The card those two files show is mounted by the product own compiled card view, copied byte for byte out of dist/main/notify/surface/; the document is this script and the stylesheet is this script, because the product has neither',
-    })
-  }
-  if (shippedDelivery !== null && shippedDelivery.wired === false) {
-    changes.push({
+      closedBy: 'NS-1',
+      required: 'src/dashboard/card.html as a third entry of the dashboard build, with its stylesheet and its entry bundle',
+      observedBefore:
+        'the shipped build served no card document: dist/dashboard/card.html did not exist, GET /card.html ' +
+        'answered 404, and a window showing a Chromium error page is not a card (APX-FR-02)',
+      observedNow:
+        'the build carries dist/dashboard/card.html with the entry bundle and stylesheet it references, and the ' +
+        "hub's own static route served those exact bytes, under the product's own content-security policy, for " +
+        'the path the surface window loads',
+      howThisRunProvesIt: SHIPPED_ASSERTIONS[0],
+      suppliedByThisRun: nothingSupplied,
+    },
+    {
       id: 'card-renderer-channel',
-      owner: 'notification-engineer with dashboard-engineer',
+      closedBy: 'NS-2',
       required:
-        'a DesktopBridge.renderCard presenter on the shipped Electron bridge, and the main-to-renderer channel that carries a card model into a document running with contextIsolation, no nodeIntegration and sandbox: true. A preload with a context bridge, or a loopback route the document polls, are the two shapes that do not weaken the renderer; this run used neither, because choosing one is a decision about NT-6 own Electron surface',
+        'a card presenter on the shipped Electron bridge and a main-to-renderer channel that leaves ' +
+        'contextIsolation, nodeIntegration and the renderer sandbox in force',
+      observedBefore:
+        'the shipped bridge supplied no presenter, so resolveSurfaceNotifier answered no-card-renderer, the ' +
+        'delivery policy was not wired, and every delivery on the shipped entry point was recorded not-wired',
+      observedNow:
+        "the shipped delivery policy answered wired, which the product only reports when a presenter is behind " +
+        'the surface, and a card then reached a real window on a real display and painted the product own fill',
+      howThisRunProvesIt: `${SHIPPED_ASSERTIONS[1]}; ${NEEDS_YOU_ASSERTIONS[1]}`,
+      notObservedHere:
+        "the three renderer settings are recorded from the built artefact rather than read from the live " +
+        'window, and tests/notify/surface-host.test.ts is what asserts the option object itself',
+      suppliedByThisRun: nothingSupplied,
+    },
+    {
+      id: 'acknowledgement-does-not-reach-the-card',
+      closedBy: 'NS-3',
+      required: 'a notifier hook on POST /api/ack/:eventId, so the card can be removed with the end its own lifetime cell names',
+      observedBefore:
+        'the lifetime table named `acknowledged` as an end and the card view removed on it, but nothing called ' +
+        'it during a run: a needs-you card left the screen only when its window was destroyed at shutdown',
+      observedNow:
+        'after a real POST /api/ack, the card window the hub owns was no longer viewable, nothing painted was on ' +
+        'the display, and the pending count the badge reads fell to zero - with no dismissal from this script',
+      howThisRunProvesIt: `${NEEDS_YOU_ASSERTIONS[7]}; ${NEEDS_YOU_ASSERTIONS[8]}`,
+      suppliedByThisRun: nothingSupplied,
+    },
+    {
+      id: 'nothing-takes-the-window-down-when-a-card-ends',
+      closedBy: 'NS-3',
+      required:
+        "the card view's own end must reach the host, so host.hide() runs when a card ends. A mapped transparent " +
+        'window that nothing takes down is neither a card nor the quiet surface NT-FR-10 promises',
+      observedBefore:
+        'the host window was still mapped and visible when a finished card expired, and its drawable was empty, ' +
+        'so the run had to complete the gap itself',
+      observedNow:
+        'the host window was unmapped after an acknowledged block and again after an expired finished card, and ' +
+        'in both cases the map state is recorded so a reader can tell unmapped from merely empty',
+      howThisRunProvesIt: `${NEEDS_YOU_ASSERTIONS[8]}; ${FINISHED_ASSERTIONS[3]}`,
+      suppliedByThisRun: nothingSupplied,
+    },
+  ]
+  const open = [
+    {
+      id: 'not-wired-diagnostic-has-no-destination',
+      owner: 'hub-engineer',
+      required: 'startElectronMain should pass an onDiagnostic that writes to stderr, so the not-wired reason reaches the operator',
       observed:
-        'src/main/index.ts electronSurfaceBridge deliberately supplies no renderer, so resolveSurfaceNotifier answers no-card-renderer, the delivery policy is not wired, and every delivery on the shipped entry point is recorded not-wired with nothing delivered. The product own tests assert exactly this state',
-      suppliedByThisRun:
-        'a presenter on the run own DesktopBridge, carrying the model with webContents.executeJavaScript into the product own card view running in the product own window. The renderer options were not touched: contextIsolation, nodeIntegration and sandbox came from the product own frozen SURFACE_WINDOW_OPTIONS',
-    })
-  }
-  changes.push({
-    id: 'acknowledgement-does-not-reach-the-card',
-    owner: 'hub-engineer',
-    required:
-      'a notifier hook on POST /api/ack/:eventId, so the card surface is told a block was acknowledged and the card can be removed with the end `acknowledged` its own lifetime cell names',
-    observed:
-      'the lifetime table names `acknowledged` as an end and the card view removes on it, but no path calls it during a run. On the shipped entry point a needs-you card would leave the screen only when its window was destroyed at shutdown',
-    suppliedByThisRun:
-      'the harness watches the hub own pending accessor and calls the card view own remove("acknowledged") - a product method on a product object - as soon as the acknowledged item is gone from the pending set',
-  })
-  changes.push({
-    id: 'nothing-takes-the-window-down-when-a-card-ends',
-    owner: 'notification-engineer with hub-engineer',
-    required:
-      'the card view own end must reach the host, so host.hide() runs when a card ends. NT-FR-10 promises the surface occupies no screen space and draws nothing when no card is showing, and a mapped transparent window that nothing takes down is neither',
-    observed:
-      'this run watched the host window at the moment a finished card expired: it was still mapped and visible, and its own drawable was empty. An empty mapped rectangle is not a card and nothing is painted, so the card itself had gone - but the window outliving its card is a real gap and it is why the run had to complete it',
-    suppliedByThisRun:
-      'the harness calls the product own host hide() only after the product own card view reported an end that the product own lifetime cell names, and only for the ends a cell lists. Nothing in this script takes a window down for any other reason',
-  })
-  changes.push({
-    id: 'not-wired-diagnostic-has-no-destination',
-    owner: 'hub-engineer',
-    required: 'startElectronMain should pass an onDiagnostic that writes to stderr, so the not-wired reason reaches the operator',
-    observed:
-      `this run captured the shipped entry point stdout and stderr across its whole life. ` +
-      `${String(childLineCount)} of those lines were written by this product, and ` +
-      `${String(chromiumLineCount)} by the Electron runtime tearing itself down (zygote, network service and ` +
-      'GPU), which this script separates by the shape of the line rather than counting as a diagnostic. ' +
-      'startHub defaults onDiagnostic to a no-op and the Electron entry point supplies none, so the reason a run ' +
-      'can show no card is never reported anywhere by the product itself (APX-FR-02, ADR-010)',
-    suppliedByThisRun:
-      'none on the shipped entry point. The run-time harness passes an onDiagnostic that writes to stderr, which is why its own line count is not zero and the shipped one is',
-  })
-  changes.push({
-    id: 'tray-is-not-observable-outside-the-process',
-    owner: 'notification-engineer',
-    required:
-      'a way for a verification run to observe the tray: a diagnostic on mount, or the badge number through a route that already exists',
-    observed:
-      'an Electron Tray is a StatusNotifierItem and not an X window, so this run could not see whether the icon mounted or what number it carried. The badge number was read from GET /api/pending, which is the accessor the badge itself reads',
-    suppliedByThisRun: 'none',
-  })
-  if (delivery !== null || shippedDelivery !== null) {
-    changes.push({
+        `this run captured the shipped entry point's stdout and stderr across its whole life. ${String(productLineCount)} ` +
+        `of those lines were written by this product, and ${String(chromiumLineCount)} by the Electron runtime ` +
+        'tearing itself down (zygote, network service and GPU), which this script separates by the shape of the ' +
+        'line rather than counting as a diagnostic. startHub defaults onDiagnostic to a no-op and the Electron ' +
+        'entry point supplies none, so on a desktop where the surface refuses the reason a run can show no card ' +
+        'is never reported by the product itself (APX-FR-02, ADR-010)',
+      suppliedByThisRun: 'none, and there is nothing to supply: the surface was wired on this run, so nothing refused',
+    },
+    {
+      id: 'tray-is-not-observable-outside-the-process',
+      owner: 'notification-engineer',
+      required:
+        'a way for a verification run to observe the tray: a diagnostic on mount, or the badge number through a ' +
+        'route that already exists',
+      observed:
+        'an Electron Tray is a StatusNotifierItem and not an X window, so this run could not see whether the icon ' +
+        'mounted or what number it carried. The badge number was read from GET /api/pending, which is the ' +
+        'accessor the badge itself reads',
+      suppliedByThisRun: 'none',
+    },
+    {
       id: 'the-durable-schema-is-not-in-the-build',
       owner: 'tooling-engineer, with packaging-engineer for the package allowlist',
-      required:
-        'a copy step in scripts/build.mjs for src/storage/schema.sql, and dist/main/storage/schema.sql in the package files allowlist',
+      required: 'a copy step in scripts/build.mjs for src/storage/schema.sql, and dist/main/storage/schema.sql in the package files allowlist',
       observed:
-        'the tsc build emits JavaScript only, so a hub started from the build cannot find its schema and refuses to open its log. This run has to copy the file by hand before it can start anything at all',
+        'the tsc build emits JavaScript only, so a hub started from the build cannot find its schema and refuses ' +
+        'to open its log. This run has to copy the file by hand before it can start anything at all',
       suppliedByThisRun: 'none: the remedy is a command in the preflight, and it is the preflight and the runbook that say so',
+    },
+  ]
+  if (shipped?.artefacts !== 'in-the-build') {
+    open.unshift({
+      id: 'the-shipped-build-is-missing-a-card-artefact',
+      owner: 'dashboard-engineer with notification-engineer',
+      required: 'npm run build must produce the card document, its entry bundle, its stylesheet and the surface preload together',
+      observed: `this run found the shipped build without them: ${String(shipped?.artefacts ?? 'the artefacts were never read')}`,
+      suppliedByThisRun: 'none, deliberately: a run that created the artefact it is here to prove would prove itself',
     })
   }
-  return changes
+  return { closed, open }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2963,99 +2955,7 @@ async function waitForServing(stateDir, hub) {
   return { ready: false, record: null, origin: null, elapsedMs: Date.now() - started, reason: lastReason }
 }
 
-/**
- * What the product does on this machine today, as shipped.
- *
- * A second Electron process, the shipped entry point, started and read from the outside and
- * then stopped. It is a *record*, not an assertion, and the difference is deliberate: a
- * shipped build that grew a card document or a renderer channel tomorrow would make a
- * passing assertion here a false alarm, and the runbook would be the stale artefact
- * instead. What this section answers is "what does a developer's machine get today", which
- * is the question NT-9 was also told to record rather than change.
- *
- * It runs before the harness so the two never overlap: a second Electron process owning a
- * card-sized window on the same display would be indistinguishable from the hub's own.
- */
-async function observeShippedPosture({ pre, stateDir }) {
-  const child = launchHub({ electronBinary: pre.electronBinary, stateDir, entryPoint: BUILT_ENTRY_POINT })
-  const record = {
-    entryPoint: BUILT_ENTRY_POINT,
-    question:
-      'what does the product as shipped do on this display today: can it show a card at all?',
-    asserted: false,
-    why:
-      'a record and not an assertion. A shipped build that grew a card document or a renderer channel ' +
-      'would make a passing assertion here a false alarm, and the runbook would be the stale artefact. It ' +
-      'also runs against a state directory of its own, so a block stored here cannot be replayed into the ' +
-      'journeys and put a card on the screen before the first journey has taken its baseline',
-    startedAt: nowIso(),
-    readyMs: null,
-    delivery: null,
-    cardDocument: { path: '/card.html', status: null },
-    toastDeliveries: null,
-    pendingAfterARealBlock: null,
-    cardWindowOnTheDisplay: null,
-    diagnosticLines: [],
-    productDiagnosticLines: [],
-    chromiumDiagnosticLines: [],
-    productDiagnosticCount: null,
-    chromiumDiagnosticCount: null,
-    diagnosticLinesNote:
-      "the two populations are kept apart because one finding is about whether this product's own " +
-      'diagnostic reaches an operator, and a count that included Chromium teardown noise would answer a ' +
-      'different question. Chromium writes its GPU and zygote lines while a process is being stopped on this ' +
-      'desktop, so a nonzero chromium count beside a zero product count is the expected reading for a healthy ' +
-      'hub and is not a fault',
-    stopped: null,
-  }
-  try {
-    const ready = await waitForServing(stateDir, child)
-    record.readyMs = ready.elapsedMs
-    if (ready.ready) {
-      const health = (await readHealth(ready.origin)).health
-      record.delivery = health?.delivery ?? null
-      const document = await request(`${ready.origin}/card.html`)
-      record.cardDocument.status = document.status
-      const token = readWriteToken(stateDir)
-      if (token !== null) {
-        await postSignal(ready.origin, token, {
-          harness: 'opencode',
-          eventName: 'permission.asked',
-          sessionId: BLOCK_SESSION,
-          repoFullPath: REPO_PATH,
-          transitionId: 'verify-shipped-block',
-          occurredAt: occurredAt(),
-        })
-        record.pendingAfterARealBlock = (await readPending(ready.origin)).count
-        const metrics = await readMetrics(ready.origin)
-        record.toastDeliveries = metrics.toast_deliveries ?? null
-        // The shipped bridge creates its window from hub start, with show: false, and
-        // nothing ever asks it to show: so the display must have no viewable card window
-        // at all, and the drawable of the window it does own must be empty.
-        const facts = observerOf(pre).cardWindowFacts(ready.record.pid).facts
-        record.cardWindowOnTheDisplay = cardOnScreenVerdict(facts, ready.record.pid)
-        record.cardWindowFacts = facts
-      }
-    } else {
-      record.reason = ready.reason
-    }
-  } finally {
-    record.stopped = await child.stop()
-    record.finishedAt = nowIso()
-    record.diagnosticLines = [...child.stderr, ...child.stdout]
-    const split = splitChildDiagnostics(record.diagnosticLines)
-    record.productDiagnosticLines = split.product
-    record.chromiumDiagnosticLines = split.chromium
-    record.productDiagnosticCount = split.productCount
-    record.chromiumDiagnosticCount = split.chromiumCount
-  }
-  return record
-}
-
-/** One observer, for the shipped probe, from the same tools every other reading uses. */
-const observerOf = (pre) => new DesktopObserver(pre.tools)
-
-async function run({ pre, stateDir, probeStateDir, harnessRoot }) {
+async function run({ pre, stateDir }) {
   const startedAt = nowIso()
   const observations = []
   const observer = new DesktopObserver(pre.tools)
@@ -3082,19 +2982,11 @@ async function run({ pre, stateDir, probeStateDir, harnessRoot }) {
     ),
   )
 
-  // The shipped build first, on its own, and stopped before the harness starts: what a
-  // developer's machine gets today, recorded rather than asserted.
-  const shipped = await observeShippedPosture({ pre, stateDir: probeStateDir })
-
-  const harness = prepareHarness(harnessRoot)
-  const hub = launchChild({
-    electronBinary: pre.electronBinary,
-    stateDir,
-    entryPoint: harness.mainPath,
-    env: { AGENT_PING_SURFACE_DASHBOARD_ROOT: harness.dashboardRoot },
-  })
+  // The one process, started once, with nothing of this run's own in its environment but
+  // the state directory.
+  const hub = launchHub({ electronBinary: pre.electronBinary, stateDir })
   const evidence = {
-    taskId: 'NT-9',
+    taskId: 'NS-4',
     evidenceVersion: EVIDENCE_VERSION,
     script: SCRIPT_NAME,
     producedBy: SCRIPT_PATH,
@@ -3105,42 +2997,63 @@ async function run({ pre, stateDir, probeStateDir, harnessRoot }) {
     repository: {
       builtEntryPoint: BUILT_ENTRY_POINT,
       builtDashboard: 'dist/dashboard',
-      cardDocumentPresent: existsSync(path.join(repoRoot, 'dist', 'dashboard', 'card.html')),
-      cardDocumentSource: 'src/dashboard/card.html, a second entry in the dashboard Vite build',
+      builtCardDocument: BUILT_CARD_DOCUMENT,
+      cardDocumentPresent: pre.built.document.present,
+      cardDocumentSource: pre.built.document.source,
       stateDirUsed: 'a fresh temporary directory per run, so this run cannot touch a real installation',
     },
-    harness: {
-      whatThisIs:
-        'the run-time harness that completes the three seams the product has not built, and only those. ' +
-        'The card itself - its words, its attributes, its accessible name, its lifetime, its expiry and its ' +
-        'removal - is the product own compiled code, imported from the build and served to the document by ' +
-        'the hub itself (NT-FR-02, NT-FR-08, APX-FR-01)',
-      seams: [
-        {
-          seam: 'the card document',
-          productState: 'src/dashboard/card.html does not exist and the dashboard build has one entry, so GET /card.html is a 404 on the shipped build',
-          suppliedHere: 'a run-time document, its stylesheet and its module entry, in a copy of the built dashboard',
-          productCodeUsed: BUILT_CARD_MODULES,
-        },
-        {
-          seam: 'the main-to-renderer channel',
-          productState:
-            'the shipped bridge supplies no DesktopBridge.renderCard, and the renderer has contextIsolation, no nodeIntegration and sandbox: true with no preload, so nothing can carry a card model into a document',
-          suppliedHere: 'webContents.executeJavaScript on the product own BrowserWindow, which the harness holds only by wrapping the class so the instance can be reached',
-          productCodeUsed: ['src/notify/surface/electron-host.ts SURFACE_WINDOW_OPTIONS, unchanged'],
-        },
-        {
-          seam: 'the acknowledgement signal',
-          productState: 'POST /api/ack/:eventId has no notifier hook, and nothing takes the window down when a card ends',
-          suppliedHere:
-            'the hub own pending accessor watched by the harness, which then calls the product own card view remove("acknowledged") and the product own host hide() - and only after the product own card view has reported an end the product own lifetime cell names',
-          productCodeUsed: ['src/notify/surface/card-view.ts remove', 'src/notify/surface/electron-host.ts hide'],
-        },
+    seams: {
+      count: 0,
+      suppliedByThisRun: [],
+      whatThisRunUsesInstead:
+        "the product's own built entry point, the product's own built dashboard, the product's own preload, the " +
+        'product own static route, the product own loopback routes, and the X server and the product own runtime ' +
+        'file for everything observed',
+      whatItWouldHaveToWriteToSubstitute: [
+        'a card document',
+        'a card stylesheet',
+        'a card entry module',
+        'a renderer bridge that injects a card model into the window',
       ],
-      manifest: harness.manifest,
-      dashboardRoot: 'this run own directory, never the checkout',
+      enforcedBy:
+        "tests/scripts/verify-notification-surface.test.ts reads this file's own source and fails on all four, on " +
+        'the one file it is allowed to write, and on the one artefact it is allowed to start',
+      whyThisMatters:
+        'a verification script that has to substitute for any of those four is measuring the script, not the ' +
+        'product, and a green run would say nothing about the card a developer sees (NT-FR-12)',
     },
-    shippedPosture: shipped,
+    shippedPosture: {
+      entryPoint: BUILT_ENTRY_POINT,
+      question: 'can the product as shipped show a card on this display, with no seam supplied by a test?',
+      asserted: true,
+      whyItIsAnAssertionNow:
+        'NT-9 recorded this instead of asserting it, on purpose, because the product could not do it and the run ' +
+        'had substituted all three of the missing pieces itself. NS-1 built and served the card document, NS-2 ' +
+        'opened the renderer channel and wired the card presenter and NS-3 took the card down when its block ends, ' +
+        'so the withheld assertion became real. A run that still recorded it would now be the stale artefact, ' +
+        'and the runbook section behind it is the thing that should be stale instead',
+      artefacts: null,
+      delivery: null,
+      wiredVerdict: null,
+      cardDocument: { path: CARD_DOCUMENT_PATH, status: null, servedIdentically: null },
+      rendererOptionsReadFromTheBuild: null,
+      pendingAfterARealBlock: null,
+      pendingAfterTheAcknowledgement: null,
+      toastDeliveries: null,
+      cardWindowOnTheDisplayAtTheEnd: null,
+      diagnosticLines: [],
+      productDiagnosticLines: [],
+      chromiumDiagnosticLines: [],
+      productDiagnosticCount: null,
+      chromiumDiagnosticCount: null,
+      diagnosticLinesNote:
+        "the two populations are kept apart because one open finding is about whether this product's own " +
+        'diagnostic reaches an operator, and a count that included Chromium teardown noise would answer a ' +
+        'different question. Chromium writes its GPU and zygote lines while a process is being stopped on this ' +
+        'desktop, so a nonzero chromium count beside a zero product count is the expected reading for a healthy ' +
+        'hub and is not a fault',
+      stateDirectory: 'a directory of this run own, so a block stored here cannot be replayed into a later run',
+    },
     machine: {
       platform: `${process.platform} ${process.arch}`,
       node: process.version,
@@ -3162,18 +3075,20 @@ async function run({ pre, stateDir, probeStateDir, harnessRoot }) {
     delivery: null,
     badge: null,
     tray: null,
-    cardReports: [],
     childDiagnostics: null,
     notificationCentre: null,
-    requiredProductChanges: [],
+    productChanges: { closed: [], open: [] },
     notVerified: [
       'anything at all about macOS or Windows: this run happened on one Linux desktop and no statement in this file is evidence about another platform (APX-CON-06)',
-      'whether the card text is legible at its real size: the pixel capture measures painted content and cannot read a word, and the stylesheet that drew the card in this run is the harness own, so legibility remains a manual per-platform step with the product own stylesheet',
+      'the contents of the card. Reading a renderer from outside the process would mean injecting code into it, which is the shape this run exists to prove the product does not need, so nothing here reads the card document. Its element tree, its attributes, its accessible name, its live-region role and its reduced-motion behaviour are held by tests/notify/surface-card-view.test.ts and tests/dashboard/card-document.test.ts rather than by this run (NT-FR-02, NT-FR-12)',
+      'whether the card text is legible at its real size: the pixel capture measures painted values and reads no word, and no human read a card off this run display. Legibility remains a manual per-platform step with the product own stylesheet (NT-FR-02)',
+      'the exact colour on the screen: the fill comparison is a per-channel tolerance, because the desktop colour-manages what it is handed. On this machine it moved the product own fill by at most 7 per channel, and every reading records the distance it found, but no claim is made that a given hexadecimal value reached the compositor (APX-CON-06)',
       'whether showInactive left the keyboard focus alone: the X server exposes no focus reading for a card window on this desktop, so this run observed visibility and not focus (NT-FR-04)',
-      'whether a pointer can reach the card: the surface is click-through until a pointer arrives, and no synthetic pointer was moved',
-      'whether the click-through switch and the release both work: they are asserted against this product own host interface in tests/notify/surface-host.test.ts, and no pointer was moved here',
+      'whether a pointer can reach the card, and whether the click-through switch and its release both work: the surface is click-through until a pointer arrives, no pointer was moved, and tests/notify/surface-host.test.ts is what asserts the switch itself',
       'whether the tray icon mounted and what number it carried: an Electron Tray is a StatusNotifierItem, not an X window. The number was read through the accessor the badge reads',
-      'that the product as shipped can show a card: it cannot, and shippedPosture is the record of that. The journeys were driven through the run-time harness described in the harness section',
+      "the renderer settings of the running window: contextIsolation, nodeIntegration, sandbox and webSecurity are recorded from the built artefact and attributed to tests/notify/surface-host.test.ts, because a run outside the process cannot read a live window's options (NT-FR-12)",
+      "an installation that is already running: the shipped entry point takes Electron's single-instance lock, so a second launch quits before it serves. This run therefore proves the build in a state directory of its own and cannot verify a hub that is in use on the same desktop",
+      'GPU behaviour: Chromium reported a failed GPU process launch on this machine under software rendering, both during the run and while it was being stopped. The application reached ready and served regardless, and the failure is recorded rather than worked around, so nothing in this file says anything about a machine with a working GPU (PRD 16 Open Question 13)',
     ],
   }
 
@@ -3200,8 +3115,19 @@ async function run({ pre, stateDir, probeStateDir, harnessRoot }) {
     const token = ready.ready ? readWriteToken(stateDir) : null
     const origin = ready.origin
     const hubPid = ready.record?.pid ?? null
-    const journeyInput = { observer, hub, origin, token, workArea: desktop.workArea, hubPid }
+    const built = pre.built
+    const fills = built.fills
 
+    // The shipped build, asserted, before any journey takes a baseline of the display.
+    const shipped = await runShippedBuildJourney({ origin, built })
+    observations.push(...shipped.observations)
+    evidence.journeys.push(...shipped.records)
+    evidence.shippedPosture.artefacts = shipped.records[0]?.artefacts ?? null
+    evidence.shippedPosture.delivery = shipped.records[0]?.delivery ?? null
+    evidence.shippedPosture.wiredVerdict = shipped.records[0]?.wiredVerdict ?? null
+    evidence.shippedPosture.rendererOptionsReadFromTheBuild = readRendererOptionsFromBuild()
+
+    const journeyInput = { observer, origin, token, workArea: desktop.workArea, hubPid, built, fills }
     for (const [name, journey] of [
       ['needs-you', runNeedsYouJourney],
       ['finished', runFinishedJourney],
@@ -3220,20 +3146,19 @@ async function run({ pre, stateDir, probeStateDir, harnessRoot }) {
     const finalPending = origin === null ? null : await readPending(origin)
     const metrics = origin === null ? null : await readMetrics(origin)
     evidence.delivery = finalHealth?.delivery ?? null
-    evidence.cardReports = hub.reports.map((report) => ({
-      seq: report.seq,
-      at: report.at,
-      showsCard: report.showing === true,
-      ends: Array.isArray(report.ends) ? report.ends : [],
-      cardElement: report.element === undefined ? null : report.element,
-      cardEnd: report.cardEnd ?? null,
-      harnessStarted: report.harness ?? null,
-      endState: report.endState ?? null,
-      ackState: report.ackState ?? null,
-      presented: report.presented ?? null,
-      ackRemovals: report.ackRemovals ?? null,
-      error: report.error ?? null,
-    }))
+    const needsYou = evidence.journeys.find((record) => record.journey === 'needs-you') ?? null
+    evidence.shippedPosture.cardDocument = {
+      path: CARD_DOCUMENT_PATH,
+      status: needsYou?.cardDocumentStatus ?? null,
+      servedIdentically: needsYou?.cardDocumentServed ?? null,
+      contentSecurityPolicy: needsYou?.contentSecurityPolicy ?? null,
+      provedBy: NEEDS_YOU_ASSERTIONS[6],
+    }
+    evidence.shippedPosture.pendingAfterARealBlock = needsYou?.pendingAfterIngest ?? null
+    evidence.shippedPosture.pendingAfterTheAcknowledgement = needsYou?.pendingAfterAck ?? null
+    evidence.shippedPosture.toastDeliveries = metrics?.toast_deliveries ?? null
+    evidence.shippedPosture.cardWindowOnTheDisplayAtTheEnd =
+      origin === null || hubPid === null ? null : cardOnScreenVerdict(observer.cardWindowFacts(hubPid).facts, hubPid)
     evidence.badge = {
       source: 'GET /api/pending, the same accessor the tray badge reads (src/hub/tray.ts)',
       finalPendingCount: finalPending?.count ?? null,
@@ -3251,15 +3176,21 @@ async function run({ pre, stateDir, probeStateDir, harnessRoot }) {
         'the icon mounted or what it carried',
     }
   } finally {
-    evidence.harnessStopped = await hub.stop()
+    evidence.hubStopped = await hub.stop()
     evidence.childDiagnostics = {
-      stdoutLines: hub.stdout.filter((line) => !line.startsWith(CARD_REPORT_PREFIX)),
+      stdoutLines: hub.stdout,
       stderrLines: hub.stderr,
       note:
-        'bounded at 200 lines each, and the harness own card-report lines are kept out of them and recorded ' +
-        'under cardReports instead. The shipped entry point, by contrast, passes no onDiagnostic into ' +
-        'startHub, so its own not-wired reason is written nowhere - see shippedPosture',
+        `bounded at ${String(MAX_CHILD_OUTPUT_LINES)} lines each. The shipped entry point passes no onDiagnostic ` +
+        'into startHub, so a reason a run can show no card is written nowhere by the product itself - see ' +
+        'productChanges.open',
     }
+    evidence.shippedPosture.diagnosticLines = [...hub.stderr, ...hub.stdout]
+    const split = splitChildDiagnostics(evidence.shippedPosture.diagnosticLines)
+    evidence.shippedPosture.productDiagnosticLines = split.product
+    evidence.shippedPosture.chromiumDiagnosticLines = split.chromium
+    evidence.shippedPosture.productDiagnosticCount = split.productCount
+    evidence.shippedPosture.chromiumDiagnosticCount = split.chromiumCount
     centre.sealDuring()
     await centre.runPositiveControl()
     evidence.notificationCentre = centre.record
@@ -3268,11 +3199,10 @@ async function run({ pre, stateDir, probeStateDir, harnessRoot }) {
   evidence.finishedAt = nowIso()
   evidence.timings.totalMs = Date.parse(evidence.finishedAt) - Date.parse(evidence.startedAt)
   evidence.timings.observerControlMs = control.elapsedMs ?? null
-  evidence.requiredProductChanges = requiredProductChanges({
-    evidence,
-    shipped,
-    childLineCount: shipped.productDiagnosticCount ?? 0,
-    chromiumLineCount: shipped.chromiumDiagnosticCount ?? 0,
+  evidence.productChanges = productChanges({
+    shipped: { artefacts: evidence.shippedPosture.artefacts },
+    productLineCount: evidence.shippedPosture.productDiagnosticCount ?? 0,
+    chromiumLineCount: evidence.shippedPosture.chromiumDiagnosticCount ?? 0,
   })
 
   const decision = decide(observations, { assertionsExpected: ASSERTIONS_EXPECTED, dependencies: pre.dependencies })
@@ -3287,12 +3217,14 @@ async function run({ pre, stateDir, probeStateDir, harnessRoot }) {
   evidence.missingDependencies = decision.missingDependencies
   evidence.finding =
     decision.verdict === 'pass'
-      ? 'a real card was drawn into a real window inside the display work area, held while its block was ' +
-        'outstanding, and left the screen under this product own rules; the journeys were driven through the ' +
-        'run-time harness, and shippedPosture records that the product as shipped still cannot show a card ' +
-        'without it. See harness, assertions, journeys and requiredProductChanges'
+      ? "the product as shipped, built by this repository and started by this run with no seam supplied, put a " +
+        'real card on a real display inside the work area, painted it with its own stylesheet fill for the class, ' +
+        'held it while its block was outstanding, took it off the screen when the block was acknowledged through ' +
+        "the product's own write route, expired a finished card on its own interval with nothing dismissing it, " +
+        'and showed nothing at all for a session that did no work. See shippedPosture, seams, assertions, ' +
+        'journeys and productChanges'
       : `the run exercised every assertion and ${String(decision.failures.length)} did not hold. The reasons ` +
-        'are in failures and requiredProductChanges, and none of them was worked around'
+        'are in failures and productChanges, and none of them was worked around'
   return { decision, evidence, dependencies: pre.dependencies }
 }
 
@@ -3340,19 +3272,16 @@ async function main(argv) {
   // next run into a false failure. Removed in the `finally` below, on the failure path
   // too.
   //
-  // The harness root is a sibling of it and holds the run-time card document and the
-  // Electron main that starts the hub. Also temporary, also removed: nothing this run
-  // writes lands in the checkout, so a card document written by one run cannot be served
-  // by the next one or mistaken for a product artefact.
+  // One directory, and it holds a log, a token and a runtime file — nothing else. There is
+  // no dashboard root beside it and no run-time document in it, because there is nothing
+  // of the card path here to write: the whole of what this run produces is the evidence
+  // file, in the repository, on request.
   const stateDir = path.join(tmpdir(), `agent-ping-surface-verify-${process.pid}-${Date.now()}`)
-  const probeStateDir = `${stateDir}-shipped`
-  const harnessRoot = `${stateDir}-harness`
   mkdirSync(stateDir, { recursive: true, mode: 0o700 })
-  mkdirSync(probeStateDir, { recursive: true, mode: 0o700 })
 
   let result
   try {
-    result = await run({ pre, stateDir, probeStateDir, harnessRoot })
+    result = await run({ pre, stateDir })
   } catch (cause) {
     process.stderr.write(`[${SCRIPT_NAME}] the run itself failed: ${cause?.stack ?? cause}\n`)
     emitSummary({
@@ -3370,12 +3299,8 @@ async function main(argv) {
     })
     return 1
   } finally {
-    if (args.keepState) log(`temporary state kept at ${stateDir}, ${probeStateDir} and ${harnessRoot}`)
-    else {
-      rmSync(stateDir, { recursive: true, force: true })
-      rmSync(probeStateDir, { recursive: true, force: true })
-      rmSync(harnessRoot, { recursive: true, force: true })
-    }
+    if (args.keepState) log(`temporary state kept at ${stateDir}`)
+    else rmSync(stateDir, { recursive: true, force: true })
   }
 
   const { decision, evidence, dependencies } = result
@@ -3392,9 +3317,14 @@ async function main(argv) {
     display: evidence.machine.display,
     dependencies,
     shippedPosture: {
+      asserted: evidence.shippedPosture?.asserted ?? null,
+      artefacts: evidence.shippedPosture?.artefacts ?? null,
       delivery: evidence.shippedPosture?.delivery ?? null,
+      wiredVerdict: evidence.shippedPosture?.wiredVerdict ?? null,
       cardDocumentStatus: evidence.shippedPosture?.cardDocument?.status ?? null,
+      cardWindowOnTheDisplayAtTheEnd: evidence.shippedPosture?.cardWindowOnTheDisplayAtTheEnd ?? null,
     },
+    seamsSuppliedByThisRun: evidence.seams?.count ?? null,
     assertionsRun: decision.assertionsRun,
     assertionsExpected: decision.assertionsExpected,
     assertions: decision.assertions,
@@ -3413,12 +3343,9 @@ if (invokedDirectly) process.exit(await main(process.argv.slice(2)))
 
 export {
   main,
-  requiredProductChanges,
   DesktopObserver,
   preflight,
   run,
   launchHub,
-  launchChild,
   readRuntimeFile,
-  prepareHarness,
 }

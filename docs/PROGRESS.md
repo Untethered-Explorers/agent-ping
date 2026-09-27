@@ -1,10 +1,10 @@
 # Project Progress
 
 ## Current State
-**Phase**: COPILOT-CLI-ACP-SPIKE-2
+**Phase**: NOTIFICATION-AND-TRAY-PRESENCE-4
 **Status**: In Progress
-**Validation Gaps**: 112 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-27T18:11:00.238Z
+**Validation Gaps**: 119 unverified check(s) - see "Validation Gaps"
+**Last Updated**: 2026-09-27T18:53:52.173Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -60,6 +60,8 @@
   - Files: src/notify/surface/channel.ts, src/notify/surface/preload.ts, src/notify/surface/electron-host.ts, src/main/index.ts, tests/notify/surface-channel.test.ts, tests/notify/surface-host.test.ts, docs/runbooks/notification-surface.md, eslint.config.js, src/dashboard/card-main.ts, tests/dashboard/card-document.test.ts, tests/notify/policy.test.ts, tests/notify/surface-card.test.ts, tsconfig.build.json, tsconfig.json, src/notify/surface/preload.cts, tests/helpers/read-module.ts
 - [x] Phase NOTIFICATION-AND-TRAY-PRESENCE-4, Task NS-3: Take the card down when its block ends (@hub-engineer)
   - Files: src/hub/routes/ack.ts, src/hub/routes/read.ts, src/main/index.ts, src/notify/surface/dismissal.ts, tests/hub/ack.test.ts, tests/notify/surface-dismissal.test.ts, docs/runbooks/notification-surface.md, src/notify/surface/electron-host.ts, tests/hub/lifecycle.test.ts, tests/hub/security.test.ts, tests/notify/policy.test.ts, tests/notify/surface-card.test.ts
+- [x] Phase NOTIFICATION-AND-TRAY-PRESENCE-4, Task NS-4: Re-prove the card on the shipped build (@qa-engineer)
+  - Files: scripts/verify-notification-surface.mjs, docs/reviews/notification-surface-evidence.json, docs/runbooks/notification-surface.md, tests/scripts/verify-notification-surface.test.ts
 - [x] Phase OPENCODE-PLUGIN-ADAPTER-1, Task OA-1: Translate opencode events into the normalized envelope (@connector-engineer)
   - Files: src/plugin/opencode/index.ts, src/plugin/opencode/translate.ts, src/plugin/opencode/work-signal.ts, tests/plugin/opencode-translate.test.ts, tests/plugin/opencode-work-signal.test.ts, docs/engine-config.json
 - [x] Phase OPENCODE-PLUGIN-ADAPTER-1, Task OA-2: Deliver events to the hub and leave a breadcrumb on failure (@connector-engineer)
@@ -85,7 +87,6 @@
 - None currently running
 
 ## Remaining
-- [ ] Phase NOTIFICATION-AND-TRAY-PRESENCE-4: Phase 4: Closing the delivery path
 - [ ] Phase OPENCODE-PLUGIN-ADAPTER-3: Phase 3: Live adapter gate
 - [ ] Phase LIVE-DASHBOARD-1: Phase 1: Live state on the approved layout
 - [ ] Phase LIVE-DASHBOARD-2: Phase 2: Interactions against the real API
@@ -182,6 +183,13 @@
 - Task NS-3: In the five-ends run the expired end comes from the card view's injected clock, so the main process's own arm of the same interval - which is what takes the window down for a finished card - is not what fired. That path is proven separately with a real clock in tests/notify/surface-channel.test.ts; in this run exactly the two hub-originated ends produced a hide, and the test says so.
 - Task NS-3: The source readers used for the module enumerations and the import-list assertion are the repository's hand-written comment strippers: a backtick template is read as one string to its closing backtick, so a nested template inside a ${...} would end a scan early. No module these checks are pointed at contains one.
 - Task NS-3: tests/plugin/install.test.ts failed once during a full parallel run (a scratch directory counted in the system temp dir) and passed alone and in every full run since. It is unrelated to this change - nothing here writes to the system temp directory - but it is a flake the next full run could see.
+- Task NS-4: One Linux desktop, X11 :1, Electron 44.4.5, one run. No statement in the evidence file or the runbook is evidence about macOS or Windows, and the manual steps in runbook section 2 are where they belong.
+- Task NS-4: No human read a word off a card and no OCR was attempted. Legibility, real font metrics and contrast remain a manual per-platform step.
+- Task NS-4: The card's contents - element tree, attribute names, accessible name, live-region role, text lines - are no longer observed by this run and are not claimed by it. tests/notify/surface-card-view.test.ts and tests/dashboard/card-document.test.ts hold those claims, in jsdom and against the built document respectively.
+- Task NS-4: The fill comparison is a per-channel tolerance, not a colour reading: the desktop colour-manages what it is handed, and no claim is made that a given hexadecimal value reached the compositor.
+- Task NS-4: The renderer settings are read out of the built artefact's frozen option object, not from the live window; a run outside the process cannot read a live window's options. tests/notify/surface-host.test.ts is what asserts the object.
+- Task NS-4: showInactive's focus behaviour, pointer reachability, the click-through switch and its release, and the tray icon are all unobserved here, each named in notVerified.
+- Task NS-4: Chromium's GPU process fails to launch on this machine under software rendering, both during the run and while it is being stopped. The application reaches ready and serves regardless; nothing in the evidence says anything about a machine with a working GPU.
 - Task OA-1: No live opencode session was run. The payload shapes are the 1.18.32 type declarations, not a capture from a running harness; proving the harness delivers them is OA-5's script and OA-6's gate, not this task.
 - Task OA-1: The one-envelope and block-lifecycle tests use the real ingest pipeline and the real SQLite log but drive it from fixtures rather than from a harness's event stream.
 - Task OA-1: The plugin was not loaded by opencode itself. Its structural plugin and client types mirror the 1.18.32 declarations rather than importing @opencode-ai/plugin, which is deliberate (the adapter must load with no dependency), so a signature change upstream would not be caught by a compile error here - the OA-3 install and OA-5 live run are where that surfaces.
