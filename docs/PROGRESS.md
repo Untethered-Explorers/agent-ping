@@ -3,8 +3,8 @@
 ## Current State
 **Phase**: NOTIFICATION-AND-TRAY-PRESENCE-3
 **Status**: In Progress
-**Validation Gaps**: 66 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-27T08:11:09.549Z
+**Validation Gaps**: 72 unverified check(s) - see "Validation Gaps"
+**Last Updated**: 2026-09-27T08:35:40.800Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -48,6 +48,8 @@
   - Files: src/hub/tray.ts, src/tray/badge.ts, src/main/index.ts, tests/hub/tray.test.ts, tests/tray/badge.test.ts, src/hub/metrics.ts
 - [x] Phase NOTIFICATION-AND-TRAY-PRESENCE-3, Task NT-6: Make the Electron host real and mount the overlay window (@notification-engineer)
   - Files: package.json, package-lock.json, src/notify/surface/host.ts, src/notify/surface/electron-host.ts, src/notify/surface/position.ts, src/main/index.ts, tests/notify/surface-host.test.ts, tests/notify/surface-position.test.ts
+- [x] Phase NOTIFICATION-AND-TRAY-PRESENCE-3, Task NT-7: Render the card and own its lifetime (@notification-engineer)
+  - Files: src/notify/surface/lifetime.ts, src/notify/surface/card.ts, src/notify/surface/card-view.ts, tests/notify/surface-lifetime.test.ts, tests/notify/surface-card.test.ts, tests/notify/surface-card-view.test.ts, docs/EXECUTION-MANIFEST.json
 - [x] Phase OPENCODE-PLUGIN-ADAPTER-1, Task OA-1: Translate opencode events into the normalized envelope (@connector-engineer)
   - Files: src/plugin/opencode/index.ts, src/plugin/opencode/translate.ts, src/plugin/opencode/work-signal.ts, tests/plugin/opencode-translate.test.ts, tests/plugin/opencode-work-signal.test.ts, docs/engine-config.json
 - [x] Phase OPENCODE-PLUGIN-ADAPTER-1, Task OA-2: Deliver events to the hub and leave a breadcrumb on failure (@connector-engineer)
@@ -76,6 +78,7 @@
 ## Blockers
 - Manifest reconciliation added 4 pending task(s): NT-6, NT-7, NT-8, NT-9
 - Manifest reconciliation removed 2 task(s): NT-4, NT-5
+- Manifest reconciliation changed 16 existing task(s): NT-1, NT-2, NT-3, OA-5, OA-6, LD-1, LD-2, LD-3, LD-4, LD-5, IO-1, IO-2, IO-3, IO-4, IO-5, CP-4
 - Manifest reconciliation changed 16 existing task(s): NT-1, NT-2, NT-3, OA-5, OA-6, LD-1, LD-2, LD-3, LD-4, LD-5, IO-1, IO-2, IO-3, IO-4, IO-5, CP-4
 
 ## Validation Gaps
@@ -130,6 +133,12 @@
 - Task NT-6: No claim is made about macOS or Windows window behaviour. Nothing was run on either platform, the launch policy is applied unconditionally rather than per platform, and the transparency compositing that differs between the three desktops is unobserved.
 - Task NT-6: The live check drove this product's option set and placement but not this product's own host code end to end: the check transcribes the option object and the placement rather than importing them, because the built entry point's card document does not exist yet. The host itself is proven against the stub, and NT-9's probe is what closes that gap.
 - Task NT-6: A GPU zygote fork failure is visible on this machine under software rendering. The application still reaches ready without a workaround, and the failure is recorded rather than worked around, so no measurement here says anything about GPU behaviour on a normal desktop.
+- Task NT-7: No Electron process was started, no window was created and no card was seen on any desktop from this checkout. Every claim in these three suites is about the model, the document and the source; whether any of the three desktops composites a transparent frameless window correctly is unobserved and is NT-9's evidence to produce.
+- Task NT-7: No macOS or Windows observation of any kind is claimed, and none was possible: the card has one implementation, its reduced-motion query and DOM are platform-neutral, and this suite ran on Linux only.
+- Task NT-7: The seam is proven against jsdom's document and elements rather than a browser's, and the reduced-motion preference is proven through an injected matchMedia rather than a real OS setting; the real preference path is a one-line delegation to window.matchMedia that nothing here exercised.
+- Task NT-7: 'When the host is destroyed' is proven at the view: view.destroy() removes the card, cancels the timer and refuses to render again. That the host's destroy reaches the view is NT-8's wiring, because NT-6's host deliberately takes placement only and knows nothing about a card document's contents.
+- Task NT-7: The deep link is rendered as a data attribute with no control attached, so a click doing something is unbuilt by design (the feature's UI rule forbids buttons in the card) and the deep-link agreement with the tray is asserted structurally - the card takes the plan's own link - rather than by comparing two strings in a test.
+- Task NT-7: The source reader is a hand-written comment stripper. A backtick template is read as one string to its closing backtick, so a nested template inside a ${...} would end the scan early; no module on this path contains one, and the same tokens are checked in both the code and the values that code uses.
 - Task OA-1: No live opencode session was run. The payload shapes are the 1.18.32 type declarations, not a capture from a running harness; proving the harness delivers them is OA-5's script and OA-6's gate, not this task.
 - Task OA-1: The one-envelope and block-lifecycle tests use the real ingest pipeline and the real SQLite log but drive it from fixtures rather than from a harness's event stream.
 - Task OA-1: The plugin was not loaded by opencode itself. Its structural plugin and client types mirror the 1.18.32 declarations rather than importing @opencode-ai/plugin, which is deliberate (the adapter must load with no dependency), so a signature change upstream would not be caught by a compile error here - the OA-3 install and OA-5 live run are where that surfaces.

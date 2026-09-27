@@ -2901,84 +2901,9 @@
     }
   ],
   "warnings": [
-    "Manifest reconciliation: 4 new task(s) start pending.",
-    "Manifest reconciliation: 2 removed task(s) will be dropped from workflow state.",
-    "Manifest reconciliation: 16 existing task(s) changed; review their preserved state before running.",
     "Team validation: file 'package.json' is owned by multiple agents (tooling-engineer, notification-engineer, packaging-engineer).",
     "Team validation: file 'src/main/index.ts' is owned by multiple agents (hub-engineer, notification-engineer).",
-    "Team validation: file 'docs/runbooks/notification-surface.md' is owned by multiple agents (notification-engineer, qa-engineer).",
-    "Manifest reconciliation: task timeout restored to the value the previous run used (2700000 ms), so the two completed human-review gates keep their approval digests; the launcher also passes it as --task-timeout-ms at run time."
+    "Team validation: file 'docs/runbooks/notification-surface.md' is owned by multiple agents (notification-engineer, qa-engineer)."
   ],
-  "reconciliation": {
-    "previousGeneratedAt": "2026-09-26T10:43:03.665Z",
-    "preservedTaskIds": [
-      "DP-1",
-      "DP-2",
-      "DP-3",
-      "DP-4",
-      "EL-1",
-      "EL-2",
-      "EL-3",
-      "EL-4",
-      "HC-1",
-      "HC-2",
-      "HC-3",
-      "HC-4",
-      "HC-5",
-      "HC-6",
-      "HC-7",
-      "NT-1",
-      "NT-2",
-      "NT-3",
-      "OA-1",
-      "OA-2",
-      "OA-3",
-      "OA-4",
-      "OA-5",
-      "OA-6",
-      "LD-1",
-      "LD-2",
-      "LD-3",
-      "LD-4",
-      "LD-5",
-      "IO-1",
-      "IO-2",
-      "IO-3",
-      "IO-4",
-      "IO-5",
-      "CP-1",
-      "CP-2",
-      "CP-3",
-      "CP-4"
-    ],
-    "newTaskIds": [
-      "NT-6",
-      "NT-7",
-      "NT-8",
-      "NT-9"
-    ],
-    "removedTaskIds": [
-      "NT-4",
-      "NT-5"
-    ],
-    "changedTaskIds": [
-      "NT-1",
-      "NT-2",
-      "NT-3",
-      "OA-5",
-      "OA-6",
-      "LD-1",
-      "LD-2",
-      "LD-3",
-      "LD-4",
-      "LD-5",
-      "IO-1",
-      "IO-2",
-      "IO-3",
-      "IO-4",
-      "IO-5",
-      "CP-4"
-    ]
-  },
   "responsibilityMatrixPath": "/home/mcfuzzysquirrel/Projects/agent-ping/docs/agent-responsibility-matrix.md"
 }
