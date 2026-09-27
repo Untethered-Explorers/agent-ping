@@ -78,6 +78,141 @@ body {
 }
 
 /* --------------------------------------------------------------------------
+   The controls and the panels (LD-3)
+
+   Four regions below the header: the one acknowledgement control and the sentence
+   that says why it is or is not available, the refusals region, the deep link's
+   sentence, and the history toggle. Every one of them is real text with real
+   contrast tokens, and every one of them is styled here rather than set inline,
+   because this policy has no `unsafe-inline`.
+   -------------------------------------------------------------------------- */
+
+[data-dashboard-ack] {
+  font: inherit;
+  color: var(--row-label-text);
+  background: transparent;
+  border: 1px solid var(--row-muted-text);
+  border-radius: 4px;
+  padding: 3px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+[data-dashboard-ack]:disabled {
+  color: var(--row-muted-text);
+  border-color: var(--row-muted-text);
+  cursor: not-allowed;
+}
+
+/* The reason the control is or is not available. In the muted token because it is
+   context, not a fact to act on, and the sentence itself says which it is. */
+[data-dashboard-ack-hint] {
+  color: var(--row-muted-text);
+  max-width: 62ch;
+}
+
+/* A refused acknowledgement. The words are the encoding, exactly as they are on the
+   row; the rail is a second, non-colour cue for anyone who scans rather than reads,
+   and it is a shape rather than a change of hue.
+
+   The rail reuses the focus rail rather than a red, and that is LD-2's invariant
+   rather than an oversight: no state accent appears anywhere in this stylesheet, so
+   nothing in the DOM can be encoded by a hue the live page happens to change. A
+   refusal therefore looks like the page's other marks - a bright rail and bright
+   text - and says what happened in words. */
+[data-dashboard-refusals] {
+  flex-basis: 100%;
+  color: var(--row-label-text);
+}
+
+[data-dashboard-refusals] p {
+  margin: 4px 0 0;
+  padding-left: 8px;
+  border-left: 3px solid var(--focus-rail);
+}
+
+[data-dashboard-deep-link] {
+  flex-basis: 100%;
+  margin: 4px 0 0;
+  color: var(--row-label-text);
+}
+
+[data-dashboard-history-toggle] {
+  font: inherit;
+  color: var(--row-label-text);
+  background: transparent;
+  border: 1px solid var(--row-muted-text);
+  border-radius: 4px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+
+/* --------------------------------------------------------------------------
+   The handoff panel and the history panel
+
+   Both are ordinary text, both live under the rows, and neither is a control that
+   reaches anything. The `<code>` element is selectable so the command can be copied,
+   and there is nothing here that submits it.
+   -------------------------------------------------------------------------- */
+
+[data-dashboard-handoff],
+[data-dashboard-history] {
+  padding: 8px 24px 16px;
+  color: var(--row-muted-text);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 12.5px;
+  border-top: 1px solid #2a2f3a;
+}
+
+[data-dashboard-handoff] code,
+[data-dashboard-history] code {
+  display: block;
+  margin: 4px 0;
+  color: var(--row-label-text);
+  /* Wrapped rather than scrolled: a command that is off the right edge of a panel is
+     a command a developer cannot select without scrolling first. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+[data-dashboard-history] h2 {
+  margin: 0 0 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--row-label-text);
+}
+
+[data-dashboard-history] ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+[data-dashboard-history] li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  padding: 2px 0;
+}
+
+[data-dashboard-history] li > span:first-child {
+  color: var(--row-label-text);
+}
+
+/* An information-only event is in the panel and says so in words. Nothing about it
+   is styled to look urgent, because nothing about it is: this class never waits on
+   the developer (LD-FR-11). */
+[data-history-class='Information only'] {
+  color: var(--row-muted-text);
+}
+
+[data-history-ack='Unacknowledged'],
+[data-history-resolution='Unresolved'] {
+  color: var(--row-label-text);
+}
+
+/* --------------------------------------------------------------------------
    The DOM mirror
    -------------------------------------------------------------------------- */
 

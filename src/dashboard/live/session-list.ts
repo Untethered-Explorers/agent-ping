@@ -73,6 +73,16 @@ export const LIVE_FOCUS = Object.freeze({
 
 /** The word the activated row carries in its meta cell. Never a colour. */
 export const ACTIVATED_MARKER = 'activated'
+/**
+ * The word a row whose acknowledgement was refused carries in its meta cell.
+ *
+ * The same shape of mark as `ACTIVATED_MARKER` and for the same reason: a refused
+ * write that changed only a colour, or that appeared only in a panel the developer
+ * was not looking at, would leave them believing a block was dealt with. The word is
+ * in the row they are reading, and the sentence is in the header's refusal region -
+ * the two places a person looks when an action of theirs did not take (LD-FR-05).
+ */
+export const REFUSED_MARKER = 'ack refused'
 /** Between the age and that word. */
 export const META_SEPARATOR = ' · '
 
@@ -320,6 +330,11 @@ export interface BuildLivePlanOptions {
   readonly focusedSessionId?: string | null
   /** The row the keyboard last activated. Painted, because DP-4 required it. */
   readonly activatedSessionId?: string | null
+  /**
+   * Rows whose acknowledgement was refused. Painted, because a refusal the developer
+   * cannot see on the row is a refusal they will believe succeeded (LD-FR-05).
+   */
+  readonly refusedSessionIds?: readonly string[]
 }
 
 /**
@@ -360,13 +375,26 @@ export function buildLivePlan(
   })
 
   // The plan's groups, rows, hover regions and geometry all come from the shared
-  // layout untouched; only the draw commands gain the two marks DP-4 required.
+  // layout untouched; only the draw commands gain the two marks DP-4 required and
+  // the one LD-FR-05 required. Each mark is applied through the same meta-cell
+  // helper, so a row can carry more than one word without two different
+  // implementations of where a word goes.
   const focused = base.rows.find((row) => row.sessionId === options.focusedSessionId)
   const activated = base.rows.find((row) => row.sessionId === options.activatedSessionId)
+  const refused = (options.refusedSessionIds ?? []).map(
+    (sessionId) => base.rows.find((row) => row.sessionId === sessionId) ?? null,
+  )
   const marked =
     focused === undefined ? base : { ...base, draws: insertFocusMark(base.draws, focused, base.width) }
-
-  return activated === undefined ? marked : { ...marked, draws: markActivated(marked.draws, activated) }
+  const withActivation =
+    activated === undefined ? marked : { ...marked, draws: appendMetaMark(marked.draws, activated, ACTIVATED_MARKER) }
+  return {
+    ...withActivation,
+    draws: refused.reduce(
+      (draws, row) => (row === null ? draws : appendMetaMark(draws, row, REFUSED_MARKER)),
+      withActivation.draws,
+    ),
+  }
 }
 
 /**
@@ -421,22 +449,28 @@ function commandTopY(command: DrawCommand): number {
 }
 
 /**
- * Extend the activated row's meta cell with the word that says it was activated.
+ * Extend one row's meta cell with a word that says what happened to it.
  *
  * A word rather than a colour or a fill, because a row that only changed shade is a
  * dead end for anyone who cannot see shades and for anyone reading the mirror. The
  * cell is the row's own age cell, which the approved layout already draws right
- * aligned and unclipped, so nothing about the row's geometry changes.
+ * aligned and unclipped, so nothing about the row's geometry changes and a second
+ * word extends leftwards from the same edge.
+ *
+ * One function for both marks, and a mark already on the cell is left alone: a
+ * rebuild that re-applied the same mark would append it twice, and "2m ago ·
+ * activated · activated" is a row that has been edited by its own render.
  */
-function markActivated(
+function appendMetaMark(
   draws: readonly DrawCommand[],
   row: { readonly y: number; readonly height: number },
+  word: string,
 ): readonly DrawCommand[] {
   return draws.map((command) => {
     if (command.kind !== 'text' || command.role !== 'session-age') return command
     if (command.y < row.y || command.y >= row.y + row.height) return command
-    if (command.text.includes(ACTIVATED_MARKER)) return command
-    return { ...command, text: `${command.text}${META_SEPARATOR}${ACTIVATED_MARKER}` }
+    if (command.text.includes(word)) return command
+    return { ...command, text: `${command.text}${META_SEPARATOR}${word}` }
   })
 }
 

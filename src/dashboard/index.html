@@ -30,10 +30,26 @@
       hearing from the hub must not be able to look quiet. The entry point fills both
       in and marks the connection state as a live region, so a disconnect reaches
       someone who is not looking at the top of the page.
+
+      The rest of the header is the one acknowledgement control, the sentence that
+      says why it is or is not available, the refusals region and the history toggle.
+      They are declared here rather than built in script so the page's chrome is
+      readable in its own markup; the entry point finds these elements, fills them in,
+      and creates any that are missing.
+
+      Two of these are `disabled` in this markup. The page has no write token unless
+      one was given to it (src/hub/security.ts keeps the token out of every served
+      file on purpose), and it will not present a control that would be refused at the
+      boundary. The entry point enables it only when it can honour the press.
     -->
     <header data-dashboard-header>
       <span data-dashboard-pending>pending count not read yet</span>
       <span data-dashboard-connection-text>Connecting to the hub</span>
+      <button type="button" data-dashboard-ack disabled>Acknowledgement is not available on this page</button>
+      <span data-dashboard-ack-hint></span>
+      <div data-dashboard-refusals role="alert"></div>
+      <p data-dashboard-deep-link></p>
+      <button type="button" data-dashboard-history-toggle aria-controls="dashboard-history" aria-expanded="true">History</button>
     </header>
     <main data-dashboard-root></main>
     <script type="module" src="./main.ts"></script>

@@ -1,20 +1,26 @@
-// Shared jsdom harness for the LD-1 suites.
+// Shared jsdom harness for the LD-1, LD-2 and LD-3 suites.
 //
 // The live page cannot be driven against a real hub here: jsdom has no
 // `EventSource`, no `fetch` to a socket, and no 2D or WebGL context for
-// `Application.init()`. So this harness supplies the three seams the real entry
-// point takes - a stream transport, a full-refresh reader, and timers - and the
-// two recording seams the prototype harness already established (a host and a
-// scene target that record what the mount asked of them). Everything asserted in
-// the two live suites is therefore asserted against the real `mountDashboard` and
-// the exact command stream the browser would paint.
+// `Application.init()`. So this harness supplies the seams the real entry point
+// takes - a stream transport, a full-refresh reader, timers, and from LD-3 the
+// pending reader, the history reader and the ack transport's `fetch` - plus the two
+// recording seams the prototype harness already established (a host and a scene
+// target that record what the mount asked of them). Everything asserted in the live
+// suites is therefore asserted against the real `mountDashboard` and the exact
+// command stream the browser would paint.
 //
 // The stub hub is a recorder rather than a mock: it keeps the URLs the client
-// opened, the frames it was sent and how many times it re-read, so "reconnects
-// with the last cursor" and "a too-old cursor triggers a full refresh" are read
-// off the transport rather than asserted about a function.
+// opened, the frames it was sent, how many times it re-read, the acknowledgement
+// requests that were posted and the answer each one got, so "reconnects with the
+// last cursor", "a too-old cursor triggers a full refresh" and "the only write is a
+// POST to the ack route with the token and no body" are read off the transport
+// rather than asserted about a function.
 
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { createStreamClient, type HubSession, type HubSessionState, type StreamConnection, type StreamMessage } from '@/dashboard/live/stream-client'
+import { ACK_ROUTE_PREFIX, type AckAnswer, type PendingItemRecord } from '@/dashboard/live/ack'
 import { mountDashboard, type LiveDashboard, type RevealedRow, type ScrollRowIntoView } from '@/dashboard/main'
 import { createMotionController, type MotionControllerOptions } from '@/dashboard/theme/motion'
 import type { DrawCommand, HoverRegion, SceneTarget, TextCommand } from '@/dashboard/prototype/scene'
@@ -86,6 +92,62 @@ export function hubEvent(overrides: Partial<Record<string, unknown>> = {}): Reco
     resolutionState: 'unresolved',
     ...overrides,
   }
+}
+
+// ---------------------------------------------------------------------------
+// The pending set and the history
+// ---------------------------------------------------------------------------
+
+/**
+ * One pending item, in the field set `/api/pending` serves and the page reads.
+ *
+ * Note what is *not* here: `harness`, `repoShortName` and `repoFullPath` exist on
+ * the store's row and are deliberately absent, because the page's
+ * `PendingItemRecord` does not carry them (a repository is a session row's identity,
+ * APX-CON-09) and a fixture that had them would be a fixture the parser drops.
+ */
+export function hubPendingItem(
+  overrides: Partial<PendingItemRecord> = {},
+): PendingItemRecord {
+  return {
+    eventId: 'event-1',
+    sessionId: 'session-one',
+    class: 'needs-you',
+    occurredAt: LIVE_NOW,
+    ackState: 'unacknowledged',
+    resolutionState: 'unresolved',
+    ...overrides,
+  }
+}
+
+/**
+ * One event as `/api/events` serves it, with two extra keys no payload has.
+ *
+ * `body` and `transcript` are here so a test can prove the parser drops them: a
+ * hostile payload is the only honest way to assert that a field this product cannot
+ * store cannot reach the page (APX-FR-01, ADR-003).
+ */
+export function hubHistoryEvent(
+  overrides: Partial<Record<string, unknown>> = {},
+): Record<string, unknown> {
+  return {
+    eventId: 'event-1',
+    sessionId: 'session-one',
+    class: 'needs-you',
+    subtype: null,
+    rawEventType: 'permission.ask',
+    occurredAt: LIVE_NOW,
+    receivedAt: LIVE_NOW,
+    dedupeKey: 'dedupe-1',
+    ackState: 'unacknowledged',
+    resolutionState: 'unresolved',
+    ...overrides,
+  }
+}
+
+/** One read of `/api/events`, as the route answers it. */
+export function historyPayload(events: readonly Record<string, unknown>[]): unknown {
+  return { events, count: events.length, limit: 100, sessionId: null }
 }
 
 // ---------------------------------------------------------------------------
@@ -189,26 +251,73 @@ export interface StubHubOptions {
   readonly sessions?: readonly HubSession[]
   /** The pending set the read routes return. The count is derived from it. */
   readonly pending?: readonly string[]
+  /** The pending *items*, which the acknowledgement path reads. */
+  readonly pendingItems?: readonly PendingItemRecord[]
+  /** The raw `/api/events` payload, before the page's parser has seen it. */
+  readonly events?: readonly Record<string, unknown>[]
+}
+
+/** One acknowledgement request, as the page actually put it on the wire. */
+export interface AckRequestRecord {
+  readonly url: string
+  readonly method: string
+  readonly headers: Readonly<Record<string, string>>
+  /** The body the page sent, verbatim. `null` when the body was undefined. */
+  readonly body: string | null
+  readonly eventId: string
 }
 
 export interface StubHub {
   /** Every URL the page opened, in order. The cursor contract is read off these. */
   readonly opened: readonly string[]
   readonly connections: readonly StubConnection[]
+  /** Every URL the page read or wrote over `fetch`, in order. */
+  readonly requests: readonly { readonly url: string; readonly method: string }[]
+  /** Every acknowledgement the page posted, in order. The write audit. */
+  readonly ackRequests: readonly AckRequestRecord[]
   /** The connection currently open, or the last one opened. */
   latest(): StubConnection
   /** How many times the read routes have been read. */
   reads: number
+  /** How many times the pending set has been read by the acknowledgement path. */
+  pendingReads: number
+  /** How many times the bounded history has been read. */
+  historyReads: number
   /** The cursor the hub's `ready` and `heartbeat` frames report by default. */
   cursor: number
   /** What the read routes return. */
   sessions: readonly HubSession[]
   /** The pending set, as event identifiers. Its length is the pending count. */
   pending: readonly string[]
+  /** The pending items the acknowledgement path reads. */
+  pendingItems: readonly PendingItemRecord[]
+  /** The events `/api/events` serves, verbatim and unparsed. */
+  events: readonly Record<string, unknown>[]
   /** Set the read routes' answer. */
   setSnapshot(options: { sessions?: readonly HubSession[]; pending?: readonly string[] }): void
   /** Make the next read fail, as a hub that has gone away would. */
   failNextRead(): void
+  /** Make the next pending read fail. */
+  failNextPendingRead(): void
+  /** Make the next history read fail. */
+  failNextHistoryRead(): void
+  /**
+   * Hold the next acknowledgement's answer until the returned function is called.
+   *
+   * The optimistic half of an acknowledgement is only observable while the request is
+   * in flight, so the stub has to be able to leave it in flight. One hold at a time:
+   * the function releases the hold and further acknowledgements answer normally.
+   */
+  deferAck(): () => void
+  /**
+   * Answer the next acknowledgement with a refusal instead of applying it.
+   *
+   * Sticky until `acceptAck()`: a test that refuses an acknowledgement and then
+   * presses the control again is testing a second refusal, not a fresh default.
+   */
+  refuseAck(answer: AckAnswer): void
+  /** Go back to applying acknowledgements. */
+  acceptAck(): void
   /** Fire the `ready` frame the hub opens every stream with. */
   ready(cursor?: number): void
   /** Fire one `change` frame. */
@@ -234,20 +343,53 @@ export interface StubHub {
   readonly timers: FakeTimers
   createEventSource(url: string): StreamConnection
   readSnapshot(): Promise<{ sessions: readonly HubSession[]; pendingCount: number }>
+  /**
+   * The page's `fetch`, for the ack transport.
+   *
+   * A recorder that answers from the stub rather than a socket, so the *real*
+   * transport builds the real request - its URL, its method, its one header and its
+   * absent body - and this records what the page actually asked for.
+   */
+  fetch(input: string, init?: RequestInit): Promise<Response>
   now(): string
+}
+
+/**
+ * A `Response` shaped like the one the transport reads.
+ *
+ * Two members, because `createFetchAckTransport` reads two: the status and the JSON
+ * body. A real `Response` would work too, but building the shape here keeps the
+ * harness independent of whether the jsdom environment carries undici's globals.
+ */
+function stubResponse(status: number, body: unknown): Response {
+  return {
+    status,
+    ok: status >= 200 && status < 300,
+    async json(): Promise<unknown> {
+      return body
+    },
+  } as unknown as Response
 }
 
 export function createStubHub(options: StubHubOptions = {}): StubHub {
   const opened: string[] = []
   const connections: StubConnection[] = []
+  const requests: { url: string; method: string }[] = []
+  const ackRequests: AckRequestRecord[] = []
   const timers = createFakeTimers()
   const hub: StubHub = {
     opened,
     connections,
+    requests,
+    ackRequests,
     cursor: 0,
     sessions: options.sessions ?? [],
     pending: options.pending ?? [],
+    pendingItems: options.pendingItems ?? [],
+    events: options.events ?? [],
     reads: 0,
+    pendingReads: 0,
+    historyReads: 0,
     timers,
     latest(): StubConnection {
       const connection = connections[connections.length - 1]
@@ -260,6 +402,27 @@ export function createStubHub(options: StubHubOptions = {}): StubHub {
     },
     failNextRead(): void {
       failing = true
+    },
+    failNextPendingRead(): void {
+      pendingFailing = true
+    },
+    failNextHistoryRead(): void {
+      historyFailing = true
+    },
+    deferAck(): () => void {
+      let release = (): void => {}
+      deferredAck = new Promise<void>((resolve) => {
+        release = resolve
+      })
+      return () => {
+        release()
+      }
+    },
+    refuseAck(answer): void {
+      ackRefusal = answer
+    },
+    acceptAck(): void {
+      ackRefusal = null
     },
     ready(cursor?: number): void {
       const at = cursor ?? hub.cursor
@@ -338,12 +501,100 @@ export function createStubHub(options: StubHubOptions = {}): StubHub {
       }
       return { sessions: hub.sessions, pendingCount: hub.pending.length }
     },
+    async fetch(input, init) {
+      const method = init?.method ?? 'GET'
+      requests.push({ url: input, method })
+
+      // `/api/pending`: the set the acknowledgement path chooses its item from. A
+      // failure is answered with a status rather than thrown, because that is what a
+      // hub does and the page's reader turns it into the `unreadable` refusal.
+      if (input === `${LIVE_ORIGIN}/api/pending`) {
+        hub.pendingReads = hub.pendingReads + 1
+        if (pendingFailing) {
+          pendingFailing = false
+          return stubResponse(500, { error: 'internal-error' })
+        }
+        return stubResponse(200, { items: hub.pendingItems, count: hub.pendingItems.length })
+      }
+
+      // `/api/events`: the bounded history. The limit in the URL is the page's, and
+      // the answer is clamped to it the way the route clamps what it is given.
+      if (input.startsWith(`${LIVE_ORIGIN}/api/events`)) {
+        hub.historyReads = hub.historyReads + 1
+        if (historyFailing) {
+          historyFailing = false
+          return stubResponse(500, { error: 'internal-error' })
+        }
+        const limit = Number(new URLSearchParams(input.split('?')[1] ?? '').get('limit'))
+        const events = hub.events.slice(0, Number.isFinite(limit) && limit > 0 ? limit : undefined)
+        return stubResponse(200, historyPayload(events))
+      }
+
+      // `POST /api/ack/:eventId`: the one route that can change a record.
+      if (!input.startsWith(`${LIVE_ORIGIN}${ACK_ROUTE_PREFIX}`)) {
+        throw new Error(`the stub hub serves no route for ${method} ${input}`)
+      }
+      if (method !== 'POST') {
+        return stubResponse(405, { error: 'method-not-allowed' })
+      }
+      const eventId = decodeURIComponent(input.slice(`${LIVE_ORIGIN}${ACK_ROUTE_PREFIX}`.length))
+      const headers = normaliseHeaders(init?.headers)
+      ackRequests.push({
+        url: input,
+        method,
+        headers,
+        body: typeof init?.body === 'string' ? init.body : null,
+        eventId,
+      })
+      if (deferredAck !== null) {
+        const hold = deferredAck
+        deferredAck = null
+        await hold
+      }
+      if (ackRefusal !== null) return stubResponse(ackRefusal.status, ackRefusal.body)
+      // Apply it the way the hub does: the item leaves the pending set, and the count
+      // the answer carries is the set's length afterwards - which is the number the
+      // tray badge draws for the same state (NT-FR-05).
+      hub.pending = hub.pending.filter((id) => id !== eventId)
+      hub.pendingItems = hub.pendingItems
+        .filter((item) => item.eventId !== eventId)
+        .concat(
+          hub.pendingItems
+            .filter((item) => item.eventId === eventId)
+            .map((item) => ({ ...item, ackState: 'acknowledged' as const })),
+        )
+      return stubResponse(200, {
+        acknowledged: true,
+        eventId,
+        outcome: 'applied',
+        reason: 'acknowledged',
+        ackState: 'acknowledged',
+        resolutionState: 'unresolved',
+        pendingCount: hub.pending.length,
+      })
+    },
     now(): string {
       return LIVE_NOW
     },
   }
   let failing = false
+  let pendingFailing = false
+  let historyFailing = false
+  let ackRefusal: AckAnswer | null = null
+  let deferredAck: Promise<void> | null = null
   return hub
+}
+
+/** Headers as a plain object, however the request expressed them. */
+function normaliseHeaders(headers: HeadersInit | undefined): Record<string, string> {
+  if (headers === undefined) return {}
+  const entries: [string, string][] =
+    headers instanceof Headers
+      ? [...headers.entries()]
+      : Array.isArray(headers)
+        ? headers.map(([key, value]) => [key, value] as [string, string])
+        : Object.entries(headers)
+  return Object.fromEntries(entries.map(([key, value]) => [key.toLowerCase(), value]))
 }
 
 // ---------------------------------------------------------------------------
@@ -400,6 +651,27 @@ export interface MountLiveOptions {
    * implementation, which a test then observes through the window's `scrollBy`.
    */
   readonly scrollRowIntoView?: ScrollRowIntoView | 'default'
+  /**
+   * The write token this page holds. Omitted, the page reads the served document,
+   * which in jsdom has no `<meta name="agent-ping-write-token">` and therefore no
+   * token - the state a dashboard served as a static file is really in
+   * (src/hub/security.ts). `'token'` gives it one, which is what makes an
+   * acknowledgement possible at all.
+   */
+  readonly writeToken?: 'token' | null
+  /** Whether the history panel starts open. Defaults to the page's own default. */
+  readonly historyOpen?: boolean
+  /**
+   * Mount against the header exactly as `src/dashboard/index.html` declares it.
+   *
+   * The served document and the entry point each own half of the page's chrome, and
+   * a real browser found what happens when the two disagree: the mount created a
+   * second copy of the acknowledgement hint and of the refusals region, and every
+   * reader found the empty one. jsdom cannot find that defect because its document
+   * has no pre-declared header - so this option mounts with the real markup, and the
+   * suite asserts there is exactly one of each.
+   */
+  readonly servedHeader?: boolean
 }
 
 const mounted: LiveDashboard[] = []
@@ -414,10 +686,27 @@ export async function mountLiveDashboard(options: MountLiveOptions = {}): Promis
     options.reducedMotion === undefined ? null : createFakePreference(options.reducedMotion)
   const revealed: RevealedRow[] = []
   let host: RecordingHost | null = null
+  // The header exactly as the hub serves it, when a test asks for it.
+  const servedHeader =
+    options.servedHeader === true
+      ? (() => {
+          const html = readFileSync(path.join(process.cwd(), 'src/dashboard/index.html'), 'utf8')
+          const markup = /<header[^>]*data-dashboard-header[\s\S]*?<\/header>/.exec(html)?.[0]
+          if (markup === undefined) throw new Error('index.html declares no dashboard header')
+          const header = document.createElement('div')
+          // The markup as served, wrapper and all: `mountDashboard` finds its header
+          // by the attribute on the `<header>` itself, so the element handed to it is
+          // that element rather than the div it was parsed inside.
+          header.innerHTML = markup
+          document.body.append(header)
+          return header.firstElementChild as HTMLElement
+        })()
+      : null
   let hover: (repositoryId: string | null) => void = () => undefined
 
   const dashboard = await mountDashboard({
     container,
+    ...(servedHeader === null ? {} : { header: servedHeader }),
     origin: LIVE_ORIGIN,
     now: () => LIVE_NOW,
     search: options.search ?? '',
@@ -450,6 +739,13 @@ export async function mountLiveDashboard(options: MountLiveOptions = {}): Promis
         timers: hub.timers,
         now: hub.now,
       }),
+    // One `fetch` behind all three routes, so the requests this page makes are the
+    // shipped ones: the ack transport builds its own URL, method, header and absent
+    // body, and the pending and history readers build their own. The stub only
+    // answers them, and records what it was asked.
+    fetchImpl: hub.fetch,
+    ...(options.writeToken === undefined ? {} : { writeToken: options.writeToken === 'token' ? 'test-write-token' : null }),
+    ...(options.historyOpen === undefined ? {} : { historyOpen: options.historyOpen }),
   })
   mounted.push(dashboard)
 

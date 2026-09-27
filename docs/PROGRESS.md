@@ -1,10 +1,10 @@
 # Project Progress
 
 ## Current State
-**Phase**: LIVE-DASHBOARD-1
+**Phase**: LIVE-DASHBOARD-2
 **Status**: In Progress
-**Validation Gaps**: 125 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-27T20:58:05.637Z
+**Validation Gaps**: 130 unverified check(s) - see "Validation Gaps"
+**Last Updated**: 2026-09-27T22:17:14.528Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -78,6 +78,8 @@
   - Files: src/dashboard/index.html, src/dashboard/main.ts, src/dashboard/live/stream-client.ts, src/dashboard/live/session-list.ts, tests/dashboard/session-list.test.ts, tests/dashboard/stream-client.test.ts, src/dashboard/a11y/dom-mirror.ts, src/dashboard/prototype/index.html, src/dashboard/prototype/main.ts, src/dashboard/prototype/scene.ts, vite.config.ts, src/dashboard/dashboard.css, src/dashboard/host.ts, tests/dashboard/live-harness.ts
 - [x] Phase LIVE-DASHBOARD-1, Task LD-2: Carry the accessibility pattern onto live data (@dashboard-engineer)
   - Files: src/dashboard/main.ts, src/dashboard/a11y/dom-mirror.ts, src/dashboard/a11y/keyboard-nav.ts, tests/dashboard/live-dom-mirror.test.ts, src/dashboard/dashboard.css, tests/dashboard/live-harness.ts
+- [x] Phase LIVE-DASHBOARD-2, Task LD-3: Add acknowledgement, deep-link focus, handoff and history (@dashboard-engineer)
+  - Files: src/dashboard/live/ack.ts, src/dashboard/live/deeplink.ts, src/dashboard/live/handoff.ts, src/dashboard/live/history.ts, src/dashboard/main.ts, tests/dashboard/live-interactions.test.ts, src/dashboard/dashboard.css, src/dashboard/index.html, src/dashboard/live/session-list.ts, tests/dashboard/live-harness.ts
 - [x] Phase COPILOT-CLI-ACP-SPIKE-1, Task CP-1: Probe the real Copilot ACP surface (@connector-engineer)
   - Files: scripts/probe-copilot-acp.mjs, tests/scripts/probe-copilot-acp.test.ts, docs/research/copilot-acp-capture.json, tests/scripts/fixtures/copilot-acp-capture.json
 - [x] Phase COPILOT-CLI-ACP-SPIKE-1, Task CP-2: Probe the Copilot hook surface and write the report (@connector-engineer)
@@ -91,7 +93,6 @@
 - None currently running
 
 ## Remaining
-- [ ] Phase LIVE-DASHBOARD-2: Phase 2: Interactions against the real API
 - [ ] Phase LIVE-DASHBOARD-3: Phase 3: End-to-end journey and review
 - [ ] Phase INSTALL-AUTOSTART-AND-OPERATIONS-1: Phase 1: Package and command line
 - [ ] Phase INSTALL-AUTOSTART-AND-OPERATIONS-2: Phase 2: Autostart
@@ -224,6 +225,11 @@
 - Task LD-2: The reduced-motion browser observation mounts the page with the preference already in force. Setting the preference on an already-mounted page was not proven to re-read in a real browser - the controller's change handler is asserted in jsdom - because CDP's media emulation did not deliver a MediaQueryList change event in this run.
 - Task LD-2: The dense twenty-row fixture is the layout stress case in jsdom. The browser run used nine rows across two repositories in a 300px-tall emulated viewport, which is what made the scroll observable; twenty rows in a real browser is not observed here.
 - Task LD-2: APX-CON-11's first-paint budget was not re-measured. LD-1 reported 1095ms from a warm cache against the 1s budget in this environment, and nothing in this change addresses that; the authoritative browser measurement is LD-4's.
+- Task LD-3: jsdom applies no layout, so what the committed suite proves about the mirror and the panels is the DOM, order, attributes, keyboard controller and motion policy - not a pixel, a computed style, a scroll or a measurement. The canvas, focus rail, scroll-into-view, contrast and the mirror-growth fix were proven by the headless-Chrome run instead, and that run is in /tmp and is not committed evidence.
+- Task LD-3: The browser run is one headless Chrome on one Linux machine with software WebGL and --disable-gpu, driving a fresh build of the current sources. It asserts DOM, attributes, the hub's responses and sampled painted pixels; it makes no claim about how the page looks to a person.
+- Task LD-3: The refusal the browser observed is a 401 driven by a deliberately wrong token, because that is the one refusal a page holding a token can provoke. A 404 and a 409 are covered by the committed jsdom suite and by the hub's own ack tests, but were not each driven through the browser.
+- Task LD-3: The deep-link browser observation used ?session=<id> on a live page; it does not cover the notification card's own click path, which is notification-engineer's surface and is asserted against the hub's published DEEP_LINK_QUERY_KEY literal rather than end to end.
+- Task LD-3: The ack control's availability was observed with the mirror clipped (the shipped view) and the mirror-height arithmetic was observed in the ?mirror=visible inspection view; a page both un-clipped and scrolled was not exercised.
 - Task CP-1: The permission finding is from one run on one machine against one Copilot version. It is evidence, not a proof across versions, and the gate decision should cite the version alongside the claim.
 - Task CP-1: The hook surface is untouched: CP-2 owns the documented Copilot hook triggers and the consolidated report.
 - Task CP-1: The stub-binary deadline test executes a shebang script directly, so it assumes a POSIX-style platform, consistent with the existing tests/tooling/runner-convention.test.ts, which already spawns npm by bare name.
