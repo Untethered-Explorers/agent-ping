@@ -21,6 +21,23 @@
 //   4. The dashboard response's policy and cross-origin headers are asserted in
 //      tests/hub/security.test.ts too, for the same reason.
 //
+// SINCE NS-3, THE CARD DISMISSAL
+// Acknowledging a block also takes the card showing it off the screen, through the
+// dismissal port the ack route is handed in `HubServices`. Three claims came with that and
+// they are the last describe block in this file:
+//   - an unauthorised, a rejected and a not-found acknowledgement each remove *nothing*
+//     and change *nothing*, and only a successful one takes a card down (criterion 4);
+//   - the 200 body keeps its exact key set, the whole-log diff across every registered
+//     route and method is still empty for everything but the ack route's one column, and
+//     the registered route-signature list is byte-identical - all of it re-asserted on a
+//     hub with a real card surface, because a dismissal that could change a record would
+//     not show up in any of the tests above (criterion 5);
+//   - the dismissal port is in *both* of the two `HubServices` objects the composition
+//     root builds, and a source read is the only way to see the pre-bind one, which no
+//     request can reach (criterion 9).
+// The dismissal itself - which end, for which session, and what the document is told - is
+// tests/notify/surface-dismissal.test.ts, which is where the card lives.
+//
 // Around those four, the properties that make the ack route trustworthy:
 //   - The one effect is one column flip on one pending row. Not the class, not the
 //     session state, not the resolution, and not a count that is accumulated rather
@@ -46,7 +63,7 @@ import { request } from 'node:http'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { startHub, type RunningHub } from '@/main/index'
+import { electronDesktopBridge, startHub, type RunningHub } from '@/main/index'
 import {
   openEventStore,
   type EventRecord,
@@ -66,6 +83,8 @@ import {
 import { MUTATING_ROUTE, MUTATING_ROUTES, RouteRegistry } from '@/hub/server'
 import { WRITE_TOKEN_HEADER, readWriteToken } from '@/hub/security'
 import type { HubServices } from '@/hub/routes/read'
+import { CARD_CHANNEL_REMOVE, CARD_CHANNEL_SHOW, CARD_CHANNEL_READY } from '@/notify/surface/channel'
+import { readModuleWithoutProse } from '../helpers/read-module'
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -1039,8 +1058,325 @@ describe('the ack answer table', () => {
 })
 
 // ---------------------------------------------------------------------------
-// Helpers used only by the assertions above
+// NS-3: the card dismissal this route causes
 // ---------------------------------------------------------------------------
+
+/**
+ * A structural Electron module, so the real composition root can build the real card
+ * surface over a window that records.
+ *
+ * The same three things a real runtime provides and nothing else: a window with
+ * `webContents`, a display's work area, and an `ipcMain` that answers the preload's
+ * readiness announcement. The announcement is fired as the window is created, because a
+ * real preload runs before any document script and the channel's readiness wait is a
+ * safety net rather than the normal path (src/notify/surface/electron-host.ts).
+ */
+function stubElectron(): {
+  readonly electron: Parameters<typeof electronDesktopBridge>[0]
+  /** The messages sent on the card window's channel, in order. */
+  readonly sent: { readonly channel: string; readonly payload: unknown }[]
+  /** How many times the card window was hidden. */
+  hides(): number
+} {
+  const sent: { readonly channel: string; readonly payload: unknown }[] = []
+  const readyListeners: Array<() => void> = []
+  let hides = 0
+  class BrowserWindow {
+    private gone = false
+    constructor(options: unknown) {
+      void options
+      for (const listener of readyListeners.splice(0)) listener()
+    }
+    get webContents(): {
+      send(channel: string, ...args: readonly unknown[]): void
+      isDestroyed(): boolean
+    } {
+      return {
+        send: (channel, ...args): void => {
+          sent.push({ channel, payload: args[0] })
+        },
+        isDestroyed: (): boolean => this.gone,
+      }
+    }
+    loadURL(): Promise<void> {
+      return Promise.resolve()
+    }
+    showInactive(): void {}
+    hide(): void {
+      hides += 1
+    }
+    isDestroyed(): boolean {
+      return this.gone
+    }
+    destroy(): void {
+      this.gone = true
+    }
+    setBounds(): void {}
+    setIgnoreMouseEvents(): void {}
+  }
+  // A tray that accepts the two calls the tray module makes and does nothing else, so the
+  // real bridge can be mounted without the tray becoming the subject of this file.
+  class TrayStub {
+    setImage(): void {}
+    setToolTip(): void {}
+    setContextMenu(): void {}
+    popUpContextMenu(): void {}
+    on(): void {}
+    destroy(): void {}
+  }
+  const electron = {
+    BrowserWindow,
+    screen: {
+      getPrimaryDisplay: (): { workArea: { x: number; y: number; width: number; height: number } } => ({
+        workArea: { x: 0, y: 32, width: 1920, height: 1048 },
+      }),
+    },
+    nativeImage: { createFromBitmap: (): unknown => ({}) },
+    Menu: { buildFromTemplate: (): unknown => ({}) },
+    Tray: TrayStub,
+    ipcMain: {
+      on: (channel: string, listener: (event: unknown) => void): unknown => {
+        if (channel !== CARD_CHANNEL_READY) return undefined
+        readyListeners.push(() => listener({}))
+        return undefined
+      },
+    },
+  }
+  return {
+    electron: electron as unknown as Parameters<typeof electronDesktopBridge>[0],
+    sent,
+    hides: (): number => hides,
+  }
+}
+
+/** A hub with a real card surface, and the messages its window was sent. */
+async function startCardHub(): Promise<{
+  readonly hub: RunningHub
+  readonly sent: { readonly channel: string; readonly payload: unknown }[]
+  readonly hides: () => number
+}> {
+  const stub = stubElectron()
+  const hub = await startHub({
+    stateDir: temporaryDirectory('agent-ping-state-'),
+    dashboardRoot: dashboardFixture(),
+    lifecycle: { installSignals: false, exit: (): void => undefined },
+    // No `delivery` override: the notifier is the surface's own, resolved inside
+    // `startHub` from the bridge this test just built.
+    desktop: { isPrimaryInstance: true, ...electronDesktopBridge(stub.electron) },
+  })
+  openHubs.push(hub)
+  return { hub, sent: stub.sent, hides: stub.hides }
+}
+
+/** The one write a client makes, without the token, for the refusal half. */
+function ackWithoutToken(hub: RunningHub, eventId: string): Promise<Fetched> {
+  return call(hub.origin, { method: 'POST', pathname: `/api/ack/${eventId}` })
+}
+
+/** The pending set's row keys, in a stable order. */
+function pendingIds(hub: RunningHub): string[] {
+  return hub.pending
+    .readPending()
+    .map((item) => item.eventId)
+    .sort()
+}
+
+describe('a card comes off the screen only for an applied acknowledgement (NS-3)', () => {
+  it('removes nothing for an unauthorised, a rejected or a not-found answer', async () => {
+    const { hub, sent, hides } = await startCardHub()
+    const store = observer(hub)
+    // A real block, so a real card is on the screen before any of the refusals: a test
+    // that asserted "removes nothing" against an empty surface would prove nothing.
+    const blockId = seedThreeClasses(store)
+    await call(hub.origin, {
+      method: 'POST',
+      pathname: '/api/ingest',
+      body: JSON.stringify({
+        harness: 'opencode',
+        eventName: 'permission.asked',
+        sessionId: SESSION,
+        repoFullPath: REPO_PATH,
+        transitionId: 'block-card',
+        occurredAt: '2026-09-26T13:00:00.000Z',
+      }),
+    })
+    await hub.ingest.idle()
+    const cardId = hub.pending.readPending().find((item) => item.dedupeKey.endsWith('block-card'))?.eventId
+    expect(cardId).toBeDefined()
+    expect(sent.filter((message) => message.channel === CARD_CHANNEL_SHOW)).toHaveLength(1)
+    expect(hides()).toBe(0)
+
+    // The finished row this session also holds: acknowledging it is refused, because only
+    // a pending item may be acknowledged (APX-CON-08), and the card on the screen is a
+    // different block's - which is the case where a careless dismissal would take it down.
+    const finishedId = store
+      .readEventHistory({ limit: 10 })
+      .find((event) => event.class === 'finished')?.eventId as string
+
+    // 1. Unauthorised: no token at all. The check is the first statement in the handler,
+    //    so nothing was read and nothing was written (HC-FR-06).
+    let before = snapshotOf(store)
+    expect((await ackWithoutToken(hub, cardId as string)).status).toBe(401)
+    expect(diffLogs(before, snapshotOf(store))).toEqual(NOTHING_CHANGED)
+    expect(sent.filter((message) => message.channel === CARD_CHANNEL_REMOVE)).toEqual([])
+    expect(hides()).toBe(0)
+
+    // 2. Not-found: an identifier that names no row, with the right token.
+    before = snapshotOf(store)
+    expect((await ack(hub, 'evt_no_such_row')).status).toBe(404)
+    expect(diffLogs(before, snapshotOf(store))).toEqual(NOTHING_CHANGED)
+    expect(sent.filter((message) => message.channel === CARD_CHANNEL_REMOVE)).toEqual([])
+    expect(hides()).toBe(0)
+
+    // 3. Rejected: a row this transition cannot apply to, for a block that is still
+    //    pending and still showing.
+    before = snapshotOf(store)
+    const conflict = await ack(hub, finishedId)
+    expect(conflict.status).toBe(409)
+    expect(conflict.json<{ reason: string }>().reason).toBe('not-a-pending-item')
+    expect(diffLogs(before, snapshotOf(store))).toEqual(NOTHING_CHANGED)
+    expect(sent.filter((message) => message.channel === CARD_CHANNEL_REMOVE)).toEqual([])
+    expect(hides()).toBe(0)
+    // The card is still up, and both blocks are still pending: the surface answers the
+    // block's state rather than the request's outcome (NT-FR-10). Both, because the block
+    // this file seeded went in through a second connection and the one that was ingested
+    // over the socket is the one the card is showing.
+    expect(pendingIds(hub).sort()).toEqual([blockId, cardId].sort())
+
+    // And the one that does apply takes it down, which is what makes the three above
+    // refusals rather than a dismissal that never fires.
+    const applied = await ack(hub, cardId as string)
+    expect(applied.status).toBe(ACK_STATUS.applied)
+    const removals = sent.filter((message) => message.channel === CARD_CHANNEL_REMOVE)
+    expect(removals).toEqual([{ channel: CARD_CHANNEL_REMOVE, payload: { end: 'acknowledged' } }])
+    expect(hides()).toBe(1)
+    // The block that was seeded through the second connection was never shown - that
+    // connection is outside the hub, so no delivery was made for it - and it is the only
+    // one left pending.
+    expect(pendingIds(hub)).toEqual([blockId])
+  })
+})
+
+describe('the route surface is byte-identical with a card on the screen (NS-3)', () => {
+  it('keeps the 200 body, empties the whole-log diff everywhere else, and the route list', async () => {
+    const { hub } = await startCardHub()
+    const store = observer(hub)
+    const blockId = seedThreeClasses(store)
+    const token = tokenFor(hub)
+
+    // The 200 body: the same seven keys, asserted by name rather than by memory, because
+    // a dismissal gave the handler something to say and the temptation to say it in the
+    // answer is exactly what this criterion forbids (APX-FR-01, ADR-003).
+    const applied = await ack(hub, blockId)
+    expect(applied.status).toBe(ACK_STATUS.applied)
+    expect(Object.keys(applied.json<AckAcceptedBody>()).sort()).toEqual([
+      'ackState',
+      'acknowledged',
+      'eventId',
+      'outcome',
+      'pendingCount',
+      'reason',
+      'resolutionState',
+    ])
+
+    // The whole log, every registered route and every mutating method, on a hub whose
+    // window exists and whose card is not wired to anything: the ack route's one column
+    // and nothing else moves. A dismissal is a window operation, and this is where a
+    // window operation that wrote a row would be caught.
+    const changed: string[] = []
+    for (const route of hub.registry.routes()) {
+      for (const method of WALK_METHODS) {
+        const before = snapshotOf(store)
+        await requestFor(hub, route.pattern, method, blockId, token)
+        const diff = diffLogs(before, snapshotOf(store))
+        const signature = `${method} ${route.pattern}`
+        if (method === 'POST' && route.pattern === MUTATING_ROUTE) {
+          // The repeat acknowledgement is `unchanged`, so it flips nothing at all - and
+          // the card is already down, so it removes nothing either (HC-FR-08).
+          expect(diff, signature).toEqual(NOTHING_CHANGED)
+          continue
+        }
+        if (method === 'POST' && route.pattern === '/api/ingest') {
+          // The append, restated rather than skipped: it creates a row and changes nothing
+          // that already exists, and the walk would be weaker if the one route that does
+          // move the log were the one route left unasserted (ADR-002).
+          expect(diff.added, signature).toHaveLength(1)
+          expect(diff.changed, signature).toEqual([])
+          expect(diff.removed, signature).toEqual([])
+          expect(diff.sessionsChanged, signature).toEqual([])
+          continue
+        }
+        if (describeDiff(diff) !== 'nothing') changed.push(`${signature} ${describeDiff(diff)}`)
+      }
+    }
+    expect(changed).toEqual([])
+
+    // And the surface itself, from the running hub: no route was added, removed or
+    // renamed by the dismissal, and the control surface is still exactly one route.
+    expect([...hub.registry.signatures()].sort()).toEqual([
+      'GET /',
+      'GET /api/events',
+      'GET /api/health',
+      'GET /api/metrics',
+      'GET /api/pending',
+      'GET /api/sessions',
+      'GET /api/sessions/:sessionId',
+      'GET /api/stream',
+      'POST /api/ack/:eventId',
+      'POST /api/ingest',
+    ])
+    expect(hub.registry.routes().filter((route) => route.mutation === 'ack-only')).toHaveLength(1)
+  })
+
+  it('carries the dismissal port in both services objects the composition root builds', async () => {
+    // Criterion 9. The pre-bind object exists only between the claim and the bind, and no
+    // request can arrive in that window, so a source read is the only way to see it - and
+    // it is the only way that matters, because a port present in one of the two literals
+    // and absent from the other is a field that exists until the socket is bound and then
+    // stops existing. The two literals are located by their own markers and read to their
+    // closing brace, so the assertion is about each object rather than about a count.
+    const source = readModuleWithoutProse('src/main/index.ts')
+    const literals = ['let services: HubServices = {', 'services = {'].map((marker) => {
+      const start = source.indexOf(marker)
+      expect(start, marker).toBeGreaterThan(-1)
+      let depth = 0
+      for (let index = source.indexOf('{', start); index < source.length; index += 1) {
+        if (source[index] === '{') depth += 1
+        else if (source[index] === '}') {
+          depth -= 1
+          if (depth === 0) return source.slice(start, index)
+        }
+      }
+      throw new Error(`the services object beginning at "${marker}" is not closed`)
+    })
+
+    expect(literals).toHaveLength(2)
+    for (const literal of literals) {
+      // Every collaborator, and the port among them: the two objects are the whole of
+      // what a handler is ever handed, so a field that differs between them is a field
+      // that exists in one run and not the other.
+      for (const field of [
+        'store',
+        'counters',
+        'stream',
+        'ingest',
+        'pending',
+        'delivery',
+        'security',
+        'dismissal',
+        'hub',
+      ]) {
+        expect(literal, `a services object is missing ${field}`).toMatch(
+          new RegExp(`^\\s{6}${field}[,:]`, 'm'),
+        )
+      }
+    }
+    // And the port is only declared, never built, in either of them: the one dismissal in
+    // this product is built once at step 4a-bis, above the first literal.
+    expect([...source.matchAll(/createCardDismissal\(/g)]).toHaveLength(1)
+    expect(literals.some((literal) => literal.includes('createCardDismissal'))).toBe(false)
+  })
+})
 
 /** The path a pattern addresses once its parameters are filled in. */
 function concretePath(pattern: string, blockId: string): string {

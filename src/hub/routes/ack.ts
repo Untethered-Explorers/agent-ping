@@ -18,6 +18,15 @@
 // which is what makes "it can only mark a pending item acknowledged" a property
 // rather than an intention.
 //
+// AND WHAT ELSE HAPPENS, WHICH IS NOT A SECOND EFFECT ON THE RECORD
+// When the transition is applied the card showing that block comes off the screen,
+// through `services.dismissal` (NT-FR-12). That is a consequence rather than a second
+// capability: no row is changed, no counter is recorded, no session is named in the
+// answer, and a dismissal whose removal fails is reported on the hub's diagnostic
+// callback and leaves this response exactly as it would have been without the call
+// (APX-FR-02). A refused, unauthorised or not-found acknowledgement reaches none of it,
+// so none of them can take anything off a developer's screen.
+//
 // THE ANSWER TABLE, IN FULL
 //   200  the row is acknowledged. `outcome` distinguishes the transition that
 //        recorded the fact (`applied`) from the one that found it already recorded
@@ -246,6 +255,26 @@ function serveAck({ request, response, params, services }: RouteContext<HubServi
     resolutionState: transition.event?.resolutionState ?? null,
     pendingCount: transition.pendingCountAfter,
   } satisfies AckAcceptedBody)
+
+  // 4. The card, if one is showing for this block. Only after the answer above is
+  //    decided, and only on a 2xx: a transition that was refused, a row that does not
+  //    exist and a write the boundary refused all reach none of this, so none of them
+  //    can take anything off a developer's screen.
+  //
+  //    The end is the lifetime table's own name for a developer's decision, and it is
+  //    the table rather than this route that decides whether it applies: the dismissal
+  //    compares it against the cell the card was shown under, and a finished card's only
+  //    end is `expired`. An `unchanged` answer is included on purpose - the block is
+  //    acknowledged, so its card must not be on the screen, and a retried click that
+  //    found nothing left to do has to leave the same answer it found the first time
+  //    (HC-FR-08).
+  //
+  //    Nothing here can fail the request. The dismissal never throws, reports a failed
+  //    removal of its own accord, and changes no row and no counter, so the body above is
+  //    byte-for-byte what it would have been without this call (APX-FR-02, NT-FR-12).
+  if (transition.event !== null) {
+    services.dismissal.dismiss(transition.event.sessionId, 'acknowledged')
+  }
 }
 
 /** The one route a write token is required on, as a sentence a log can quote. */

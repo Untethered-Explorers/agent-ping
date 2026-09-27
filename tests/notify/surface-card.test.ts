@@ -417,9 +417,10 @@ function surfaceModules(): string[] {
 describe('the notification path reaches no platform notification mechanism', () => {
   it('reads every module under src/notify, and says which it read', () => {
     // The sweep is only as good as its coverage, so the file list is asserted rather than
-    // assumed: the six surface modules of NT-6 and NT-7, the class policy, the surface
-    // notifier NT-8 built, and the notifier's own vocabulary. Nine modules, and the
-    // count is stated so a tenth one fails here rather than being swept in silence.
+    // assumed: the surface modules of NT-6 and NT-7, the channel and preload NS-2 added,
+    // the card dismissal NS-3 added, the class policy, the surface notifier NT-8 built,
+    // and the notifier's own vocabulary. Thirteen modules, and the count is stated so a
+    // fourteenth one fails here rather than being swept in silence.
     const modules = notifyModules()
     expect(modules).toEqual(
       expect.arrayContaining([
@@ -436,12 +437,17 @@ describe('the notification path reaches no platform notification mechanism', () 
         'src/notify/surface/channel.ts',
         'src/notify/surface/preload.cts',
         'src/notify/surface/preload.ts',
+        // NS-3 added this one: the card dismissal, which takes a card off the screen when
+        // the hub acknowledges or resolves the block it was showing. It reaches the
+        // document and the window through the channel, so it is on the same path and is
+        // swept rather than exempted.
+        'src/notify/surface/dismissal.ts',
         'src/notify/policy.ts',
         'src/notify/registry.ts',
         'src/notify/types.ts',
       ]),
     )
-    expect(modules).toHaveLength(12)
+    expect(modules).toHaveLength(13)
   })
 
   it('has no notification API call, no audio and no spawned command on the surface path', () => {

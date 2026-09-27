@@ -1077,7 +1077,18 @@ describe('the main entry point constructs the surface notifier and the delivery 
     // platform registry's name appears nowhere (ADR-012, NT-FR-11).
     const source = readFileSync(repositoryPath('src/main/index.ts'), 'utf8')
     expect([...source.matchAll(/resolveSurfaceNotifier\(/g)]).toHaveLength(1)
-    expect(source).toContain('toNotifierPort(surfaceNotifier.notifier')
+    // AMENDED BY NS-3, DELIBERATELY, AND THE AMENDMENT MAKES THE CLAIM STRONGER.
+    // This used to pin the exact call `toNotifierPort(surfaceNotifier.notifier`. NS-3 put
+    // one adapter between the resolved notifier and the port - `rememberingCard`, which
+    // records the session a card was shown for so the hub can take it down again - so
+    // the literal moved. What this criterion is about is that the notifier is resolved
+    // once and adapted once, so both are now counted, and the adapter that sits between
+    // them is named: a second `toNotifierPort` anywhere in the composition root fails
+    // here rather than becoming a second delivery path nobody reads.
+    expect([...source.matchAll(/toNotifierPort\(/g)]).toHaveLength(1)
+    expect(source).toContain(
+      'toNotifierPort(rememberingCard(surfaceNotifier.notifier, dismissal)',
+    )
     for (const withdrawn of [
       'createPlatformNotifier',
       'notify/linux',
@@ -1225,19 +1236,24 @@ const PLATFORM_LITERALS = ["'linux'", "'darwin'", "'win32'", "'macos'", "'window
 
 describe('no child process spawn, no exec call and none of the removed tool names exists anywhere under src/notify', () => {
   it('reads every module under src/notify, and says which it read', () => {
-    // The sweep is only as good as its coverage, so the file list is asserted: the seven
+    // The sweep is only as good as its coverage, so the file list is asserted: the eight
     // surface modules, the class policy, the surface notifier and the notifier's own
     // vocabulary. A module added later fails here until the sweep's reach is restated.
     //
     // NS-2 added two: the channel contract, and the preload. Both are on the
     // notification path - the second is the only module here that runs inside a
     // renderer - so both are swept rather than listed as exemptions.
+    //
+    // NS-3 added a ninth: the card dismissal, which is on the notification path and
+    // reaches the document and the window through the channel. Swept for the same
+    // reason, and it imports nothing but this product's own lifetime table.
     expect(notifyModules()).toEqual([
       'src/notify/policy.ts',
       'src/notify/registry.ts',
       'src/notify/surface/card-view.ts',
       'src/notify/surface/card.ts',
       'src/notify/surface/channel.ts',
+      'src/notify/surface/dismissal.ts',
       'src/notify/surface/electron-host.ts',
       'src/notify/surface/host.ts',
       'src/notify/surface/lifetime.ts',

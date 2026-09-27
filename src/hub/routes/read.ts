@@ -16,6 +16,17 @@
 // recording side is the busiest of the four, is served from its own module and
 // still cannot write.
 //
+// SINCE NS-3: A PORT, WHICH IS NOT A WRITER
+// `HubServices` also carries the card dismissal port, because the ack route has to be
+// able to take a needs-you card off the screen when a block is acknowledged
+// (NT-FR-12). What this file gained is a *declaration* of it: there is no dismissal
+// here, no implementation, and nothing in this module that changes a row, a counter
+// or a file. The one place a card is taken down is src/notify/surface/dismissal.ts, and
+// the same object reaches the surface notifier and the ack route, so there is one
+// dismissal in the product rather than one per caller. Nothing in the read routes
+// reaches it, and the walk in tests/hub/ack.test.ts asserts the whole log is unchanged
+// by every one of them with a card on the screen.
+//
 // WHAT CROSSES THE WIRE
 // The exact read shapes of the store, and nothing else. The store's shapes are
 // themselves the persisted field set: harness, repository short name and full
@@ -64,6 +75,7 @@ import type { DeliveryStatus } from '../delivery.js'
 import type { HubState } from '../lifecycle.js'
 import type { HubSecurity } from '../security.js'
 import type { PendingLifecycle } from '../../domain/pending.js'
+import type { CardDismissalPort } from '../../notify/surface/dismissal.js'
 import { respondJson, type RouteDefinition } from '../server.js'
 
 /**
@@ -128,6 +140,29 @@ export interface HubServices {
    * no ambient way to reach it.
    */
   readonly security: HubSecurity
+  /**
+   * The card dismissal port (NT-FR-12).
+   *
+   * The one thing a route may ask of the notification surface: take one session's card
+   * off the screen, naming the end. It is here for the reason `pending` is - `HubServices`
+   * is the one description of what a handler is given, and the ack route is the ack
+   * route's own collaborator rather than something it reaches for on the side.
+   *
+   * Narrow on purpose. It cannot show a card, cannot deliver anything, cannot read a row
+   * and cannot change one, and it records no counter: the whole of its effect is a
+   * removal and a `hide` on a window this product owns (NT-FR-10). A route that needed
+   * more than "this card is no longer wanted" is asking for a second delivery path, and
+   * the delivery policy - which `HubServices.delivery` is narrowed to `status()` on
+   * precisely so a route calling `deliver` is a compile error - is not where to look
+   * (APX-CON-08, ADR-002).
+   *
+   * This file gains a *declaration* and not a writer: there is no dismissal here, no
+   * implementation, and nothing in this module that changes anything. The one place a
+   * card is taken down is src/notify/surface/dismissal.ts, and the composition root is
+   * what hands the same object to the surface notifier and to both of the services
+   * objects built here.
+   */
+  readonly dismissal: CardDismissalPort
   readonly hub: HubIdentity
 }
 

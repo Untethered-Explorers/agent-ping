@@ -727,14 +727,32 @@ export interface CreateCardChannelOptions {
 
 /**
  * The main process's half of the card channel: the `CardPresenter` NT-8 made a required
- * port, over the two messages the preload carries.
+ * port, over the two messages the preload carries, plus the one call that takes a card
+ * back off the screen.
  *
- * Structurally this is the notifier's `CardPresenter` and nothing wider, which is why
- * src/main/index.ts can hand it to `resolveSurfaceNotifier` without either file naming
- * the other's type.
+ * `present` is structurally the notifier's `CardPresenter`, which is why
+ * src/main/index.ts can hand the same object to `resolveSurfaceNotifier` without either
+ * file naming the other's type - and why `dismiss` is a *separate* member rather than a
+ * second argument to `present`: the notifier delivers a card and this product is done
+ * with it, while a dismissal arrives from the hub's own acknowledgement and is a
+ * different event with a different reason (NT-FR-12).
  */
 export interface CardChannelPresenter {
   present(model: CardModel, cell: CardLifetimeCell): Promise<void>
+  /**
+   * Take the card off the screen, naming the end.
+   *
+   * The one place a hub-originated end crosses into the document, and it is the same
+   * three lines the expiry path uses: send the removal through the channel, so the
+   * document's own view removes its own element under its own lifetime cell, and then
+   * call the host's own `hide` (NT-FR-10). It also cancels the card's own clock, because
+   * an arm that outlives its card would take down the *window* a later card is using.
+   *
+   * Never throws and never waits: the caller is an HTTP handler or a change-feed
+   * subscriber, and a removal that cannot be delivered is reported rather than turned
+   * into a failed acknowledgement (APX-FR-02, ADR-010).
+   */
+  dismiss(end: CardEnd): void
 }
 
 /**
@@ -766,12 +784,14 @@ export interface CardChannelPresenter {
  *   so it is checked rather than assumed, because a window with an empty card in it is
  *   exactly what NT-FR-10 forbids.
  *
- * It is NOT the acknowledgement path. Nothing here is told that a block was resolved or
- * acknowledged: that is a hub concern, its destination is the dashboard, and the
- * acknowledgement belongs on a dismissal port rather than on the host window. A
- * needs-you card therefore leaves the screen when the host is destroyed, which is correct
- * at shutdown and is recorded as the hub's next piece of work rather than worked around
- * here (NT-FR-12's third clause, ADR-010).
+ * IT IS ALSO THE ACKNOWLEDGEMENT PATH, AND ONLY FOR REMOVING
+ * `dismiss` is how the hub's acknowledgement and a harness's resolution reach the card.
+ * It is not how anything is *told*: this channel does not know a block was acknowledged,
+ * does not read a row and has no route, and the decision that a card should go down is
+ * the hub's (src/notify/surface/dismissal.ts). What this side owns is the removal - the
+ * message to the document and the host's own `hide` - and it owns it for the card's own
+ * end and for a hub-originated one alike, so there is one place a card leaves the screen
+ * rather than two (NT-FR-12's third clause, ADR-010).
  */
 export function createElectronCardChannel(options: CreateCardChannelOptions): CardChannelPresenter {
   const diagnostic = options.onDiagnostic ?? ((): void => {})
@@ -866,6 +886,15 @@ export function createElectronCardChannel(options: CreateCardChannelOptions): Ca
         arm = null
         endCard('expired')
       })
+    },
+
+    dismiss: (end: CardEnd): void => {
+      // The card's own clock goes first, for the same reason the view cancels its arm
+      // before it takes the node out: a callback that is already in flight must not find
+      // a card to remove and take down the window a later card is using (NT-FR-08).
+      arm?.cancel()
+      arm = null
+      endCard(end)
     },
   }
 }

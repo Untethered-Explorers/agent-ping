@@ -72,6 +72,7 @@ import { RUNTIME_FILE_NAME } from '@/hub/runtime-file'
 import { INGEST_ROUTES } from '@/hub/routes/ingest'
 import { READ_ROUTES } from '@/hub/routes/read'
 import { createDeliveryPolicy } from '@/hub/delivery'
+import { createCardDismissal } from '@/notify/surface/dismissal'
 import {
   createRequestListener,
   MUTATING_ROUTE,
@@ -326,6 +327,10 @@ describe('the loopback predicate (APX-CON-01)', () => {
       // than about delivery, so nothing here may interrupt the developer either.
       delivery: createDeliveryPolicy({ store }),
       security,
+      // The card dismissal (NS-3), built the way a headless run gets it: this fixture has
+      // no card renderer, so no card can be showing and every dismissal is a no-op. The
+      // boundary being exercised here is the address, not the surface.
+      dismissal: createCardDismissal({ remove: null }),
       hub: {
         instanceId: 'synthetic',
         pid: process.pid,

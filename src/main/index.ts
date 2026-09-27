@@ -78,6 +78,11 @@
 // `nodeIntegration: false` and the renderer `sandbox` are all still in force, and a test
 // asserts all three survive this wiring. A runtime with no `ipcMain` gets a diagnostic and
 // the previous honest `not-wired` answer rather than a card it cannot deliver (NT-FR-12).
+// The bridge supplies `dismissCard` as well (NS-3), and the hub wires the two triggers
+// that take a card off the screen: the ack route's one transition, and the live state
+// feed's own resolution frame. The dismissal is a port, not a second delivery path - it
+// cannot show a card, cannot deliver anything, cannot read a row and records no counter -
+// and it is held in both of the `HubServices` objects below rather than in one of them.
 // What remains deliberately absent is any route that can spawn, steer, interrupt, prompt
 // or approve anything inside a harness (APX-CON-08): the mutating set in
 // src/hub/server.ts is exactly two signatures, the append-only ingest route and the ack
@@ -158,8 +163,17 @@ import {
   resolveSurfaceNotifier,
   toNotifierPort,
   type CardPresenter,
+  type SurfaceNotifier,
   type SurfaceNotifierResolution,
 } from '../notify/registry.js'
+import {
+  createCardDismissal,
+  isCardTransition,
+  type CardDismissal,
+  type CardRemover,
+  type CardTransition,
+} from '../notify/surface/dismissal.js'
+import { cardLifetimeFor } from '../notify/surface/lifetime.js'
 import {
   applyChromiumLaunchPolicy,
   createElectronCardChannel,
@@ -274,6 +288,30 @@ export interface DesktopBridge {
    * no window, no card, and no stub pretending otherwise.
    */
   readonly renderCard?: CardPresenter
+  /**
+   * How a card is taken off the screen, when this run has one.
+   *
+   * The other half of a card, and it is a separate member rather than a second method on
+   * the presenter for the reason the surface host is not handed its window: the notifier
+   * *shows* a card and this product is done with it, while a dismissal arrives from the
+   * hub's own acknowledgement and from a harness's resolution, and is a different event
+   * with a different reason (NS-3, NT-FR-12).
+   *
+   * The Electron bridge supplies it (NS-2's channel, with the removal NS-3 added): it
+   * sends the one message that carries an end and then calls the host's own `hide`, so
+   * nothing occupies screen space once nothing is showing (NT-FR-10). The decision that
+   * a card *should* go down is the hub's (src/notify/surface/dismissal.ts) and this
+   * function makes no decision at all.
+   *
+   * Absent means this run can put a card in the document but has no way to take it out.
+   * That is a line on the diagnostic callback and nothing else: the delivery itself still
+   * happened and is still counted, and the card stays up until the next one replaces it or
+   * the hub stops. It is *not* a `not-wired` run - a card that is on the screen was shown,
+   * and reporting a delivery as not made because the card cannot be dismissed would be a
+   * different lie (NT-FR-09, APX-FR-02). The shipped bridge supplies both halves, so a
+   * run that has one and not the other is a bridge somebody assembled by hand.
+   */
+  readonly dismissCard?: CardRemover
   /** The origin the hub published, once it is serving. */
   onHubReady?(hub: RunningHub): void
 }
@@ -606,6 +644,10 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
     //    ingest path that already reads it twice.
     stream = createChangeFeed(options.stream)
     const watching = withChangeFeed(withPendingSnapshot(store, localMetrics), stream)
+    // The feed as a constant rather than through the `let` above, for the same reason
+    // `log` is one: the closures built further down outlive this block's narrowing, and
+    // the shutdown path re-reads them long after the try has either finished or failed.
+    const feed: ChangeFeed = stream
 
     // 4a. The notification surface host (NT-6, NT-FR-04), before the delivery policy and
     //     therefore before any notifier is wired. The order is the requirement, not a
@@ -641,6 +683,56 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
     // Asked for and not created. Distinct from "not asked for", which is the headless run
     // and is not a refusal - see the note on the notifier below.
     const surfaceRefused = options.desktop?.surface !== undefined && surface === null
+
+    // 4a-bis. The card dismissal (NS-3, NT-FR-12), between the host and the notifier
+    //     because it needs both: the channel's removal, to take the card out of the
+    //     document, and the hub's own live state feed, to hear about a resolution.
+    //
+    //     The decision this object makes is a card's own: whether the end that just
+    //     arrived is one the card on the screen may end on, for the session it belongs
+    //     to. The decision that a block was acknowledged, or resolved, is the hub's - the
+    //     ack route's one transition and the pending lifecycle's one resolution - and
+    //     neither is a route this added (APX-CON-08, ADR-002).
+    //
+    //     `remove` is the desktop's own dismissal and is null when the bridge did not
+    //     supply one - a headless run, a run whose window was refused, and a runtime with
+    //     no `ipcMain`. A null removal records no card and dismisses nothing, so a
+    //     stub cannot report a removal this product never made (APX-FR-02). A bridge that
+    //     can *show* a card but supplied no way to take it down is said out loud below,
+    //     because a card whose only ending is the window being destroyed is the
+    //     situation NS-3 exists to close and a caller deserves to know it is still there.
+    const dismissal: CardDismissal = createCardDismissal({
+      remove: options.desktop?.dismissCard ?? null,
+      onDiagnostic: diagnostic,
+    })
+    if (options.desktop?.renderCard !== undefined && options.desktop.dismissCard === undefined) {
+      diagnostic(
+        'agent-ping can put a card on the screen on this run but was given no way to take it ' +
+          'down, so an acknowledged or resolved block leaves its card up until the next one ' +
+          'replaces it or the hub stops (NT-FR-12, NT-FR-10, APX-FR-02)',
+      )
+    }
+    // The live state feed, as the one line the dismissal reads. A structural reader
+    // rather than the feed itself, so nothing under src/notify imports a hub type and
+    // the narrowing is a guard a test can hand a poisoned value: a heartbeat, a close
+    // and anything the feed published that is not a transition all pass through here and
+    // none of them reaches a dismissal (HC-FR-03).
+    dismissal.watch({
+      subscribe: (listener): (() => void) =>
+        feed.subscribe({
+          onFrame: (frame): void => {
+            if (frame.event !== 'change') return
+            if (!isCardTransition(frame.data)) return
+            listener(frame.data as CardTransition)
+          },
+          onHeartbeat: (): void => undefined,
+          // The feed is closing, so the hub is shutting down and the surface window has
+          // already been destroyed. Nothing is read and nothing is removed here: the
+          // ordered shutdown took the card down, which is the `destroyed` end and not
+          // either of the two this port produces (HC-FR-10).
+          onClose: (): void => undefined,
+        }),
+    })
 
     // 4b. The delivery policy (HC-FR-07), over the same wrapped store and before the
     //     ingest pipeline, because the pipeline's port *is* this policy. Built here
@@ -691,17 +783,27 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
       // chooses the port, and a deep link built from the preferred one would point at
       // a port nobody is listening on (HC-FR-01, HC-FR-07).
       origin: (): string => server?.origin ?? '',
-      // The one conversion between the two notifier shapes: the surface notifier
-      // resolves with an outcome carrying a reason, and the policy's port has
-      // "resolved", "thrown" and one typed suppression - so the adapter is where a
-      // `failed` outcome becomes a throw the policy records as a failure with its
-      // reason beside it, and where a *refused* class becomes a suppression rather than
-      // a delivery (APX-FR-02, ADR-010, NT-FR-09). An `fyi` is refused by the class
-      // policy before a card is built at all and is never counted as a notification
-      // (NT-FR-02).
+      //     The one conversion between the two notifier shapes: the surface notifier
+      //     resolves with an outcome carrying a reason, and the policy's port has
+      //     "resolved", "thrown" and one typed suppression - so the adapter is where a
+      //     `failed` outcome becomes a throw the policy records as a failure with its
+      //     reason beside it, and where a *refused* class becomes a suppression rather than
+      //     a delivery (APX-FR-02, ADR-010, NT-FR-09). An `fyi` is refused by the class
+      //     policy before a card is built at all and is never counted as a notification
+      //     (NT-FR-02).
+      //
+      //     The wrapper below it is where a session and a card finally meet, and it is
+      //     the only place in this process that knows which session the card on the
+      //     screen belongs to (NS-3). The notifier's own request is the only value that
+      //     carries both, and a `delivered` outcome is the only answer that means a card
+      //     is on the screen - a refusal drew nothing, and a failure says so itself.
       ...(notifierUnwired || surfaceNotifier.notifier === null
         ? {}
-        : { notifier: toNotifierPort(surfaceNotifier.notifier, { onDiagnostic: diagnostic }) }),
+        : {
+            notifier: toNotifierPort(rememberingCard(surfaceNotifier.notifier, dismissal), {
+              onDiagnostic: diagnostic,
+            }),
+          }),
       onDiagnostic: diagnostic,
       // The one place a delivery outcome leaves the policy (HC-6). A `delivered`
       // outcome is the increment for `toast_deliveries`; the other four are handed
@@ -783,6 +885,11 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
       pending,
       delivery,
       security,
+      // The same object the post-bind literal below carries, and it is named in both on
+      // purpose: these two literals are the whole of what a handler is ever given, and a
+      // port present in one of them and absent from the other is a field that exists
+      // until the socket is bound and then stops existing (NS-3).
+      dismissal,
       hub: unpublishedIdentity(claim, lifecycle),
     }
 
@@ -813,6 +920,9 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
       pending,
       delivery,
       security,
+      // The same object the pre-bind literal above carries, for the reason given there
+      // (NS-3).
+      dismissal,
       hub: {
         instanceId: claim.instanceId,
         pid: claim.pid,
@@ -1225,6 +1335,35 @@ function deliveryPort(delivery: DeliveryPolicy): DeliveryPort {
   }
 }
 
+/**
+ * The bridge from a card on the screen to the hub that has to be able to take it down.
+ *
+ * The counterpart to `deliveryPort`, and the same shape for the same reason: this is the
+ * one place the two halves meet, and the composition root is where a collaborator is
+ * wired rather than where behaviour is decided.
+ *
+ * The only thing it adds is the session, and it adds it *after* the notifier has answered
+ * rather than before. A `delivered` outcome is the notifier's own statement that a card
+ * was rendered, so a refusal - an `fyi`, which never leaves the app (NT-FR-02) - records
+ * nothing, and a failure records nothing either because nothing is on the screen to
+ * remember. The cell is the lifetime table's own for the class the hub classified, read
+ * with the same `cardLifetimeFor` the notifier itself used, so the table and not this
+ * function decides which ends may take the card away (NT-FR-08, ADR-004).
+ *
+ * Nothing else changes: the outcome is passed through untouched, so a delivery is counted
+ * exactly as it would have been, and no counter, row or request field is read on the way
+ * (NT-FR-09, APX-FR-01).
+ */
+function rememberingCard(notifier: SurfaceNotifier, dismissal: CardDismissal): SurfaceNotifier {
+  return async (request) => {
+    const outcome = await notifier(request)
+    if (outcome.status === 'delivered') {
+      dismissal.shown(request.event.sessionId, cardLifetimeFor(request.class))
+    }
+    return outcome
+  }
+}
+
 function releaseQuietly(claim: HubInstanceClaim): void {
   try {
     claim.release()
@@ -1529,6 +1668,13 @@ function electronTrayBridge(electron: ElectronModuleLike): TrayBridge {
  * was honestly recorded as not-wired and no card ever left this machine
  * (NT-FR-12, APX-FR-02).
  *
+ * `dismissCard` is the same channel's other half, and it is handed over beside the
+ * renderer rather than on its own (NS-3): a channel that can put a card into the document
+ * and not take it out is a card whose only ending is the window being destroyed at
+ * shutdown, so the two are never separated. The composition root decides *whether* a card
+ * should go down; this function only knows how to send the one message that takes it out
+ * and to call the host's own `hide` afterwards (NT-FR-10).
+ *
  * It is still absent in one case, and it is absent rather than throwing: a runtime with
  * no `ipcMain` cannot carry a model into a document at all, so this reports a diagnostic
  * and hands the composition root no renderer, which is the product's existing `not-wired`
@@ -1545,6 +1691,7 @@ function electronTrayBridge(electron: ElectronModuleLike): TrayBridge {
 function electronSurfaceChannel(electron: ElectronModuleLike): {
   readonly surface: SurfaceHostBridge
   readonly renderCard: CardPresenter | undefined
+  readonly dismissCard: CardRemover | undefined
 } {
   // The one window both halves share, read rather than captured: the host is created when
   // the hub mounts the surface, which is after this runs.
@@ -1590,7 +1737,7 @@ function electronSurfaceChannel(electron: ElectronModuleLike): {
         'pending set are unchanged, and every delivery is recorded as not-wired rather than as a ' +
         'card somebody saw (NT-FR-12, APX-FR-02).\n',
     )
-    return { surface, renderCard: undefined }
+    return { surface, renderCard: undefined, dismissCard: undefined }
   }
   // Built once, here, and not per card. The channel's `ipcMain` listener is registered
   // eagerly so it is in place before the card document loads, and its readiness state and
@@ -1607,7 +1754,11 @@ function electronSurfaceChannel(electron: ElectronModuleLike): {
       process.stderr.write(`${message}\n`)
     },
   })
-  return { surface, renderCard: channel }
+  // The same object under two names, and that is deliberate: the notifier is given the
+  // presenting half, the composition root the dismissing half, and neither can reach the
+  // other's job. `renderCard`'s type does not carry `dismiss`, so a caller holding the
+  // presenter cannot take a card down by accident (NS-3).
+  return { surface, renderCard: channel, dismissCard: channel.dismiss }
 }
 
 /**
@@ -1626,12 +1777,14 @@ export function electronDesktopBridge(electron: ElectronModuleLike): {
   readonly tray: TrayBridge
   readonly surface: SurfaceHostBridge
   readonly renderCard: CardPresenter | undefined
+  readonly dismissCard: CardRemover | undefined
 } {
-  const { surface, renderCard } = electronSurfaceChannel(electron)
+  const { surface, renderCard, dismissCard } = electronSurfaceChannel(electron)
   return {
     tray: electronTrayBridge(electron),
     surface,
     renderCard,
+    dismissCard,
   }
 }
 

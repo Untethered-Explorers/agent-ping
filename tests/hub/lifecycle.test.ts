@@ -78,6 +78,7 @@ import {
 } from '@/hub/lifecycle'
 import { readRuntimeFile, runtimeFilePath, writeRuntimeFile } from '@/hub/runtime-file'
 import { readHealth, type HubServices } from '@/hub/routes/read'
+import { createCardDismissal } from '@/notify/surface/dismissal'
 import type { Notifier } from '@/hub/delivery'
 import { SHUTDOWN_PORT_BASE, startRealHub, stopStrayHubs, type RealHub } from './fixtures/hub-process'
 
@@ -865,6 +866,11 @@ describe('health reports the state the shutdown is in', () => {
       pending: hub.pending,
       delivery: hub.delivery,
       security: hub.security,
+      // The card dismissal this hub was built with (NS-3), built the way a headless run
+      // gets it: no card renderer, so no card can be showing and every dismissal is a
+      // no-op. A real one rather than a literal, so this fixture stays the services
+      // object the composition root hands a handler.
+      dismissal: createCardDismissal({ remove: null }),
       hub: {
         instanceId: hub.instanceId,
         // The health payload reports this process's own pid, which for a hub in this

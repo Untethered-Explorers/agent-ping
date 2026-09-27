@@ -1,10 +1,10 @@
 # Project Progress
 
 ## Current State
-**Phase**: COPILOT-CLI-ACP-SPIKE-2
+**Phase**: NOTIFICATION-AND-TRAY-PRESENCE-4
 **Status**: In Progress
-**Validation Gaps**: 104 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-27T15:56:53.849Z
+**Validation Gaps**: 109 unverified check(s) - see "Validation Gaps"
+**Last Updated**: 2026-09-27T16:41:48.902Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -58,6 +58,8 @@
   - Files: src/dashboard/card.html, src/dashboard/card.css, src/dashboard/card-main.ts, vite.config.ts, tests/dashboard/card-document.test.ts, tests/hub/server.test.ts, tests/hub/metrics.test.ts, src/main/index.ts, src/notify/surface/card-view.ts, src/notify/surface/card.ts
 - [x] Phase NOTIFICATION-AND-TRAY-PRESENCE-4, Task NS-2: Open the renderer channel and wire the card presenter (@notification-engineer)
   - Files: src/notify/surface/channel.ts, src/notify/surface/preload.ts, src/notify/surface/electron-host.ts, src/main/index.ts, tests/notify/surface-channel.test.ts, tests/notify/surface-host.test.ts, docs/runbooks/notification-surface.md, eslint.config.js, src/dashboard/card-main.ts, tests/dashboard/card-document.test.ts, tests/notify/policy.test.ts, tests/notify/surface-card.test.ts, tsconfig.build.json, tsconfig.json, src/notify/surface/preload.cts, tests/helpers/read-module.ts
+- [x] Phase NOTIFICATION-AND-TRAY-PRESENCE-4, Task NS-3: Take the card down when its block ends (@hub-engineer)
+  - Files: src/hub/routes/ack.ts, src/hub/routes/read.ts, src/main/index.ts, src/notify/surface/dismissal.ts, tests/hub/ack.test.ts, tests/notify/surface-dismissal.test.ts, docs/runbooks/notification-surface.md, src/notify/surface/electron-host.ts, tests/hub/lifecycle.test.ts, tests/hub/security.test.ts, tests/notify/policy.test.ts, tests/notify/surface-card.test.ts
 - [x] Phase OPENCODE-PLUGIN-ADAPTER-1, Task OA-1: Translate opencode events into the normalized envelope (@connector-engineer)
   - Files: src/plugin/opencode/index.ts, src/plugin/opencode/translate.ts, src/plugin/opencode/work-signal.ts, tests/plugin/opencode-translate.test.ts, tests/plugin/opencode-work-signal.test.ts, docs/engine-config.json
 - [x] Phase OPENCODE-PLUGIN-ADAPTER-1, Task OA-2: Deliver events to the hub and leave a breadcrumb on failure (@connector-engineer)
@@ -174,6 +176,11 @@
 - Task NS-2: The live run covered one journey: one needs-you block, delivered, and the card present. It did not exercise a finished card's expiry on a desktop, an fyi, a greeting-and-close session, a restart replay, or an acknowledgement. Those remain what tests/notify/surface-channel.test.ts and the section 8 harness cover.
 - Task NS-2: The suites run the Electron half against a structural stub, so what is proven there is every decision this product makes and not one thing about how any desktop composites a transparent frameless window. The live run covers that for the card path on this desktop only.
 - Task NS-2: The source sweeps that assert the absence of executeJavaScript, webSecurity, a notification API, a spawned command and a per-platform branch are hand-written comment strippers: a backtick template is read as one string to its closing backtick, so a nested template inside a ${...} would end the scan early. No module these are pointed at contains one.
+- Task NS-3: The Electron half is a structural stub and the document half is jsdom, so what is proven is every decision this product makes - which end, for which session, whether the cell names it, what the document receives, whether the window comes down - and nothing about how any of the three desktops composites a transparent frameless window (NT-FR-03, APX-CON-06). No macOS or Windows observation of any kind is claimed.
+- Task NS-3: Criterion 9 is asserted by reading the two HubServices literals out of src/main/index.ts, because the pre-bind object exists only between the claim and the bind and no request can reach it. The post-bind half is also proven behaviourally by the real acknowledgement, so the source read is the only source-level assertion here.
+- Task NS-3: In the five-ends run the expired end comes from the card view's injected clock, so the main process's own arm of the same interval - which is what takes the window down for a finished card - is not what fired. That path is proven separately with a real clock in tests/notify/surface-channel.test.ts; in this run exactly the two hub-originated ends produced a hide, and the test says so.
+- Task NS-3: The source readers used for the module enumerations and the import-list assertion are the repository's hand-written comment strippers: a backtick template is read as one string to its closing backtick, so a nested template inside a ${...} would end a scan early. No module these checks are pointed at contains one.
+- Task NS-3: tests/plugin/install.test.ts failed once during a full parallel run (a scratch directory counted in the system temp dir) and passed alone and in every full run since. It is unrelated to this change - nothing here writes to the system temp directory - but it is a flake the next full run could see.
 - Task OA-1: No live opencode session was run. The payload shapes are the 1.18.32 type declarations, not a capture from a running harness; proving the harness delivers them is OA-5's script and OA-6's gate, not this task.
 - Task OA-1: The one-envelope and block-lifecycle tests use the real ingest pipeline and the real SQLite log but drive it from fixtures rather than from a harness's event stream.
 - Task OA-1: The plugin was not loaded by opencode itself. Its structural plugin and client types mirror the 1.18.32 declarations rather than importing @opencode-ai/plugin, which is deliberate (the adapter must load with no dependency), so a signature change upstream would not be caught by a compile error here - the OA-3 install and OA-5 live run are where that surfaces.

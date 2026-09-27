@@ -261,33 +261,37 @@ nobody can date. Items 3, 4 and 6 are still open.
    `delivery.status: "not-wired"`, `toast_deliveries: 0`, no viewable card window — is a
    record of a past build, not a claim about this one, and it is kept for that reason
    rather than edited.
-4. **Removing a card when the block is acknowledged.** The lifetime table names
-   `resolved` and `acknowledged` as the two ends of a needs-you card, and the card view
-   removes on either. Nothing in the delivery path is *told* about an acknowledgement
-   yet: the ack route has no notifier hook, and adding one is a hub change rather than a
-   delivery one. On the shipped entry point a needs-you card would therefore leave the
-   screen only when its window was destroyed at shutdown, which is correct at shutdown and
-   not yet correct in the middle of a run. Owner: hub-engineer, as a handoff.
-   **Observed, and observed through the harness:** the run watched the real pending set,
-   issued a real `POST /api/ack/:eventId` (status 200), and saw the card view's own
-   `remove('acknowledged')` take the card off the screen 404 ms later — the card view
-   reported the end `acknowledged`, and the badge's own number fell 1 → 0. What is
-   observed is that the *product's* card view and the *product's* lifetime cell do the
-   right thing the moment anything tells them; what is missing is the telling, and the
-   harness's `suppliedByThisRun` field says so on the record.
+4. **Removing a card when the block is acknowledged — CLOSED by NS-3.** The lifetime table
+   names `resolved` and `acknowledged` as the two ends of a needs-you card, and the card
+   view removes on either; until NS-3 nothing produced either, so a needs-you card left the
+   screen only when its window was destroyed at shutdown. The producer is now
+   `src/notify/surface/dismissal.ts`, a narrow port on `HubServices`, called from exactly
+   two places: the ack route after a successful acknowledgement (end `acknowledged`), and
+   the hub's own live state feed when a harness resolution clears a pending item (end
+   `resolved`) — which needs no route at all, because a resolution arrives as an ordinary
+   ingested signal whose class the policy refuses. The decision that a card *should* go
+   down stays the hub's; the channel's new `dismiss` owns the removal itself, the message
+   to the document and the host's own `hide` behind it. **Proven** by
+   `tests/notify/surface-dismissal.test.ts` (a real `startHub` over a real socket, the
+   real bridge, a real `POST /api/ack/:eventId` and a real harness resolution, with the
+   window's sends and hides asserted) and by `tests/hub/ack.test.ts` for the refusals, the
+   unchanged 200 body, the empty whole-log diff and the two services objects.
+   What is *not* observed here: nothing on a real desktop. The Electron half is still a
+   structural stub, and NS-4 is the task that re-runs the section 8 harness against the
+   shipped build with no seam supplied.
 5. **Nothing takes the window down when a card ends — CLOSED by NS-2 for the card's own
-   end.** The main process's half of the channel now arms the *same* clock the card
-   document's own view arms, from the same lifetime cell and through the same
-   `armCardExpiry`; when it elapses it sends the removal through the channel and calls the
-   host's own `hide()`. Two arms of one interval, not two policies: the document's arm
-   takes the card out of the document, the main process's arm takes the *window* down, and
-   only the main process can do that. A needs-you cell arms nothing at all, so a block
-   somebody is waiting on cannot be timed out (NT-FR-08, NT-FR-10). **Proven** by
-   `tests/notify/surface-channel.test.ts` over a real host and a real channel with the
+   end, and by NS-3 for the hub's two.** The main process's half of the channel now arms
+   the *same* clock the card document's own view arms, from the same lifetime cell and
+   through the same `armCardExpiry`; when it elapses it sends the removal through the
+   channel and calls the host's own `hide()`. Two arms of one interval, not two policies:
+   the document's arm takes the card out of the document, the main process's arm takes the
+   *window* down, and only the main process can do that. A needs-you cell arms nothing at
+   all, so a block somebody is waiting on cannot be timed out (NT-FR-08, NT-FR-10). **Proven**
+   by `tests/notify/surface-channel.test.ts` over a real host and a real channel with the
    clock injected: the interval is the table's own, the removal names `expired`, `hide()`
-   is called once, and a needs-you card arms nothing. What remains open is the same
-   acknowledgement edge as item 4: when *that* arrives, the window comes down through this
-   same path.
+   is called once, and a needs-you card arms nothing. The acknowledgement edge that was
+   open here is now the dismissal above, and it ends in this same path: the same
+   `endCard`, the same `hide()`.
 6. **The `not-wired` reason has nowhere to go.** `startHub` defaults `onDiagnostic` to a
    no-op and `startElectronMain` passes none, so the diagnostic the composition root emits
    when it finds no renderer is written nowhere at all. **Observed:** the run captured the
@@ -366,9 +370,13 @@ they are written down instead of being fixed by a second writer:
    delivery was is the policy's own ledger and counts, which are correct. Giving the
    pipeline's port a third answer (so a refusal is neither delivered nor failed) is a
    change to `src/hub/ingest-service.ts`'s contract, which is hub-engineer's.
-2. **Nothing tells the card surface that a block was acknowledged.** The ack route has no
-   notifier hook, so a needs-you card currently leaves the screen when its window is
-   destroyed — correct at shutdown, not yet correct mid-run. See section 4, items 4 and 5.
+2. **Nothing tells the card surface that a block was acknowledged — CLOSED by NS-3.** The
+   ack route now holds a narrow dismissal port (`HubServices.dismissal`) and calls it after
+   a successful acknowledgement, and the hub's live state feed calls the same object when a
+   harness resolution clears a pending item, so a needs-you card comes down mid-run through
+   the channel's `dismiss` and the host's own `hide`. It is *not* a notifier hook: the port
+   cannot show a card, cannot deliver anything and cannot change a record, and it is only
+   reachable from the two places above. See section 4, items 4 and 5.
 
 ## 8. What the live run actually observed
 
@@ -450,7 +458,7 @@ product's own documented injection point:
 | --- | --- | --- |
 | the card document | `src/dashboard/card.html` did not exist; `GET /card.html` was a 404 | a run-time document, stylesheet and module entry in a copy of the built dashboard. The card those two files show is mounted by the **product's own compiled card view** — `card-view.js`, `card.js` and `lifetime.js` copied byte for byte out of `dist/main/notify/surface/`, and the evidence file records `identicalToTheBuild: true` for each. **Superseded:** the product's own document is a build entry now (section 4, item 1) |
 | the main-to-renderer channel | no `DesktopBridge.renderCard`, and the renderer had `contextIsolation`, no `nodeIntegration`, `sandbox: true` and no preload | `webContents.executeJavaScript` into the product's own window. The renderer options were **not** touched: they came from the product's own frozen `SURFACE_WINDOW_OPTIONS`. The channel shape was recorded as a required product change with an owner, not adopted as the answer. **Superseded, and deliberately not adopted:** the product now uses a preload with a context bridge, and `executeJavaScript` is asserted to appear nowhere under `src` (section 4, item 2) |
-| the acknowledgement signal | `POST /api/ack/:eventId` had no notifier hook, and nothing took the window down when a card ended | the hub's own pending accessor watched by the run, which then calls the card view's own `remove('acknowledged')` and the host's own `hide()` — **only after** the product's card view has reported an end the product's lifetime cell names. **Half superseded:** the window now comes down on the card's own end (section 4, item 5); the acknowledgement *signal* is still open (item 4) |
+| the acknowledgement signal | `POST /api/ack/:eventId` had no notifier hook, and nothing took the window down when a card ended | the hub's own pending accessor watched by the run, which then calls the card view's own `remove('acknowledged')` and the host's own `hide()` — **only after** the product's card view has reported an end the product's lifetime cell names. **Superseded:** the product now has the signal itself — the ack route's dismissal port, and the live state feed for a harness resolution — and it ends in the channel's own `dismiss` and the host's own `hide` (section 4, item 4) |
 
 Everything else was the product's, unmodified and unstubbed: the real built `startHub`,
 the real loopback server and every real route, the real ingest classifier, the real class
@@ -628,10 +636,11 @@ own. That is NT-FR-12's first two clauses observed rather than asserted.
 - **No word was read.** The capture counts distinct values in the drawable, which separates
   a painted card from a blank rectangle. Legibility at the real size, real font metrics and
   real contrast remain a manual step on every platform, including this one.
-- **The acknowledgement edge was not exercised.** The run was ended by its own deadline
-  before an `ack` was issued, so nothing here says what happens to a card when its block is
-  acknowledged mid-run. That edge is still open (section 4, item 4) and it is the same open
-  edge in both harnessed and shipped paths.
+- **The acknowledgement edge was not exercised by that run.** The run was ended by its own
+  deadline before an `ack` was issued, so nothing *in that capture* says what happens to a
+  card when its block is acknowledged mid-run. The product's own edge is built and unit
+  proven (section 4, item 4); what is still missing is a **desktop** observation of it, and
+  that is what NS-4's re-run of the section 8 harness against the shipped build is for.
 - **No pointer was moved**, so click-through and its release are unobserved here, as they
   are in 8.4. `showInactive`'s focus behaviour is unobserved, because the X server exposes
   no focus reading for a card window on this desktop.
