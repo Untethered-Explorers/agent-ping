@@ -1,10 +1,10 @@
 # Project Progress
 
 ## Current State
-**Phase**: NOTIFICATION-AND-TRAY-PRESENCE-4
+**Phase**: COPILOT-CLI-ACP-SPIKE-2
 **Status**: In Progress
 **Validation Gaps**: 104 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-27T15:56:53.605Z
+**Last Updated**: 2026-09-27T15:56:53.849Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -74,6 +74,8 @@
   - Files: scripts/probe-copilot-acp.mjs, tests/scripts/probe-copilot-acp.test.ts, docs/research/copilot-acp-capture.json, tests/scripts/fixtures/copilot-acp-capture.json
 - [x] Phase COPILOT-CLI-ACP-SPIKE-1, Task CP-2: Probe the Copilot hook surface and write the report (@connector-engineer)
   - Files: scripts/probe-copilot-hooks.mjs, docs/research/copilot-acp-probe.md, docs/research/copilot-hooks-capture.json, tests/scripts/fixtures/copilot-hooks-capture.json, tests/scripts/probe-copilot-hooks.test.ts
+- [x] Phase COPILOT-CLI-ACP-SPIKE-2, Task CP-3: Decide whether a Copilot adapter is authorised
+  - Files: docs/reviews/copilot-gate.json
 
 ## Current Task
 - None currently running
