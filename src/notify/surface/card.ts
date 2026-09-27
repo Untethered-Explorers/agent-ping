@@ -51,9 +51,11 @@
 //
 // VERIFICATION STATE, STATED THE SAME WAY IN EVERY FILE HERE
 // Implemented and unit-tested. Not live-verified on the authoring machine: no card has
-// been observed on any desktop from this checkout, because the card document the host
-// window loads does not exist in the built artefacts yet. NT-9 drives a real card and
-// owns that observation; nothing in the tests claims a card was seen on a screen.
+// been observed on any desktop from this checkout, because nothing yet carries a model
+// from the hub into the card document the host window loads - the document is in the
+// build (`dist/dashboard/card.html`) and the channel to it is not. NT-9 drives a real
+// card and owns that observation; nothing in the tests claims a card was seen on a
+// screen.
 
 import type { NotificationPlan } from '../policy.js'
 import type { NotificationUrgency } from '../types.js'

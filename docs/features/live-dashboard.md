@@ -234,7 +234,7 @@ Task review table, kept outside the phase contracts as authoring evidence.
   "id": "LD-5",
   "title": "Review the primary dashboard journey",
   "description": "Human review of the live dashboard as the surface the developer actually lands on. Complete the primary journey end to end against the running system with a real pending block: notice the card or the badge, open the dashboard from the card's deep link and again from the tray, identify which repository is asking, read the blocked row, acknowledge it, and hand the session off to a terminal. Confirm that the dashboard opened focused on the right session each time and that the pending count matched the badge throughout. Then repeat the journey with the keyboard only, and once more with a screen reader if available, and record what each pass could and could not reach. Judge whether the approved design survived contact with real data, including repositories with many sessions and a long history. Record every observation and the verdict in the review file, listing any required change rather than making it. Do not change code in this task.",
-  "dependencies": ["LD-4", "NT-9", "DP-4"],
+  "dependencies": ["LD-4", "NS-4", "DP-4"],
   "expectedOutputs": [],
   "validationCommands": [],
   "contract": {

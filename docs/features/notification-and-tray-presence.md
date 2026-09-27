@@ -20,6 +20,7 @@
 | NT-FR-09 | This feature | owns |
 | NT-FR-10 | This feature | owns |
 | NT-FR-11 | This feature | owns |
+| NT-FR-12 | This feature | owns |
 
 **PRD:** [docs/PRD.md](../PRD.md)
 **Decision of record:** [ADR-012 — The surface is rendered by agent-ping, not the platform](../adr/ADR-012-surface-is-rendered-by-agent-ping.md)
@@ -44,6 +45,26 @@ against the one implementation that now exists.
 The requirement IDs `NT-FR-01` through `NT-FR-04` are **repurposed, not deleted**, so
 that the contracts of the already-complete Phase 1 and Phase 2 tasks still resolve.
 Each now states something the current design actually requires.
+
+### The gap NT-9 found, and Phase 4
+
+NT-6, NT-7 and NT-8 each passed every gate, and together they still could not put a card
+on a developer's screen. NT-9 proved it rather than hiding it: its evidence file records
+`delivery.status: 'not-wired'`, `cardDocument: { path: '/card.html', status: 404 }` and
+`cardWindowOnTheDisplay: 'no-card-window'`, and it supplied three seams itself to run the
+journeys at all.
+
+| Missing | Why nothing built it | Owner of the fix |
+|---|---|---|
+| The card document | NT-6 was told to *load* a card document over loopback. Nobody was told to *create* one; IO-1 was told to assert it exists. | NS-1 |
+| The main-to-renderer channel | `webPreferences` is `contextIsolation: true, nodeIntegration: false, sandbox: true` with no preload, so no card model can reach a document. NT-7 built the view and nothing could hand it a model. | NS-2 |
+| The acknowledgement hook | `POST /api/ack/:eventId` never reaches the notifier, so the `acknowledged` end that the lifetime table names was produced by nobody. | NS-3 |
+
+This is a defect in the Phase 3 task contracts, not in the work: each of them was
+individually correct and collectively incomplete, and all three passed. The reason is now
+`NT-FR-12`, which makes "with no seam supplied by a test" a requirement rather than
+something a verification script has to notice for itself. NS-4 is the re-proof, and it is
+the first task in this feature whose assertion is that the *shipped* build works.
 
 ---
 
@@ -114,6 +135,10 @@ Each now states something the current design actually requires.
 {"id":"NT-FR-11","kind":"requirement","text":"A test asserts the notification path contains no platform notification mechanism: no notification API, no spawned notification command, no per-platform branch, and none of the names of the tools that were removed. The change of track is enforced by the suite rather than promised in prose."}
 ```
 
+```forge-requirement
+{"id":"NT-FR-12","kind":"requirement","text":"A real block produces a real card on a real desktop with no seam supplied by a test: the card document is in the built artefacts and served by the hub, the card model reaches that document across a channel that leaves contextIsolation, nodeIntegration and the renderer sandbox in force, and acknowledging or resolving the block takes the card off the screen. A verification script that has to substitute for any of those three is measuring the script, not the product."}
+```
+
 **Priority:** every requirement in this feature is Must. `NT-FR-03` and `NT-FR-04` were
 Should in version 1.0 because they could only be confirmed on their own platforms; with
 one implementation they are Must, and what remains unverifiable from Linux is narrower
@@ -156,6 +181,10 @@ Task review table, kept outside the phase contracts as authoring evidence.
 | NT-7 | A card is rendered as DOM with a lifetime this product owns | notification-engineer | NT-6 | src/notify/surface/lifetime.ts, card.ts, card-view.ts, tests/notify/surface-lifetime.test.ts, surface-card.test.ts, surface-card-view.test.ts | pure lifetime table; focus and accessible-name assertions; no-platform-mechanism source sweep | No delivery wiring, no deletion of the old notifiers |
 | NT-8 | Delivery reaches the surface and the platform notifiers are gone | notification-engineer | NT-7, HC-5 | src/notify/types.ts, policy.ts, registry.ts, src/main/index.ts, tests/notify/policy.test.ts, tests/hub/tray.test.ts, docs/runbooks/notification-surface.md; **deleted** src/notify/linux.ts, macos.ts, windows.ts, command.ts and their four test files and docs/runbooks/notify-platforms.md | no-platform-mechanism sweep; refused-class counter test; deep-link agreement test | No new window work, no dashboard |
 | NT-9 | A script proves a real card on a real desktop, or the run stops | qa-engineer | NT-8, HC-1 | scripts/verify-notification-surface.mjs, docs/reviews/notification-surface-evidence.json, docs/runbooks/notification-surface.md | machine-readable summary, non-zero exit on any failed assertion | No product code changes; records required changes instead |
+| NS-1 | The card document is built and served, and is not a dashboard open | dashboard-engineer | NT-6, NT-7 | src/dashboard/card.html, card.css, card-main.ts, vite.config.ts, tests/dashboard/card-document.test.ts | build-output shape, real socket 200 + CSP, dashboard-open invariant, browser-safe import closure | No renderer channel, no ack |
+| NS-2 | A card model crosses into the sandboxed document, and delivery stops being not-wired | notification-engineer | NS-1 | src/notify/surface/channel.ts, preload.ts, electron-host.ts, src/main/index.ts, tests/notify/surface-channel.test.ts | closed bridge shape, content-free payload, hardened preferences still in force, wired delivery | No ack hook |
+| NS-3 | Acknowledging or resolving a block takes its card off the screen | hub-engineer | NS-2 | src/hub/routes/ack.ts, routes/read.ts, src/main/index.ts, src/notify/surface/dismissal.ts, tests/hub/ack.test.ts, tests/notify/surface-dismissal.test.ts | real ingest→card→ack→gone, both ends, unchanged route and counter surface | No new route, no counter |
+| NS-4 | The shipped build shows a card with no seam supplied by a test | qa-engineer | NS-3 | scripts/verify-notification-surface.mjs, docs/reviews/notification-surface-evidence.json, docs/runbooks/notification-surface.md | asserted shipped posture, harness seams deleted, journeys intact | No product code changes |
 
 ### Phase 1: Notifier and toast policy
 
@@ -379,6 +408,149 @@ usable and the unprivileged user-namespace fallback is blocked by AppArmor on Ub
 }
 ```
 
+### Phase 4: Closing the delivery path
+
+Phase 4 exists because Phase 3's three implementation tasks each passed every gate and
+collectively could not deliver a card. The three gaps and their owners are recorded above
+under "The gap NT-9 found". Read that table before starting: each task below exists
+because a specific thing was missing, and the acceptance criteria name the existing
+seam each one must attach to rather than describing the feature again.
+
+Two constraints shape all four. First, `NT-FR-10` still holds: the host window may keep
+existing between cards, but nothing may occupy screen space when no card is showing, so
+every dismissal path ends in the host's `hide()`. Second, nothing here may widen the
+product's control surface — the ack route stays the only route that changes a record, and
+the card channel is one-way plus a dismissal, never a third route.
+
+NS-2 carries an instruction that is unusual and deliberate: it must **amend two of NT-6's
+own assertions**. `tests/notify/surface-host.test.ts` freezes `SURFACE_WINDOW_OPTIONS` and
+requires `webPreferences` to equal exactly `{ contextIsolation: true, nodeIntegration:
+false, sandbox: true }`. Adding the preload path that a channel needs breaks that
+equality. The change is correct and the assertion is stale, so update the assertion and
+say in the commit and the report that it was changed on purpose. Do not add a sixth method
+to `NotificationSurfaceHost` — a second test enumerates that interface from source and
+requires exactly five.
+
+```forge-task
+{
+  "id": "NS-1",
+  "title": "Build and serve the card document",
+  "description": "Give the product a card document, so the loopback URL the surface already requests stops being a 404. Add src/dashboard/card.html as a third rollupOptions input entry in vite.config.ts beside index and prototype, which makes the build emit dist/dashboard/card.html at exactly the path SURFACE_DOCUMENT_PATH already names. Write the document to the shape the project's own verification script demands of a card page and to the shape the hub's content-security-policy permits: a linked stylesheet at /card.css, a module script with a src, no inline style attribute, no inline script, no unsafe-inline anywhere, because DASHBOARD_CSP is style-src 'self' and script-src 'self' and LD-1 already found a served page refused for injecting one. Add the stylesheet and the entry module alongside the document. The entry imports the product's own createCardView from TypeScript source through the vite @ alias rather than copying compiled output in from dist/main, so there is no second build of the same module and no copy step; assert that this import closure is browser-safe, because nothing in the repository tests that today and a node import would fail only at runtime in a renderer. Make no server change: the dashboard route is registered as the fallback for every GET path, .html is already in the content-type table, and the card document already arrives with DASHBOARD_CSP and nosniff. Prove the dashboard-open invariant explicitly rather than assuming it: isDashboardDocumentPath is a closed two-entry list and /card.html is not in it, so a served card must not move the counter that backs the unprompted-pull metric. Keep the two existing pages byte-for-byte unchanged; this adds a third, it does not reshape the first two. Exclude the renderer channel and the acknowledgement hook.",
+  "ownerAgent": "dashboard-engineer",
+  "dependencies": ["NT-6", "NT-7"],
+  "expectedOutputs": ["src/dashboard/card.html", "src/dashboard/card.css", "src/dashboard/card-main.ts", "vite.config.ts", "tests/dashboard/card-document.test.ts", "tests/hub/server.test.ts", "tests/hub/metrics.test.ts"],
+  "validationCommands": ["npm test -- tests/dashboard/card-document.test.ts", "npm run typecheck"],
+  "contract": {
+    "version": 2,
+    "kind": "implementation",
+    "requirements": [],
+    "requirementRefs": ["docs/features/notification-and-tray-presence.md#NT-FR-02", "docs/features/notification-and-tray-presence.md#NT-FR-10", "docs/features/notification-and-tray-presence.md#NT-FR-12"],
+    "acceptanceCriteria": [
+      "After npm run build:dashboard the built dist/dashboard/card.html exists, and contains a linked stylesheet and a module script with a src, and matches neither a style attribute nor an inline script element",
+      "A test drives GET /card.html over a real loopback socket and asserts 200 with content-type text/html; charset=utf-8, the full DASHBOARD_CSP header, and no unsafe-inline in it",
+      "A test serves the card document and asserts dashboard_opens does not move, and the pure isDashboardDocumentPath test carries /card.html in its negative list",
+      "A test asserts the card entry's import closure resolves through the vite @ alias with no node: import, no child_process and no filesystem access, and that no copy step is involved",
+      "A test asserts the built artefact set is index.html, prototype/index.html and card.html, and that the first two are unchanged by this task",
+      "A test asserts the card document requests the product's own createCardView rather than a copy of compiled output"
+    ],
+    "constraints": ["No inline style or inline script: the hub's content-security-policy forbids both and is never weakened", "Exactly one mutating route exists, the ack route", "The surface occupies no screen space when nothing is showing"],
+    "constraintRefs": ["docs/PRD.md#APX-CON-08"],
+    "references": ["docs/features/notification-and-tray-presence.md#0. What changed in version 1.1, and what is already built", "docs/reviews/notification-surface-evidence.json", "docs/adr/ADR-012-surface-is-rendered-by-agent-ping.md"]
+  }
+}
+```
+
+```forge-task
+{
+  "id": "NS-2",
+  "title": "Open the renderer channel and wire the card presenter",
+  "description": "Build the half that has no precedent in this product: a way for a card model to reach a document running under contextIsolation true, nodeIntegration false and sandbox true with no preload, which today is impossible, and then supply DesktopBridge.renderCard so delivery stops reporting itself not-wired. The seam already exists and is already read: DesktopBridge declares renderCard as an optional CardPresenter and the composition root passes options.desktop.renderCard into resolveSurfaceNotifier, so a run whose bridge supplies it is wired and a run whose bridge omits it is the not-wired case NT-9 recorded. Extend the BrowserWindowLike slice with the webContents members the channel needs and the ElectronModuleLike structural interface with the ipcMain members it needs; both are declared structurally in this repository precisely so they can grow without taking a dependency on Electron. Add a preload module and reference it from SURFACE_WINDOW_OPTIONS.webPreferences. You must then amend two of NT-6's own assertions on purpose: the frozen webPreferences equality and the exact top-level key check in tests/notify/surface-host.test.ts both exclude the preload path this task requires. Say in your report and your commit that you changed them deliberately and why. Do not add a sixth method to NotificationSurfaceHost; a second test enumerates that interface from source and requires exactly probe, show, hide, setClickThrough and destroy, and the acknowledgement belongs on a dismissal port rather than on the host. The channel exposes one global whose surface is exactly two calls, show and remove, carrying a CardModel and a CardLifetimeCell and nothing else; both are plain data and the payload must be asserted content-free, because a channel is a hole in the isolation boundary and the boundary is the reason this product can be trusted with a developer's screen. Leave contextIsolation, nodeIntegration and the renderer sandbox in force, keep the options object frozen, and add no executeJavaScript and no webSettings change anywhere in src. Exclude the acknowledgement hook.",
+  "ownerAgent": "notification-engineer",
+  "dependencies": ["NS-1"],
+  "expectedOutputs": ["src/notify/surface/channel.ts", "src/notify/surface/preload.ts", "src/notify/surface/electron-host.ts", "src/main/index.ts", "tests/notify/surface-channel.test.ts", "tests/notify/surface-host.test.ts"],
+  "validationCommands": ["npm test -- tests/notify/surface-channel.test.ts tests/notify/surface-host.test.ts", "npm run typecheck"],
+  "contract": {
+    "version": 2,
+    "kind": "implementation",
+    "requirements": [],
+    "requirementRefs": ["docs/PRD.md#APX-FR-01", "docs/features/notification-and-tray-presence.md#NT-FR-02", "docs/features/notification-and-tray-presence.md#NT-FR-04", "docs/features/notification-and-tray-presence.md#NT-FR-10", "docs/features/notification-and-tray-presence.md#NT-FR-11", "docs/features/notification-and-tray-presence.md#NT-FR-12"],
+    "acceptanceCriteria": [
+      "A test asserts the electron DesktopBridge supplies renderCard, and a run with it reports delivery status wired with a real posted block counted as delivered",
+      "A test asserts the context bridge exposes exactly one global whose key set is exactly remove and show",
+      "A test asserts show and remove carry exactly a CardModel and a CardLifetimeCell, and that the payload contains no path, session identifier, harness name or conversation content",
+      "A test asserts contextIsolation true, nodeIntegration false and sandbox true are all still present after the change and that the options object is still frozen",
+      "A test asserts no executeJavaScript and no webSecurity change exists anywhere under src",
+      "A test asserts NotificationSurfaceHost still exposes exactly probe, show, hide, setClickThrough and destroy, and that the host interface was not widened",
+      "A test asserts a card rendered through the real channel carries role=status, aria-live, an aria-label, a tabindex, data-urgency and data-lifetime, and no inline style",
+      "A test asserts a card that ends is removed through the channel and the host window is hidden, so nothing occupies screen space"
+    ],
+    "constraints": ["The system never stores or transmits conversation content", "No telemetry leaves the machine", "No platform notification mechanism is used on any platform", "The surface occupies no screen space when nothing is showing"],
+    "constraintRefs": ["docs/PRD.md#APX-CON-12"],
+    "references": ["docs/features/notification-and-tray-presence.md#0. What changed in version 1.1, and what is already built", "docs/reviews/notification-surface-evidence.json", "src/notify/registry.ts", "docs/adr/ADR-002-loopback-only-single-mutating-route.md"]
+  }
+}
+```
+
+```forge-task
+{
+  "id": "NS-3",
+  "title": "Take the card down when its block ends",
+  "description": "Make the end that the lifetime table already names actually happen. CARD_LIFETIMES gives the needs-you cell the ends resolved and acknowledged, card-view removes on either, and card-view re-exports CARD_ENDS with a comment saying a caller wiring the hub's acknowledgement needs one import; today no path produces either, so a card would leave the screen only when its window was destroyed at shutdown. Both triggers are yours. The first is the ack route: after a successful acknowledgement of a needs-you item, dismiss its card with the end acknowledged. The second needs no route at all, because a resolution arrives as an ordinary ingested event whose class the policy refuses, so the card must come down from the pending-set transition that dropped the session it was showing. Add one narrow dismissal port to HubServices and call it from those two places. Do not widen HubServices.delivery, which is narrowed to status() on purpose precisely so that a route calling deliver is a compile error, and do not grow a writer into routes/read.ts, which is held to containing none. The composition root builds its services object twice, once before the socket is bound and once after, and both must gain the field or the port will be absent in one of the two runs. Keep the route surface byte-identical: the ack route stays the only route that changes a record, its 200 body keeps the same key set, a refused or unauthorised or not-found acknowledgement removes nothing, and the whole-log diff that walks every registered route and method must still be empty. Dismissal must not record a counter, because src/hub/metrics.ts is asserted to be the only caller of a counter write in the product. Every dismissal ends in the host's hide so NT-FR-10 holds, is idempotent, and is a no-op rather than an error for a session with no card showing. Exclude any new route and any new counter.",
+  "ownerAgent": "hub-engineer",
+  "dependencies": ["NS-2"],
+  "expectedOutputs": ["src/hub/routes/ack.ts", "src/hub/routes/read.ts", "src/main/index.ts", "src/notify/surface/dismissal.ts", "tests/hub/ack.test.ts", "tests/notify/surface-dismissal.test.ts"],
+  "validationCommands": ["npm test -- tests/hub/ack.test.ts tests/notify/surface-dismissal.test.ts", "npm run typecheck"],
+  "contract": {
+    "version": 2,
+    "kind": "implementation",
+    "requirements": [],
+    "requirementRefs": ["docs/PRD.md#APX-FR-02", "docs/features/notification-and-tray-presence.md#NT-FR-07", "docs/features/notification-and-tray-presence.md#NT-FR-09", "docs/features/notification-and-tray-presence.md#NT-FR-10", "docs/features/notification-and-tray-presence.md#NT-FR-12"],
+    "acceptanceCriteria": [
+      "A test drives a real ingest of a needs-you event, then a real POST /api/ack/:eventId carrying the per-install token, and asserts the card is removed with the end acknowledged and the host window is hidden",
+      "A test drives a harness resolution of the same session and asserts the card is removed with the end resolved, with no route involved",
+      "A test asserts acknowledged and resolved are the only ends this path produces and that both are members of the needs-you cell's own ends",
+      "A test asserts an unauthorised, rejected and not-found acknowledgement each remove nothing and change nothing",
+      "A test asserts the ack route's 200 body key set is unchanged, the whole-log diff across every registered route and method is still empty, and the exact registered route-signature list is unchanged",
+      "A test asserts src/hub/metrics.ts is still the only caller of a counter write and that a dismissal records none",
+      "A test asserts dismissal is idempotent and that dismissing a session with no card showing is a no-op rather than an error",
+      "A test asserts the expired end still removes a finished card, so all five ends in CARD_ENDS are reachable in one run",
+      "A test asserts the dismissal port is present in both the pre-bind and post-bind services objects the composition root builds"
+    ],
+    "constraints": ["Exactly one mutating route exists, the ack route", "The hub binds to 127.0.0.1 only", "A delivery failure is never silent", "The surface occupies no screen space when nothing is showing"],
+    "constraintRefs": ["docs/PRD.md#APX-CON-08", "docs/PRD.md#APX-CON-01"],
+    "references": ["docs/features/notification-and-tray-presence.md#0. What changed in version 1.1, and what is already built", "docs/reviews/notification-surface-evidence.json", "docs/adr/ADR-010-delivery-failure-is-never-silent.md", "src/notify/surface/lifetime.ts"]
+  }
+}
+```
+
+```forge-task
+{
+  "id": "NS-4",
+  "title": "Re-prove the card on the shipped build",
+  "description": "NT-9 proved a card and, in the same evidence file, recorded that the product as shipped cannot show one: it asserted nothing about shipped posture on purpose, because a build that had grown a card document would have turned that assertion into a false alarm, and it supplied the card document, the renderer channel and the acknowledgement path itself. The product has those three now, so the withheld assertion becomes real. Reuse NT-9's script, its evidence schema and its journeys, and change exactly this: assert the shipped posture instead of recording it. Start the real built entry point against a state directory of its own, post a real block, and assert that a card window appears on the display with no seam supplied — then delete the harness's own card document, its stylesheet, its entry module and its executeJavaScript bridge, so the run cannot silently fall back to them and a green result cannot mean the harness did the work again. A source-level test asserts those three implementations are gone from the script rather than merely unused. Keep every existing journey, and keep the reverse case that matters most: a session that opens, greets and closes must create no window and no card. Record the three previously-required product changes as closed, and name anything still unverified rather than letting the evidence imply otherwise. Exclude product code changes; record required changes instead.",
+  "ownerAgent": "qa-engineer",
+  "dependencies": ["NS-3"],
+  "expectedOutputs": ["scripts/verify-notification-surface.mjs", "docs/reviews/notification-surface-evidence.json", "docs/runbooks/notification-surface.md"],
+  "validationCommands": ["npm run typecheck"],
+  "contract": {
+    "version": 2,
+    "kind": "implementation",
+    "requirements": [],
+    "requirementRefs": ["docs/features/notification-and-tray-presence.md#NT-FR-12", "docs/features/notification-and-tray-presence.md#NT-FR-08", "docs/features/notification-and-tray-presence.md#NT-FR-10"],
+    "acceptanceCriteria": [
+      "The evidence file records shippedPosture asserted as true, and the shipped build shows a card window on the display with none of the three seams supplied",
+      "A source-level test asserts the verification script no longer contains the card document, the stylesheet, the entry module or the executeJavaScript bridge it used to substitute",
+      "The needs-you, finished and greeting-and-close journeys all still pass, and the reverse case still proves no window and no card are created for a session that did no work",
+      "The evidence file records the card-document, renderer-channel and acknowledgement-hook gaps as closed by the tasks that closed them, and names anything still unverified",
+      "The script exits non-zero on any failed assertion, treats a missing display or a missing Electron binary as a failure rather than a skip, and has no path that reports success when nothing ran"
+    ],
+    "constraints": ["A subjective visual judgement never stands alone; the journey must have been performed on the running system", "Never invent passing results, tool availability, deployed resources, human review or compliance"],
+    "constraintRefs": ["docs/PRD.md#APX-CON-06", "docs/PRD.md#APX-CON-12"],
+    "references": ["docs/research/electron-surface-preflight.json", "docs/features/notification-and-tray-presence.md#0. What changed in version 1.1, and what is already built"]
+  }
+}
+```
+
 ---
 
 ## 6. Testing Strategy
@@ -389,7 +561,9 @@ usable and the unprivileged user-namespace fallback is blocked by AppArmor on Ub
 | Unit | Card view semantics | jsdom over the real view: focusability, accessible name, attribute-written state |
 | Unit | Absence of platform integration | Source sweep across `src/notify/**` for notification APIs, spawn calls, per-platform tool names and inline styles |
 | Integration | Surface wiring, degraded mount, refused class | Real hub through the main entry point with an injected or refused host bridge |
-| Live | A real card on a real desktop | NT-9's script, which fails loudly rather than skipping |
+| Integration | The delivery path end to end | A real ingest produces a card, a real ack removes it, a real resolution removes it |
+| Unit | The renderer channel | A closed bridge key set, a content-free payload, and the hardened preferences still in force after the preload lands |
+| Live | A real card on a real desktop, from the shipped build | NS-4's script, which asserts the shipped posture and fails loudly rather than skipping |
 | Manual | macOS and Windows window-manager behaviour | Documented manual steps only; recorded as unverified, never as passed |
 | Regression | No repeat, no sound, no platform call | Policy tests plus the source sweeps above |
 
@@ -401,6 +575,10 @@ Key test scenarios:
 4. A desktop that refuses the window leaves the hub serving with delivery not-wired.
 5. The tray menu exposes exactly two actions and no suppression control.
 6. No notification API call, spawn or per-platform tool name exists anywhere on the notification path.
+7. `GET /card.html` answers 200 with the hub's content-security-policy, and serving it moves no counter.
+8. A card model crosses into the document across a bridge of exactly two calls, carrying only a card model and a lifetime cell.
+9. A real acknowledgement and a real resolution each remove the card with the end the lifetime table names, and leave the route surface and the counter surface unchanged.
+10. A green verification run means the shipped build showed a card, because the seams the script used to substitute are asserted gone.
 
 ---
 
@@ -412,7 +590,8 @@ Key test scenarios:
 4. Every card deep-links to its session, the tray resolves the same link, and opening it focuses the session.
 5. One implementation serves all three platforms, with no per-platform notification code path and a test that proves it.
 6. The operating system's notification service is never involved, and a test proves it.
-7. NT-9's evidence file records a real card rendered, persisting and clearing on the authoring machine, and records the greeting-and-close case producing nothing at all.
+7. NS-4's evidence file records a real card rendered, persisting and clearing on the authoring machine **from the shipped build with no seam supplied by the test**, and records the greeting-and-close case producing nothing at all.
+8. Every one of the five ends in `CARD_ENDS` is reachable in a run, and every dismissal ends with the host window hidden.
 
 ---
 
@@ -425,4 +604,5 @@ Key test scenarios:
 | 3 | What Chromium process-sandbox launch policy does an unprivileged per-user install use? | The pre-flight measured the answer: the installed helper is unusable and the AppArmor-restricted user-namespace fallback is blocked, so a per-user install passes `--no-sandbox`. NT-6 must assert the choice rather than inherit a default that aborts |
 | 4 | Should a card be click-through, or should it take the pointer? | Click-through until the pointer reaches it, so a card cannot swallow a click meant for the window underneath; NT-6 makes both directions of that switch explicit |
 | 5 | Is the historical counter name `toast_deliveries` worth renaming now that no toast exists? | Deferred. Renaming a persisted counter pulls the content-free schema guard into this track change for no functional gain. Recorded as a known misnomer and left for its own change |
+| 7 | Is a preload the right channel, or should the card document poll a loopback route instead? | Preload and context bridge, because the document runs under `sandbox: true` where `ipcRenderer` is unreachable without one, and a new polled route would widen a surface that a test pins as exactly ten routes. Reconsider only if the preload cannot be kept content-free, which NS-2 asserts it is |
 | 6 | Is quitting from the tray menu still safe with a card showing? | Yes, and now for a stronger reason: the card is a rendering of durable pending state rather than a thing that exists only while a process runs, so the pending item and its badge return after restart |

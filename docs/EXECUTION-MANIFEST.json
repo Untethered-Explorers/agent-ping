@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generatedAt": "2026-09-27T07:18:54.147Z",
+  "generatedAt": "2026-09-27T13:58:17.951Z",
   "granularity": "fine",
   "sourceLayout": "features",
   "repoRoot": "/home/mcfuzzysquirrel/Projects/agent-ping",
@@ -1510,6 +1510,309 @@
       ]
     },
     {
+      "id": "NOTIFICATION-AND-TRAY-PRESENCE-4",
+      "title": "Phase 4: Closing the delivery path",
+      "feature": "Notification and Tray Presence",
+      "description": "Phase 4 exists because Phase 3's three implementation tasks each passed every gate and collectively could not deliver a card. The three gaps and their owners are recorded above under \"The gap NT-9 found\". Read that table before starting: each task below exists",
+      "ownerAgents": [
+        "dashboard-engineer",
+        "notification-engineer",
+        "hub-engineer",
+        "qa-engineer"
+      ],
+      "dependencies": [
+        "NOTIFICATION-AND-TRAY-PRESENCE-3"
+      ],
+      "approvalRequired": true,
+      "tasks": [
+        {
+          "id": "NS-1",
+          "title": "Build and serve the card document",
+          "description": "Give the product a card document, so the loopback URL the surface already requests stops being a 404. Add src/dashboard/card.html as a third rollupOptions input entry in vite.config.ts beside index and prototype, which makes the build emit dist/dashboard/card.html at exactly the path SURFACE_DOCUMENT_PATH already names. Write the document to the shape the project's own verification script demands of a card page and to the shape the hub's content-security-policy permits: a linked stylesheet at /card.css, a module script with a src, no inline style attribute, no inline script, no unsafe-inline anywhere, because DASHBOARD_CSP is style-src 'self' and script-src 'self' and LD-1 already found a served page refused for injecting one. Add the stylesheet and the entry module alongside the document. The entry imports the product's own createCardView from TypeScript source through the vite @ alias rather than copying compiled output in from dist/main, so there is no second build of the same module and no copy step; assert that this import closure is browser-safe, because nothing in the repository tests that today and a node import would fail only at runtime in a renderer. Make no server change: the dashboard route is registered as the fallback for every GET path, .html is already in the content-type table, and the card document already arrives with DASHBOARD_CSP and nosniff. Prove the dashboard-open invariant explicitly rather than assuming it: isDashboardDocumentPath is a closed two-entry list and /card.html is not in it, so a served card must not move the counter that backs the unprompted-pull metric. Keep the two existing pages byte-for-byte unchanged; this adds a third, it does not reshape the first two. Exclude the renderer channel and the acknowledgement hook.",
+          "ownerAgent": "dashboard-engineer",
+          "dependencies": [
+            "NT-6",
+            "NT-7"
+          ],
+          "expectedOutputs": [
+            "src/dashboard/card.html",
+            "src/dashboard/card.css",
+            "src/dashboard/card-main.ts",
+            "vite.config.ts",
+            "tests/dashboard/card-document.test.ts",
+            "tests/hub/server.test.ts",
+            "tests/hub/metrics.test.ts"
+          ],
+          "validationCommands": [
+            "npm test -- tests/dashboard/card-document.test.ts",
+            "npm run typecheck"
+          ],
+          "contract": {
+            "version": 1,
+            "kind": "implementation",
+            "requirements": [
+              "NT-FR-02: A needs-you card is rendered by agent-ping itself, in a window agent-ping creates and owns, positioned inside the display work area. No platform notification service, notification centre, focus-assist mechanism or notification permission is used on any platform, and nothing is handed to the operating system to display.",
+              "NT-FR-10: The surface occupies no screen space and draws nothing when no card is showing and nothing is pending. The host window existing is not the same as the surface being visible, and the difference is what keeps this feature inside the product's quiet-by-default promise.",
+              "NT-FR-12: A real block produces a real card on a real desktop with no seam supplied by a test: the card document is in the built artefacts and served by the hub, the card model reaches that document across a channel that leaves contextIsolation, nodeIntegration and the renderer sandbox in force, and acknowledging or resolving the block takes the card off the screen. A verification script that has to substitute for any of those three is measuring the script, not the product."
+            ],
+            "acceptanceCriteria": [
+              "After npm run build:dashboard the built dist/dashboard/card.html exists, and contains a linked stylesheet and a module script with a src, and matches neither a style attribute nor an inline script element",
+              "A test drives GET /card.html over a real loopback socket and asserts 200 with content-type text/html; charset=utf-8, the full DASHBOARD_CSP header, and no unsafe-inline in it",
+              "A test serves the card document and asserts dashboard_opens does not move, and the pure isDashboardDocumentPath test carries /card.html in its negative list",
+              "A test asserts the card entry's import closure resolves through the vite @ alias with no node: import, no child_process and no filesystem access, and that no copy step is involved",
+              "A test asserts the built artefact set is index.html, prototype/index.html and card.html, and that the first two are unchanged by this task",
+              "A test asserts the card document requests the product's own createCardView rather than a copy of compiled output"
+            ],
+            "constraints": [
+              "No inline style or inline script: the hub's content-security-policy forbids both and is never weakened",
+              "Exactly one mutating route exists, the ack route",
+              "The surface occupies no screen space when nothing is showing",
+              "APX-CON-08: Exactly one mutating route exists, the ack route, and it can only mark a pending item acknowledged. No route can spawn, steer, interrupt, prompt or approve anything inside a harness."
+            ],
+            "references": [
+              "docs/features/notification-and-tray-presence.md#0. What changed in version 1.1, and what is already built",
+              "docs/reviews/notification-surface-evidence.json",
+              "docs/adr/ADR-012-surface-is-rendered-by-agent-ping.md",
+              "docs/features/notification-and-tray-presence.md#NT-FR-02",
+              "docs/features/notification-and-tray-presence.md#NT-FR-10",
+              "docs/features/notification-and-tray-presence.md#NT-FR-12",
+              "docs/PRD.md#APX-CON-08"
+            ]
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.ns-1",
+          "inputs": [
+            "work.nt-6",
+            "work.nt-7",
+            "work.nt-8",
+            "work.nt-9"
+          ],
+          "timeoutMs": 2700000
+        },
+        {
+          "id": "NS-2",
+          "title": "Open the renderer channel and wire the card presenter",
+          "description": "Build the half that has no precedent in this product: a way for a card model to reach a document running under contextIsolation true, nodeIntegration false and sandbox true with no preload, which today is impossible, and then supply DesktopBridge.renderCard so delivery stops reporting itself not-wired. The seam already exists and is already read: DesktopBridge declares renderCard as an optional CardPresenter and the composition root passes options.desktop.renderCard into resolveSurfaceNotifier, so a run whose bridge supplies it is wired and a run whose bridge omits it is the not-wired case NT-9 recorded. Extend the BrowserWindowLike slice with the webContents members the channel needs and the ElectronModuleLike structural interface with the ipcMain members it needs; both are declared structurally in this repository precisely so they can grow without taking a dependency on Electron. Add a preload module and reference it from SURFACE_WINDOW_OPTIONS.webPreferences. You must then amend two of NT-6's own assertions on purpose: the frozen webPreferences equality and the exact top-level key check in tests/notify/surface-host.test.ts both exclude the preload path this task requires. Say in your report and your commit that you changed them deliberately and why. Do not add a sixth method to NotificationSurfaceHost; a second test enumerates that interface from source and requires exactly probe, show, hide, setClickThrough and destroy, and the acknowledgement belongs on a dismissal port rather than on the host. The channel exposes one global whose surface is exactly two calls, show and remove, carrying a CardModel and a CardLifetimeCell and nothing else; both are plain data and the payload must be asserted content-free, because a channel is a hole in the isolation boundary and the boundary is the reason this product can be trusted with a developer's screen. Leave contextIsolation, nodeIntegration and the renderer sandbox in force, keep the options object frozen, and add no executeJavaScript and no webSettings change anywhere in src. Exclude the acknowledgement hook.",
+          "ownerAgent": "notification-engineer",
+          "dependencies": [
+            "NS-1"
+          ],
+          "expectedOutputs": [
+            "src/notify/surface/channel.ts",
+            "src/notify/surface/preload.ts",
+            "src/notify/surface/electron-host.ts",
+            "src/main/index.ts",
+            "tests/notify/surface-channel.test.ts",
+            "tests/notify/surface-host.test.ts"
+          ],
+          "validationCommands": [
+            "npm test -- tests/notify/surface-channel.test.ts tests/notify/surface-host.test.ts",
+            "npm run typecheck"
+          ],
+          "contract": {
+            "version": 1,
+            "kind": "implementation",
+            "requirements": [
+              "APX-FR-01: The system never stores or transmits conversation content: no prompt, response, tool output, file content or diff is written to the durable log, a log file or any outbound request. Only harness, repository short name and full path, session identifier, event class and subtype, timestamps and acknowledgement or resolution state are persisted.",
+              "NT-FR-02: A needs-you card is rendered by agent-ping itself, in a window agent-ping creates and owns, positioned inside the display work area. No platform notification service, notification centre, focus-assist mechanism or notification permission is used on any platform, and nothing is handed to the operating system to display.",
+              "NT-FR-04: The surface host window is frameless, transparent, always-on-top, absent from the taskbar or dock, unfocusable, and shown without taking keyboard focus from the developer's current work. It is created when the hub starts and destroyed in the ordered shutdown, it is click-through until the pointer reaches it, and a desktop that refuses to create it leaves the hub serving with delivery recorded as not-wired rather than crashing or silently swallowing events.",
+              "NT-FR-10: The surface occupies no screen space and draws nothing when no card is showing and nothing is pending. The host window existing is not the same as the surface being visible, and the difference is what keeps this feature inside the product's quiet-by-default promise.",
+              "NT-FR-11: A test asserts the notification path contains no platform notification mechanism: no notification API, no spawned notification command, no per-platform branch, and none of the names of the tools that were removed. The change of track is enforced by the suite rather than promised in prose.",
+              "NT-FR-12: A real block produces a real card on a real desktop with no seam supplied by a test: the card document is in the built artefacts and served by the hub, the card model reaches that document across a channel that leaves contextIsolation, nodeIntegration and the renderer sandbox in force, and acknowledging or resolving the block takes the card off the screen. A verification script that has to substitute for any of those three is measuring the script, not the product."
+            ],
+            "acceptanceCriteria": [
+              "A test asserts the electron DesktopBridge supplies renderCard, and a run with it reports delivery status wired with a real posted block counted as delivered",
+              "A test asserts the context bridge exposes exactly one global whose key set is exactly remove and show",
+              "A test asserts show and remove carry exactly a CardModel and a CardLifetimeCell, and that the payload contains no path, session identifier, harness name or conversation content",
+              "A test asserts contextIsolation true, nodeIntegration false and sandbox true are all still present after the change and that the options object is still frozen",
+              "A test asserts no executeJavaScript and no webSecurity change exists anywhere under src",
+              "A test asserts NotificationSurfaceHost still exposes exactly probe, show, hide, setClickThrough and destroy, and that the host interface was not widened",
+              "A test asserts a card rendered through the real channel carries role=status, aria-live, an aria-label, a tabindex, data-urgency and data-lifetime, and no inline style",
+              "A test asserts a card that ends is removed through the channel and the host window is hidden, so nothing occupies screen space"
+            ],
+            "constraints": [
+              "The system never stores or transmits conversation content",
+              "No telemetry leaves the machine",
+              "No platform notification mechanism is used on any platform",
+              "The surface occupies no screen space when nothing is showing",
+              "APX-CON-12: No telemetry leaves the machine. Counters, logs and the durable log are local files only, and no outbound network call exists other than to the loopback hub and the harnesses already running on this machine."
+            ],
+            "references": [
+              "docs/features/notification-and-tray-presence.md#0. What changed in version 1.1, and what is already built",
+              "docs/reviews/notification-surface-evidence.json",
+              "src/notify/registry.ts",
+              "docs/adr/ADR-002-loopback-only-single-mutating-route.md",
+              "docs/PRD.md#APX-FR-01",
+              "docs/features/notification-and-tray-presence.md#NT-FR-02",
+              "docs/features/notification-and-tray-presence.md#NT-FR-04",
+              "docs/features/notification-and-tray-presence.md#NT-FR-10",
+              "docs/features/notification-and-tray-presence.md#NT-FR-11",
+              "docs/features/notification-and-tray-presence.md#NT-FR-12",
+              "docs/PRD.md#APX-CON-12"
+            ]
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.ns-2",
+          "inputs": [
+            "work.ns-1",
+            "work.nt-6",
+            "work.nt-7",
+            "work.nt-8",
+            "work.nt-9"
+          ],
+          "timeoutMs": 2700000
+        },
+        {
+          "id": "NS-3",
+          "title": "Take the card down when its block ends",
+          "description": "Make the end that the lifetime table already names actually happen. CARD_LIFETIMES gives the needs-you cell the ends resolved and acknowledged, card-view removes on either, and card-view re-exports CARD_ENDS with a comment saying a caller wiring the hub's acknowledgement needs one import; today no path produces either, so a card would leave the screen only when its window was destroyed at shutdown. Both triggers are yours. The first is the ack route: after a successful acknowledgement of a needs-you item, dismiss its card with the end acknowledged. The second needs no route at all, because a resolution arrives as an ordinary ingested event whose class the policy refuses, so the card must come down from the pending-set transition that dropped the session it was showing. Add one narrow dismissal port to HubServices and call it from those two places. Do not widen HubServices.delivery, which is narrowed to status() on purpose precisely so that a route calling deliver is a compile error, and do not grow a writer into routes/read.ts, which is held to containing none. The composition root builds its services object twice, once before the socket is bound and once after, and both must gain the field or the port will be absent in one of the two runs. Keep the route surface byte-identical: the ack route stays the only route that changes a record, its 200 body keeps the same key set, a refused or unauthorised or not-found acknowledgement removes nothing, and the whole-log diff that walks every registered route and method must still be empty. Dismissal must not record a counter, because src/hub/metrics.ts is asserted to be the only caller of a counter write in the product. Every dismissal ends in the host's hide so NT-FR-10 holds, is idempotent, and is a no-op rather than an error for a session with no card showing. Exclude any new route and any new counter.",
+          "ownerAgent": "hub-engineer",
+          "dependencies": [
+            "NS-2"
+          ],
+          "expectedOutputs": [
+            "src/hub/routes/ack.ts",
+            "src/hub/routes/read.ts",
+            "src/main/index.ts",
+            "src/notify/surface/dismissal.ts",
+            "tests/hub/ack.test.ts",
+            "tests/notify/surface-dismissal.test.ts"
+          ],
+          "validationCommands": [
+            "npm test -- tests/hub/ack.test.ts tests/notify/surface-dismissal.test.ts",
+            "npm run typecheck"
+          ],
+          "contract": {
+            "version": 1,
+            "kind": "implementation",
+            "requirements": [
+              "APX-FR-02: A delivery failure is never silent: when the hub is unreachable or an event cannot be stored, the failure is surfaced where the developer will see it, and the durable log records that an event was dropped rather than pretending it was delivered.",
+              "NT-FR-07: Every card carries a deep link to its session, and opening that link focuses the session in the dashboard and counts as a dashboard open.",
+              "NT-FR-09: Every delivery outcome is recorded with its reason, a refused class is never counted as a delivered one, and a failure is visible in the doctor output rather than only in a log line.",
+              "NT-FR-10: The surface occupies no screen space and draws nothing when no card is showing and nothing is pending. The host window existing is not the same as the surface being visible, and the difference is what keeps this feature inside the product's quiet-by-default promise.",
+              "NT-FR-12: A real block produces a real card on a real desktop with no seam supplied by a test: the card document is in the built artefacts and served by the hub, the card model reaches that document across a channel that leaves contextIsolation, nodeIntegration and the renderer sandbox in force, and acknowledging or resolving the block takes the card off the screen. A verification script that has to substitute for any of those three is measuring the script, not the product."
+            ],
+            "acceptanceCriteria": [
+              "A test drives a real ingest of a needs-you event, then a real POST /api/ack/:eventId carrying the per-install token, and asserts the card is removed with the end acknowledged and the host window is hidden",
+              "A test drives a harness resolution of the same session and asserts the card is removed with the end resolved, with no route involved",
+              "A test asserts acknowledged and resolved are the only ends this path produces and that both are members of the needs-you cell's own ends",
+              "A test asserts an unauthorised, rejected and not-found acknowledgement each remove nothing and change nothing",
+              "A test asserts the ack route's 200 body key set is unchanged, the whole-log diff across every registered route and method is still empty, and the exact registered route-signature list is unchanged",
+              "A test asserts src/hub/metrics.ts is still the only caller of a counter write and that a dismissal records none",
+              "A test asserts dismissal is idempotent and that dismissing a session with no card showing is a no-op rather than an error",
+              "A test asserts the expired end still removes a finished card, so all five ends in CARD_ENDS are reachable in one run",
+              "A test asserts the dismissal port is present in both the pre-bind and post-bind services objects the composition root builds"
+            ],
+            "constraints": [
+              "Exactly one mutating route exists, the ack route",
+              "The hub binds to 127.0.0.1 only",
+              "A delivery failure is never silent",
+              "The surface occupies no screen space when nothing is showing",
+              "APX-CON-08: Exactly one mutating route exists, the ack route, and it can only mark a pending item acknowledged. No route can spawn, steer, interrupt, prompt or approve anything inside a harness.",
+              "APX-CON-01: The hub binds to 127.0.0.1 only and rejects any connection whose remote address is not loopback. The port is treated as security-relevant, not incidental."
+            ],
+            "references": [
+              "docs/features/notification-and-tray-presence.md#0. What changed in version 1.1, and what is already built",
+              "docs/reviews/notification-surface-evidence.json",
+              "docs/adr/ADR-010-delivery-failure-is-never-silent.md",
+              "src/notify/surface/lifetime.ts",
+              "docs/PRD.md#APX-FR-02",
+              "docs/features/notification-and-tray-presence.md#NT-FR-07",
+              "docs/features/notification-and-tray-presence.md#NT-FR-09",
+              "docs/features/notification-and-tray-presence.md#NT-FR-10",
+              "docs/features/notification-and-tray-presence.md#NT-FR-12",
+              "docs/PRD.md#APX-CON-08",
+              "docs/PRD.md#APX-CON-01"
+            ]
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.ns-3",
+          "inputs": [
+            "work.ns-2",
+            "work.nt-6",
+            "work.nt-7",
+            "work.nt-8",
+            "work.nt-9"
+          ],
+          "timeoutMs": 2700000
+        },
+        {
+          "id": "NS-4",
+          "title": "Re-prove the card on the shipped build",
+          "description": "NT-9 proved a card and, in the same evidence file, recorded that the product as shipped cannot show one: it asserted nothing about shipped posture on purpose, because a build that had grown a card document would have turned that assertion into a false alarm, and it supplied the card document, the renderer channel and the acknowledgement path itself. The product has those three now, so the withheld assertion becomes real. Reuse NT-9's script, its evidence schema and its journeys, and change exactly this: assert the shipped posture instead of recording it. Start the real built entry point against a state directory of its own, post a real block, and assert that a card window appears on the display with no seam supplied \u2014 then delete the harness's own card document, its stylesheet, its entry module and its executeJavaScript bridge, so the run cannot silently fall back to them and a green result cannot mean the harness did the work again. A source-level test asserts those three implementations are gone from the script rather than merely unused. Keep every existing journey, and keep the reverse case that matters most: a session that opens, greets and closes must create no window and no card. Record the three previously-required product changes as closed, and name anything still unverified rather than letting the evidence imply otherwise. Exclude product code changes; record required changes instead.",
+          "ownerAgent": "qa-engineer",
+          "dependencies": [
+            "NS-3"
+          ],
+          "expectedOutputs": [
+            "scripts/verify-notification-surface.mjs",
+            "docs/reviews/notification-surface-evidence.json",
+            "docs/runbooks/notification-surface.md"
+          ],
+          "validationCommands": [
+            "npm run typecheck"
+          ],
+          "contract": {
+            "version": 1,
+            "kind": "implementation",
+            "requirements": [
+              "NT-FR-12: A real block produces a real card on a real desktop with no seam supplied by a test: the card document is in the built artefacts and served by the hub, the card model reaches that document across a channel that leaves contextIsolation, nodeIntegration and the renderer sandbox in force, and acknowledging or resolving the block takes the card off the screen. A verification script that has to substitute for any of those three is measuring the script, not the product.",
+              "NT-FR-08: No repeat timer exists: one needs-you card is shown per block and is not re-armed, and the badge and history carry persistence instead of re-firing.",
+              "NT-FR-10: The surface occupies no screen space and draws nothing when no card is showing and nothing is pending. The host window existing is not the same as the surface being visible, and the difference is what keeps this feature inside the product's quiet-by-default promise."
+            ],
+            "acceptanceCriteria": [
+              "The evidence file records shippedPosture asserted as true, and the shipped build shows a card window on the display with none of the three seams supplied",
+              "A source-level test asserts the verification script no longer contains the card document, the stylesheet, the entry module or the executeJavaScript bridge it used to substitute",
+              "The needs-you, finished and greeting-and-close journeys all still pass, and the reverse case still proves no window and no card are created for a session that did no work",
+              "The evidence file records the card-document, renderer-channel and acknowledgement-hook gaps as closed by the tasks that closed them, and names anything still unverified",
+              "The script exits non-zero on any failed assertion, treats a missing display or a missing Electron binary as a failure rather than a skip, and has no path that reports success when nothing ran"
+            ],
+            "constraints": [
+              "A subjective visual judgement never stands alone; the journey must have been performed on the running system",
+              "Never invent passing results, tool availability, deployed resources, human review or compliance",
+              "APX-CON-06: Platform support is Linux, macOS and Windows in v1, served by one notification surface implementation rather than one per platform. Linux is the only live-verified path on the authoring machine; per-platform differences are limited to documented window-manager behaviour, shipped with scripted checks and documented manual steps, and no macOS or Windows claim is made from a Linux machine.",
+              "APX-CON-12: No telemetry leaves the machine. Counters, logs and the durable log are local files only, and no outbound network call exists other than to the loopback hub and the harnesses already running on this machine."
+            ],
+            "references": [
+              "docs/research/electron-surface-preflight.json",
+              "docs/features/notification-and-tray-presence.md#0. What changed in version 1.1, and what is already built",
+              "docs/features/notification-and-tray-presence.md#NT-FR-12",
+              "docs/features/notification-and-tray-presence.md#NT-FR-08",
+              "docs/features/notification-and-tray-presence.md#NT-FR-10",
+              "docs/PRD.md#APX-CON-06",
+              "docs/PRD.md#APX-CON-12"
+            ]
+          },
+          "requiredCapabilities": [
+            "repository-tools"
+          ],
+          "approvalRequired": false,
+          "sourceLines": [],
+          "produces": "work.ns-4",
+          "inputs": [
+            "work.ns-3",
+            "work.nt-6",
+            "work.nt-7",
+            "work.nt-8",
+            "work.nt-9"
+          ],
+          "timeoutMs": 2700000
+        }
+      ]
+    },
+    {
       "id": "OPENCODE-PLUGIN-ADAPTER-1",
       "title": "Phase 1: Event translation and delivery",
       "feature": "opencode Plugin Adapter",
@@ -1862,7 +2165,7 @@
           "description": "Human review of the adapter against the real harness on a real repository. Install the plugin globally, start the hub, and run an ordinary opencode session that asks for a permission decision. Confirm from the harness's own interface and from the dashboard that exactly one card appeared on the notification surface for the block, that the tray badge went to one, and that answering the permission cleared it without a second card. Confirm also that the operating system's own notification centre showed nothing at all, because this product renders the card itself. Then run a session that does real work and confirm exactly one finished card, and run a session that opens and closes without work and confirm nothing appeared at all: no card, no window, no badge change, no history row. Finally stop the hub and confirm a blocked session leaves a visible breadcrumb rather than failing silently, and confirm the plugin does not measurably slow the session. Record every observation, the commands used and the verdict in the review file. Do not change code in this task.",
           "dependencies": [
             "OA-5",
-            "NT-9"
+            "NS-4"
           ],
           "expectedOutputs": [],
           "validationCommands": [],
@@ -1906,7 +2209,7 @@
           "produces": "work.oa-6",
           "inputs": [
             "work.oa-5",
-            "work.nt-9",
+            "work.ns-4",
             "work.oa-4"
           ],
           "timeoutMs": 2700000
@@ -1924,7 +2227,7 @@
       "dependencies": [
         "DASHBOARD-DESIGN-PROTOTYPE-2",
         "HUB-CORE-AND-DELIVERY-POLICY-3",
-        "NOTIFICATION-AND-TRAY-PRESENCE-3"
+        "NOTIFICATION-AND-TRAY-PRESENCE-4"
       ],
       "approvalRequired": true,
       "tasks": [
@@ -2000,10 +2303,10 @@
             "work.hc-2",
             "work.dp-4",
             "work.hc-7",
-            "work.nt-6",
-            "work.nt-7",
-            "work.nt-8",
-            "work.nt-9"
+            "work.ns-1",
+            "work.ns-2",
+            "work.ns-3",
+            "work.ns-4"
           ],
           "timeoutMs": 2700000
         },
@@ -2063,10 +2366,10 @@
             "work.dp-3",
             "work.dp-4",
             "work.hc-7",
-            "work.nt-6",
-            "work.nt-7",
-            "work.nt-8",
-            "work.nt-9"
+            "work.ns-1",
+            "work.ns-2",
+            "work.ns-3",
+            "work.ns-4"
           ],
           "timeoutMs": 2700000
         }
@@ -2236,7 +2539,7 @@
           "description": "Human review of the live dashboard as the surface the developer actually lands on. Complete the primary journey end to end against the running system with a real pending block: notice the card or the badge, open the dashboard from the card's deep link and again from the tray, identify which repository is asking, read the blocked row, acknowledge it, and hand the session off to a terminal. Confirm that the dashboard opened focused on the right session each time and that the pending count matched the badge throughout. Then repeat the journey with the keyboard only, and once more with a screen reader if available, and record what each pass could and could not reach. Judge whether the approved design survived contact with real data, including repositories with many sessions and a long history. Record every observation and the verdict in the review file, listing any required change rather than making it. Do not change code in this task.",
           "dependencies": [
             "LD-4",
-            "NT-9",
+            "NS-4",
             "DP-4"
           ],
           "expectedOutputs": [],
@@ -2280,7 +2583,7 @@
           "produces": "work.ld-5",
           "inputs": [
             "work.ld-4",
-            "work.nt-9",
+            "work.ns-4",
             "work.dp-4",
             "work.ld-3"
           ],
@@ -2297,7 +2600,7 @@
         "packaging-engineer"
       ],
       "dependencies": [
-        "NOTIFICATION-AND-TRAY-PRESENCE-3",
+        "NOTIFICATION-AND-TRAY-PRESENCE-4",
         "OPENCODE-PLUGIN-ADAPTER-3"
       ],
       "approvalRequired": true,
@@ -2305,12 +2608,13 @@
         {
           "id": "IO-1",
           "title": "Publish the package and guard its build artefacts",
-          "description": "Turn the project into an installable global npm package. Declare the agent-ping binary, a files allowlist that includes only what must ship, and the packaging metadata for each platform dependency, extending the existing package manifest without removing the scripts established earlier. Because Electron is now a load-bearing runtime dependency, ship whatever the installed Electron needs to launch on a per-user install and make the prepack check assert that the chosen Chromium process-sandbox launch policy is present in the packaged entry point, so a package that would abort at startup on the target platform cannot ship. The dashboard build now emits more than one document: assert that both the dashboard document and the notification card document are present in the build output, and add a test that serving the card document over the loopback static route does not count as a dashboard open, because the counter that backs the unprompted-pull success metric must mean a human opened the dashboard. Add a prepack check that fails when any required build artefact is missing, so a package can never be published or installed in a broken state, and make it verify the Electron main bundle, the dashboard build, the notification card document and the plugin file that the installer writes. Add a test that runs the check against a deliberately incomplete tree and asserts it fails, and against a complete tree and asserts it passes. Exclude the command implementations and autostart.",
+          "description": "Turn the project into an installable global npm package. Declare the agent-ping binary, a files allowlist that includes only what must ship, and the packaging metadata for each platform dependency, extending the existing package manifest without removing the scripts established earlier. Because Electron is now a load-bearing runtime dependency, ship whatever the installed Electron needs to launch on a per-user install and make the prepack check assert that the chosen Chromium process-sandbox launch policy is present in the packaged entry point, so a package that would abort at startup on the target platform cannot ship. The dashboard build now emits three documents, index, prototype and card, and this task is the first place they are all asserted at once: assert the exact built artefact set rather than checking that one file happens to exist, and add a test that serving the card document over the loopback static route does not count as a dashboard open, because the counter that backs the unprompted-pull success metric must mean a human opened the dashboard. NS-1 builds the card document this task asserts; if that task has not run, this one must fail loudly rather than pass against a document that does not exist. Note also that package.json currently declares neither a files allowlist nor a bin, so both are net-new here, and that the durable schema is still not copied into the build output, which is a recorded gap this task should close. Add a prepack check that fails when any required build artefact is missing, so a package can never be published or installed in a broken state, and make it verify the Electron main bundle, the dashboard build, the notification card document and the plugin file that the installer writes. Add a test that runs the check against a deliberately incomplete tree and asserts it fails, and against a complete tree and asserts it passes. Exclude the command implementations and autostart.",
           "ownerAgent": "packaging-engineer",
           "dependencies": [
             "DP-1",
             "HC-1",
-            "NT-6"
+            "NT-6",
+            "NS-1"
           ],
           "expectedOutputs": [
             "package.json",
@@ -2329,7 +2633,8 @@
             ],
             "acceptanceCriteria": [
               "A test asserts the prepack check fails when a required build artefact is absent and passes when all are present",
-              "A test asserts the prepack check requires both the dashboard document and the notification card document in the build output",
+              "A test asserts the prepack check requires exactly the three built documents - index.html, prototype/index.html and card.html - and fails when any one is absent",
+              "A test asserts the files allowlist and the declared bin cover the built main bundle, all three documents and the durable schema, and that the schema is present in the build output",
               "A test asserts the packaged entry point applies the chosen Chromium process-sandbox launch policy rather than relying on a platform default",
               "A test asserts serving the notification card document over the loopback static route does not increment the dashboard-open counter",
               "A test asserts the files allowlist excludes source maps, tests and development-only configuration",
@@ -2361,9 +2666,10 @@
             "work.dp-1",
             "work.hc-1",
             "work.nt-6",
-            "work.nt-7",
-            "work.nt-8",
-            "work.nt-9",
+            "work.ns-1",
+            "work.ns-2",
+            "work.ns-3",
+            "work.ns-4",
             "work.oa-6"
           ],
           "timeoutMs": 2700000
@@ -2444,9 +2750,10 @@
             "work.oa-3",
             "work.nt-3",
             "work.nt-8",
-            "work.nt-6",
-            "work.nt-7",
-            "work.nt-9",
+            "work.ns-1",
+            "work.ns-2",
+            "work.ns-3",
+            "work.ns-4",
             "work.oa-6"
           ],
           "timeoutMs": 2700000
@@ -2604,7 +2911,7 @@
           "description": "Human review of operations on this machine. From a clean state, install the package globally, start an ordinary opencode session, and confirm the hub is running without any manual step after the next login or restart of the session environment. Then break things on purpose one at a time: stop the hub, occupy the port, remove the plugin file, and make the notification surface un-mountable by taking its card document out of the build, using the manual commands in docs/runbooks/notification-surface.md where the failure is notification-related. After each, run the doctor command and record what it printed, whether the remedy was actionable, and whether the exit code was non-zero. The surface breakage matters more than the others: confirm doctor reports a surface that cannot create a window as a distinct failure, with a remedy that names the real cause rather than telling the developer to reinstall something already installed. Finish with uninstall and confirm nothing of the product remains except the database. Record the platform each observation was made on. Because the surface is one code path, state plainly that the same code runs on macOS and Windows and that only the window manager differs, and record which of those platforms, if any, were actually available to observe. Do not change code in this task.",
           "dependencies": [
             "IO-4",
-            "NT-9"
+            "NS-4"
           ],
           "expectedOutputs": [],
           "validationCommands": [],
@@ -2648,7 +2955,7 @@
           "produces": "work.io-5",
           "inputs": [
             "work.io-4",
-            "work.nt-9",
+            "work.ns-4",
             "work.io-3"
           ],
           "timeoutMs": 2700000
@@ -2903,6 +3210,8 @@
   "warnings": [
     "Team validation: file 'package.json' is owned by multiple agents (tooling-engineer, notification-engineer, packaging-engineer).",
     "Team validation: file 'src/main/index.ts' is owned by multiple agents (hub-engineer, notification-engineer).",
+    "Team validation: file 'tests/hub/server.test.ts' is owned by multiple agents (hub-engineer, dashboard-engineer).",
+    "Team validation: file 'tests/hub/metrics.test.ts' is owned by multiple agents (hub-engineer, dashboard-engineer).",
     "Team validation: file 'docs/runbooks/notification-surface.md' is owned by multiple agents (notification-engineer, qa-engineer)."
   ],
   "responsibilityMatrixPath": "/home/mcfuzzysquirrel/Projects/agent-ping/docs/agent-responsibility-matrix.md"

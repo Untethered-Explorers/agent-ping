@@ -49,10 +49,11 @@
 // this view adds no outbound call of any kind (APX-CON-12, NT-FR-02, NT-FR-11).
 //
 // VERIFICATION STATE, STATED THE SAME WAY IN EVERY FILE HERE
-// Implemented and unit-tested, in jsdom, with the real element tree inspected. Not
-// live-verified on the authoring machine: no card has been seen on any desktop from this
-// checkout, because the card document the host window loads is not in the built
-// artefacts yet. NT-9 owns that observation.
+// Implemented and unit-tested, in jsdom, with the real element tree inspected, and
+// mounted by the card document the surface loads (`dist/dashboard/card.html`, built from
+// this same TypeScript source). Not live-verified on the authoring machine: no card has
+// been seen on any desktop from this checkout, because nothing yet carries a model from
+// the hub into that document. NT-9 owns that observation.
 
 import { cardAccessibleName, cardUrgency, type CardModel } from './card.js'
 import type { CardEnd, CardExpiryScheduler, CardLifetimeCell } from './lifetime.js'

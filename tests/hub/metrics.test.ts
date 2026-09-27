@@ -117,13 +117,29 @@ afterEach(async () => {
  *
  * The document is the point of half this file, so the page has to exist: the layout
  * is the one Vite produces, an index and a hashed asset, so "the document" and "an
- * asset" are two different requests a hub has to tell apart.
+ * asset" are two different requests a hub has to tell apart. The card document is
+ * here for the same reason and for the harder one: a card is a page too, it is served
+ * by the same route and the same policy, and PRD 11 measures how often a *person*
+ * pulled the dashboard up (NT-FR-02, NT-FR-12).
  */
 function dashboardFixture(): string {
   const root = temporaryDirectory('agent-ping-dashboard-')
   mkdirSync(path.join(root, 'assets'), { recursive: true })
   writeFileSync(path.join(root, 'index.html'), '<!doctype html><title>agent-ping</title>\n')
   writeFileSync(path.join(root, 'assets', 'index-abc123.js'), 'console.log("dashboard")\n')
+  writeFileSync(
+    path.join(root, 'card.html'),
+    [
+      '<!doctype html>',
+      '<html lang="en"><head><title>agent-ping card</title>',
+      '<link rel="stylesheet" href="./assets/card-abc123.css" />',
+      '<script type="module" src="./assets/card-abc123.js"></script>',
+      '</head><body><div data-card-surface></div></body></html>',
+      '',
+    ].join('\n'),
+  )
+  writeFileSync(path.join(root, 'assets', 'card-abc123.js'), 'console.log("card")\n')
+  writeFileSync(path.join(root, 'assets', 'card-abc123.css'), '[data-card]{color:#fff}\n')
   return root
 }
 
@@ -423,6 +439,37 @@ describe('a dashboard open is recorded when a client is served the page', () => 
     // mistyped API path is a client that got a 404. Counting either would inflate the
     // one number PRD 11 reads to mean "a person looked".
     expect(counterOf(await metricsOf(hub), 'dashboard_opens')).toBe(0)
+  })
+
+  it('does not count the card document, which is a page a person did not pull', async () => {
+    const hub = await startFixtureHub()
+
+    // A block produces a card, and the card document is what the surface window loads -
+    // over this same origin, on this same route, with this same policy (NT-FR-02,
+    // NT-FR-12). It is not a person opening the dashboard, and PRD 11 measures "the
+    // unprompted dashboard pull": counting a notification's own document here would
+    // report a developer looking at their dashboard every time a tool asked a question,
+    // which is the number the success metric is not allowed to mean.
+    const card = await get(hub, '/card.html')
+    expect(card.status).toBe(200)
+    expect(card.text).toContain('data-card-surface')
+    // The card's stylesheet and its module script are the same two requests as the live
+    // page's, and are as much not an open.
+    expect((await get(hub, '/assets/card-abc123.js')).status).toBe(200)
+    expect((await get(hub, '/assets/card-abc123.css')).status).toBe(200)
+    expect(counterOf(await metricsOf(hub), 'dashboard_opens')).toBe(0)
+
+    // The dashboard itself, in the same run and against the same hub, is the one that
+    // moves it - so the zero above is a rule and not a broken counter.
+    expect((await get(hub, '/')).status).toBe(200)
+    expect(counterOf(await metricsOf(hub), 'dashboard_opens')).toBe(1)
+
+    // And a card document carrying a deep link is still not an open and still not a
+    // deep-link open, because nothing navigates a surface window: the link is an
+    // attribute on the card, not a request (NT-FR-04, NT-FR-07).
+    expect((await get(hub, `/${'card.html'}?${DEEP_LINK_QUERY_KEY}=${SESSION}`)).status).toBe(200)
+    expect(counterOf(await metricsOf(hub), 'dashboard_opens')).toBe(1)
+    expect(counterOf(await metricsOf(hub), 'deep_link_opens')).toBe(0)
   })
 
   it('records nothing on a hub that serves no dashboard, because nothing was opened', async () => {
@@ -874,7 +921,9 @@ describe('the rules that decide what an open, a deep link and a payload are', ()
     for (const pathname of ['/index.html/', '/?session=x', '/index.html?v=2', '/api/']) {
       expect(isDashboardDocumentPath(pathname), pathname).toBe(false)
     }
-    // And the assets a dashboard build is made of.
+    // And the assets a dashboard build is made of, and the card document - which is a
+    // document this hub serves, is a page, and is emphatically not a person opening the
+    // dashboard (NT-FR-12).
     for (const pathname of [
       '/assets/index-abc123.js',
       '/assets/index-abc123.css',
@@ -882,6 +931,10 @@ describe('the rules that decide what an open, a deep link and a payload are', ()
       '/api/metrics',
       '/api',
       '/index.htm',
+      '/card.html',
+      '//card.html',
+      '/card.html/',
+      '/card.html?v=2',
     ]) {
       expect(isDashboardDocumentPath(pathname), pathname).toBe(false)
     }

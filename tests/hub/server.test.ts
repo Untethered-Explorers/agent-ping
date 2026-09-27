@@ -79,6 +79,7 @@ import {
 } from '@/hub/runtime-file'
 import { openEventStore, type EventStore, type NewEvent } from '@/storage/eventStore'
 import { DATABASE_FILE_NAME, STATE_DIR_ENV_VAR } from '@/storage/paths'
+import { SURFACE_DOCUMENT_PATH } from '@/notify/surface/electron-host'
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -102,14 +103,35 @@ function temporaryDirectory(prefix: string): string {
  * The real `dist/dashboard` is a Vite build whose asset names are hashed and change
  * whenever the renderer changes, so a test that asserted against it would be
  * asserting against whatever was last built. The layout is the one Vite produces -
- * an index.html and an assets directory - and the traversal target lives outside the
- * root, which is what makes the containment assertion mean something.
+ * an index.html, a card.html and an assets directory - and the traversal target lives
+ * outside the root, which is what makes the containment assertion mean something.
+ *
+ * The card document is here in the shape the build emits it: a linked stylesheet and a
+ * module script, both hashed names under `assets/`, and no inline style or inline
+ * script, because the hub's policy forbids both. The shape is the point rather than the
+ * bytes - the bytes are tests/dashboard/card-document.test.ts's subject, against the
+ * real build - and what this file proves is that the route a notification surface window
+ * asks for is served, with the right content type and the right headers, over a real
+ * socket (NT-FR-02, NT-FR-12).
  */
 function dashboardFixture(): string {
   const root = temporaryDirectory('agent-ping-dashboard-')
   mkdirSync(path.join(root, 'assets'), { recursive: true })
   writeFileSync(path.join(root, 'index.html'), '<!doctype html><title>agent-ping</title>\n')
   writeFileSync(path.join(root, 'assets', 'index-abc123.js'), 'console.log("dashboard")\n')
+  writeFileSync(
+    path.join(root, 'card.html'),
+    [
+      '<!doctype html>',
+      '<html lang="en"><head><title>agent-ping card</title>',
+      '<link rel="stylesheet" href="./assets/card-abc123.css" />',
+      '<script type="module" src="./assets/card-abc123.js"></script>',
+      '</head><body><div data-card-surface></div></body></html>',
+      '',
+    ].join('\n'),
+  )
+  writeFileSync(path.join(root, 'assets', 'card-abc123.js'), 'console.log("card")\n')
+  writeFileSync(path.join(root, 'assets', 'card-abc123.css'), '[data-card]{color:#fff}\n')
   writeFileSync(path.join(root, 'notes.txt'), 'not a served type\n')
   writeFileSync(path.join(path.dirname(root), 'outside-the-root.txt'), 'must never be served\n')
   return root
@@ -1191,6 +1213,51 @@ describe('the built dashboard on the same origin', () => {
 
     const missing = await call(hub.origin, '/assets/index-000000.js')
     expect(missing.status).toBe(404)
+  })
+
+  it('serves the card document the notification surface window loads, with the same policy', async () => {
+    const hub = await startFixtureHub()
+
+    // The exact request src/notify/surface/electron-host.ts makes: the hub's own live
+    // origin plus SURFACE_DOCUMENT_PATH, which is the URL whose 404 is why a real show()
+    // reports document-unavailable and draws nothing (NT-FR-03, NT-FR-12).
+    const card = await call(hub.origin, SURFACE_DOCUMENT_PATH)
+    expect(card.status).toBe(200)
+    // The content type is the table's `.html` entry, asserted exactly rather than
+    // "contains": a card window handed a bare `text/html` with no charset is a document
+    // this product's own view decodes by guesswork.
+    expect(card.headers.get('content-type')).toBe('text/html; charset=utf-8')
+    expect(card.headers.get('x-content-type-options')).toBe('nosniff')
+    expect(card.text).toContain('data-card-surface')
+
+    // The whole policy the dashboard gets, and the two directives that decide whether a
+    // card can be drawn at all: the card writes its state as attributes and links its
+    // stylesheet, so `style-src 'self'` and `script-src 'self'` with no `unsafe-inline`
+    // is exactly what it needs (src/hub/security.ts, ADR-012).
+    const csp = card.headers.get('content-security-policy') ?? ''
+    expect(csp).toBe(DASHBOARD_CSP)
+    expect(csp).toContain("style-src 'self'")
+    expect(csp).toContain("script-src 'self'")
+    expect(csp).not.toMatch(/unsafe-inline/)
+    expect(csp).not.toMatch(/unsafe-eval/)
+
+    // The document's own references travel the same route, because a card window that
+    // loaded a page whose script and stylesheet 404 is a blank rectangle on a
+    // developer's screen.
+    for (const [reference, contentType] of [
+      ['/assets/card-abc123.js', 'text/javascript'],
+      ['/assets/card-abc123.css', 'text/css'],
+    ] as const) {
+      const asset = await call(hub.origin, reference)
+      expect(asset.status, reference).toBe(200)
+      expect(asset.headers.get('content-type'), reference).toContain(contentType)
+      expect(asset.headers.get('content-security-policy'), reference).toBe(DASHBOARD_CSP)
+    }
+
+    // And the same request is not the dashboard: a card is not a pull of the page, which
+    // is the counter tests/hub/metrics.test.ts proves does not move.
+    const stillTheDashboard = await call(hub.origin, '/')
+    expect(stillTheDashboard.status).toBe(200)
   })
 
   it('answers 404 rather than the dashboard for an unknown API path', async () => {

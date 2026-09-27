@@ -1,10 +1,10 @@
 # Project Progress
 
 ## Current State
-**Phase**: LIVE-DASHBOARD-1
+**Phase**: NOTIFICATION-AND-TRAY-PRESENCE-4
 **Status**: In Progress
-**Validation Gaps**: 93 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-27T13:19:16.307Z
+**Validation Gaps**: 98 unverified check(s) - see "Validation Gaps"
+**Last Updated**: 2026-09-27T14:33:37.551Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -54,6 +54,8 @@
   - Files: src/notify/types.ts, src/notify/policy.ts, src/notify/registry.ts, src/main/index.ts, tests/notify/policy.test.ts, tests/hub/tray.test.ts, docs/runbooks/notification-surface.md, docs/runbooks/notify-platforms.md, src/hub/delivery.ts, src/hub/routes/read.ts, src/notify/command.ts, src/notify/linux.ts, src/notify/macos.ts, src/notify/windows.ts, tests/hub/delivery.test.ts, tests/notify/linux.test.ts, tests/notify/macos.test.ts, tests/notify/registry-selection.test.ts, tests/notify/surface-card.test.ts, tests/notify/windows.test.ts
 - [x] Phase NOTIFICATION-AND-TRAY-PRESENCE-3, Task NT-9: Prove the card on a real desktop with a script (@qa-engineer)
   - Files: scripts/verify-notification-surface.mjs, docs/reviews/notification-surface-evidence.json, docs/runbooks/notification-surface.md, tests/scripts/verify-notification-surface.test.ts
+- [x] Phase NOTIFICATION-AND-TRAY-PRESENCE-4, Task NS-1: Build and serve the card document (@dashboard-engineer)
+  - Files: src/dashboard/card.html, src/dashboard/card.css, src/dashboard/card-main.ts, vite.config.ts, tests/dashboard/card-document.test.ts, tests/hub/server.test.ts, tests/hub/metrics.test.ts, src/main/index.ts, src/notify/surface/card-view.ts, src/notify/surface/card.ts
 - [x] Phase OPENCODE-PLUGIN-ADAPTER-1, Task OA-1: Translate opencode events into the normalized envelope (@connector-engineer)
   - Files: src/plugin/opencode/index.ts, src/plugin/opencode/translate.ts, src/plugin/opencode/work-signal.ts, tests/plugin/opencode-translate.test.ts, tests/plugin/opencode-work-signal.test.ts, docs/engine-config.json
 - [x] Phase OPENCODE-PLUGIN-ADAPTER-1, Task OA-2: Deliver events to the hub and leave a breadcrumb on failure (@connector-engineer)
@@ -75,6 +77,7 @@
 - None currently running
 
 ## Remaining
+- [ ] Phase NOTIFICATION-AND-TRAY-PRESENCE-4: Phase 4: Closing the delivery path
 - [ ] Phase OPENCODE-PLUGIN-ADAPTER-3: Phase 3: Live adapter gate
 - [ ] Phase LIVE-DASHBOARD-1: Phase 1: Live state on the approved layout
 - [ ] Phase LIVE-DASHBOARD-2: Phase 2: Interactions against the real API
@@ -89,6 +92,7 @@
 - Manifest reconciliation removed 2 task(s): NT-4, NT-5
 - Manifest reconciliation changed 16 existing task(s): NT-1, NT-2, NT-3, OA-5, OA-6, LD-1, LD-2, LD-3, LD-4, LD-5, IO-1, IO-2, IO-3, IO-4, IO-5, CP-4
 - Manifest reconciliation changed 16 existing task(s): NT-1, NT-2, NT-3, OA-5, OA-6, LD-1, LD-2, LD-3, LD-4, LD-5, IO-1, IO-2, IO-3, IO-4, IO-5, CP-4
+- Manifest reconciliation added 4 pending task(s): NS-1, NS-2, NS-3, NS-4
 
 ## Validation Gaps
 - Task DP-1: No product, dashboard, store, hub or CLI source exists yet, so npm run build reports its tsc and Vite steps as skipped rather than compiling anything; the build wiring itself is exercised only as far as the empty source set allows.
@@ -155,6 +159,11 @@
 - Task NT-8: The source sweep strips comments and keeps strings, and reads a backtick template as one string to its closing backtick, so a nested template inside a ${...} would end the scan early. No module on this path contains one, and a missed token would still be caught by the same token in the value the code then uses.
 - Task NT-9: No human read a word off a card. The pixel capture counts distinct values in the window's own drawable, which separates a painted card from a blank rectangle and reads no text, and the stylesheet that drew the card in this run is the run's own because the product has none.
 - Task NT-9: No card was produced by the shipped build. Every card observed in this run went through the run-time harness's three seams; the shipped build's own answer (not-wired, 404, no viewable card window) is a separate record.
+- Task NS-1: No Electron process was started and no card was seen on any desktop from this checkout. Everything claimed here is about the built document, the served route, the counter and the module graph; whether a card window composites on any desktop remains unobserved and belongs to the verification run.
+- Task NS-1: The hub tests serve a stand-in dashboard root that mirrors the built artefact's shape (a card.html linking a hashed stylesheet and module script), not the real dist/dashboard, because the real build's asset names are hashed and would make the test assert against whatever was last built. The real bytes are the subject of tests/dashboard/card-document.test.ts, which builds the artefact itself; what the hub tests prove is the route, the content type and the headers.
+- Task NS-1: Nothing here says what a card looks like. jsdom applies no layout and no paint, and the contrast figures are computed from the declared tokens rather than read off a rendered pixel, so the palette is proven legible and the composition is not.
+- Task NS-1: The import-closure reader is a hand-written comment stripper: a backtick template is read as one string to its closing backtick, so a nested template inside a ${...} would end the scan early. No module in the card document's closure contains one, and the built chunk is checked independently for node built-ins, require and process.env, which does not depend on the stripper.
+- Task NS-1: The prototype page (src/dashboard/prototype/index.html) carries an inline <style> element that the hub's style-src 'self' refuses. That is pre-existing, it is one of the two pages this task was told not to reshape, and I did not touch it; it is a defect in a design-review artefact rather than in a served surface, and it is recorded here rather than fixed.
 - Task OA-1: No live opencode session was run. The payload shapes are the 1.18.32 type declarations, not a capture from a running harness; proving the harness delivers them is OA-5's script and OA-6's gate, not this task.
 - Task OA-1: The one-envelope and block-lifecycle tests use the real ingest pipeline and the real SQLite log but drive it from fixtures rather than from a harness's event stream.
 - Task OA-1: The plugin was not loaded by opencode itself. Its structural plugin and client types mirror the 1.18.32 declarations rather than importing @opencode-ai/plugin, which is deliberate (the adapter must load with no dependency), so a signature change upstream would not be caught by a compile error here - the OA-3 install and OA-5 live run are where that surfaces.

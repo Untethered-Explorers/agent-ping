@@ -252,7 +252,7 @@ Task review table, kept outside the phase contracts as authoring evidence.
   "id": "OA-6",
   "title": "Confirm a real opencode session is caught end to end",
   "description": "Human review of the adapter against the real harness on a real repository. Install the plugin globally, start the hub, and run an ordinary opencode session that asks for a permission decision. Confirm from the harness's own interface and from the dashboard that exactly one card appeared on the notification surface for the block, that the tray badge went to one, and that answering the permission cleared it without a second card. Confirm also that the operating system's own notification centre showed nothing at all, because this product renders the card itself. Then run a session that does real work and confirm exactly one finished card, and run a session that opens and closes without work and confirm nothing appeared at all: no card, no window, no badge change, no history row. Finally stop the hub and confirm a blocked session leaves a visible breadcrumb rather than failing silently, and confirm the plugin does not measurably slow the session. Record every observation, the commands used and the verdict in the review file. Do not change code in this task.",
-  "dependencies": ["OA-5", "NT-9"],
+  "dependencies": ["OA-5", "NS-4"],
   "expectedOutputs": [],
   "validationCommands": [],
   "contract": {

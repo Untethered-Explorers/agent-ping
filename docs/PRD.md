@@ -410,7 +410,7 @@ One owning definition per ID. Feature documents reference these IDs; they never 
 | DP-FR-01..08 | requirement | Dashboard Design Prototype | none, terminal feature |
 | EL-FR-01..11 | requirement | Event Model and Durable Log | none, terminal feature |
 | HC-FR-01..10 | requirement | Hub Core and Delivery Policy | none, terminal feature |
-| NT-FR-01..11 | requirement | Notification and Tray Presence | none, terminal feature |
+| NT-FR-01..12 | requirement | Notification and Tray Presence | none, terminal feature |
 | OA-FR-01..09 | requirement | opencode Plugin Adapter | none, terminal feature |
 | LD-FR-01..11 | requirement | Live Dashboard | none, terminal feature |
 | IO-FR-01..09 | requirement | Install Autostart and Operations | none, terminal feature |

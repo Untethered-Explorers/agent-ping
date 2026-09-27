@@ -1,12 +1,12 @@
 {
   "runId": "7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8",
   "startedAt": "2026-09-26T10:43:05.421Z",
-  "lastUpdatedAt": "2026-09-27T13:19:16.295Z",
+  "lastUpdatedAt": "2026-09-27T14:33:37.535Z",
   "manifestPath": "/home/mcfuzzysquirrel/Projects/agent-ping/docs/EXECUTION-MANIFEST.json",
   "manifestVersion": "1.0",
   "harness": "opencode",
   "status": "running",
-  "currentPhase": "LIVE-DASHBOARD-1",
+  "currentPhase": "NOTIFICATION-AND-TRAY-PRESENCE-4",
   "tasks": {
     "DP-1": {
       "taskId": "DP-1",
@@ -793,6 +793,69 @@
         "work-nt-3-001"
       ]
     },
+    "NS-1": {
+      "taskId": "NS-1",
+      "status": "complete",
+      "ownerAgent": "dashboard-engineer",
+      "attempt": 1,
+      "outputFiles": [
+        "src/dashboard/card.html",
+        "src/dashboard/card.css",
+        "src/dashboard/card-main.ts",
+        "vite.config.ts",
+        "tests/dashboard/card-document.test.ts",
+        "tests/hub/server.test.ts",
+        "tests/hub/metrics.test.ts",
+        "src/main/index.ts",
+        "src/notify/surface/card-view.ts",
+        "src/notify/surface/card.ts"
+      ],
+      "startedAt": "2026-09-27T14:00:43.605Z",
+      "attemptHistory": [
+        {
+          "attempt": 1,
+          "outcome": "passed",
+          "resultPath": "docs/artifacts/NS-1.2026-09-27T14-33-37-492Z.attempt-1.result.json"
+        }
+      ],
+      "completedAt": "2026-09-27T14:33:37.535Z",
+      "agentOutput": "I'll start by reading the execution file.\nNow let me look at the existing tests to understand conventions.\nNow the card document itself:\nNow the Vite config:\nNow the main test file:\nNow the document-shape describe block:\nNow the server test — a real socket request for the card document:\nNow add the import to the server test:\nNow the metrics test — the dashboard-open invariant:\nNow add the card-document counter test after the \"does not count an asset...\" test:\nNow the negative-list assertion in the pure test:\nNow the test file fixes:\nAll work is complete and validated. Here is the report.\n\n## What I built\n\n**`src/dashboard/card.html`** — the card document, a third page in the dashboard build. It links `card.css` and loads `card-main.ts` as a module script with a `src`, declares one `[data-card-surface]` element, and contains no `style` attribute, no `<style>` element, no inline script and no policy of its own. It carries no dashboard chrome and no second surface.\n\n**`src/dashboard/card.css`** — the product's stylesheet. Every selector is keyed on an attribute `src/notify/surface/card-view.ts` writes; it invents no state. The page paints nothing (`background: transparent`, because the host window is `transparent: true` and exists for the life of the hub — NT-FR-10), the card fills the window's 320×96, and the motion is keyed on `data-motion-state-arrival` plus the media query. Text pairs are ≥ 4.5:1 and borders ≥ 3:1, asserted as computed values.\n\n**`src/dashboard/card-main.ts`** — the entry. It imports `createCardView` from TypeScript source through the `@` alias, mounts it on the document's own surface, and exports the mounted view. It builds no channel: nothing shows or removes a card, which is NS-2's decision and why an inert document cannot put an empty window on a screen.\n\n**`vite.config.ts`** — `card` as the third `rollupOptions.input`, and `modulePreload: { polyfill: false }` stated explicitly (see decisions).\n\n## Files created or changed\n\n| File | Change |\n|---|---|\n| `src/dashboard/card.html` | new — the card document |\n| `src/dashboard/card.css` | new — the card stylesheet |\n| `src/dashboard/card-main.ts` | new — the entry module |\n| `vite.config.ts` | third rollup input + explicit `modulePreload` |\n| `tests/dashboard/card-document.test.ts` | new — 13 tests (builds, artefact set, document shape, import closure, mount, stylesheet) |\n| `tests/hub/server.test.ts` | card document in the fixture + a real-socket `GET /card.html` test |\n| `tests/hub/metrics.test.ts` | card document in the fixture + \"a card is not a dashboard open\" + `/card.html` in the negative list |\n| `src/main/index.ts`, `src/notify/surface/card.ts`, `src/notify/surface/card-view.ts` | comment-only: three statements that \"the card document does not exist in the build\" were falsified by this task |\n\n## Validation\n\n`npm test -- tests/dashboard/card-document.test.ts` → 13/13; `npm test -- tests/hub/server.test.ts` → 37/37; `npm test -- tests/hub/metrics.test.ts` → 31/31; `npm run typecheck`, `npm run lint`, `npm run build` exit 0; whole suite 1426/1426 in 38 files. Four applied mutations each fail a named assertion (removing `modulePreload`, an inline `<style>`, a relative import instead of the alias, a `node:fs` in the closure, and adding `/card.html` to `DASHBOARD_DOCUMENT_PATHS`).\n\n```forge-result\n{\"summary\":\"NS-1 complete: the card document is a third entry in the dashboard Vite build, so `npm run build:dashboard` emits dist/dashboard/card.html at exactly SURFACE_DOCUMENT_PATH, and all six acceptance criteria are enforced by tests. src/dashboard/card.html links card.css and a module script and inlines neither a style attribute nor a script; src/dashboard/card.css paints only the attributes card-view.ts writes, keeps the page transparent so an empty document draws nothing, honours data-motion-state-arrival plus prefers-reduced-motion, and meets WCAG AA (asserted as computed ratios); src/dashboard/card-main.ts imports the product's own createCardView from TypeScript source through the vite @ alias and mounts it on the document's [data-card-surface], with no renderer channel and no acknowledgement hook. tests/dashboard/card-document.test.ts (13 tests) runs the real build itself and proves the artefact set is card.html + index.html + prototype/index.html, that the card document's shape survives the build, that the entry's value-import closure is exactly {card-main, card-view, card, lifetime} with no node: import, subprocess or filesystem and no dist/main copy step (the chunk's sourcemap names only src/*.ts), that the built markup plus the real entry module render a real product card in jsdom, and that the two existing pages are byte-for-byte identical to a second build of the same sources with the card entry removed. tests/hub/server.test.ts drives a real GET /card.html over a real loopback socket and asserts 200, exactly text/html; charset=utf-8, nosniff, the full DASHBOARD_CSP and no unsafe-inline, plus the document's own two assets. tests/hub/metrics.test.ts proves serving the card document moves neither dashboard_opens nor deep_link_opens while a real GET / does, and carries /card.html (with //card.html and /card.html/) in the pure isDashboardDocumentPath negative list. Validation: npm test -- tests/dashboard/card-document.test.ts exit 0 (13/13); npm run typecheck, npm run lint and npm run build exit 0; whole suite 1426/1426 in 38 files.\",\"unresolved\":[],\"decisions\":[\"modulePreload: { polyfill: false } is now stated in vite.config.ts. Vite's default injected a modulepreload polyfill import into every page, and whether the empty polyfill module survives tree-shaking as a shared chunk depends on the number of entries: adding a third page silently appended a <link rel=\\\"modulepreload\\\"> to the two pages that had shipped without one. Keeping the default therefore reshapes the existing pages' documents; stating it false leaves both documents byte-identical. The cost is 528 bytes of code that only ever executed on browsers without rel=modulepreload support (Safari before 17), removed from the shared PixiJS chunk all three pages load. In Chromium - the only renderer the surface uses - the polyfill body was a runtime no-op.\",\"'The first two pages are unchanged' is proven by building the same sources twice, once with the card entry deleted from the real config, and comparing every byte both pages load, rather than by pinning a digest that the next legitimate edit to the live page would trip. That comparison needs its config inside the repository root, because vite.config.ts derives root, outDir and the @ alias from import.meta.url; the probe config is written there by the test, imports the real one, deletes one key, and is removed in afterAll.\",\"The stylesheet deliberately gives no rule to data-lifetime, data-expires-in and data-deep-link: they are facts about a card rather than its appearance, and painting them would put meaning on the screen that the card's own text does not carry (a colour-only channel for the class, a number that is not the outstanding count, and a URL that is not a control). The test names that list, so a fourth entry is a decision rather than an accident.\",\"The card entry builds no renderer channel, as the task requires. The mounted view is a module export, so a channel has a product object to reach, and the document listens to nothing. With no presenter on the shipped Electron bridge a delivery stays not-wired and no window is shown, which is why an inert document cannot put an empty rectangle on a screen (NT-FR-10).\",\"No stylesheet rule sets pointer-events: whether a click reaches the document is the host's per-card setClickThrough decision, and a stylesheet refusing pointer events would override it from the other end.\"],\"interfaces\":[\"src/dashboard/card-main.ts: CARD_SURFACE_ATTRIBUTE ('data-card-surface'), MountCardDocumentOptions, mountCardDocument(options), cardDocumentView (CardView | null, mounted on load when the document declares a surface). Imports createCardView from '@/notify/surface/card-view'.\",\"src/dashboard/card.html: one [data-card-surface] element, one linked stylesheet (./card.css), one module script (./card-main.ts). Same element name scripts/verify-notification-surface.mjs reads, so the product document and the harness report agree on where a card goes.\",\"vite.config.ts: rollupOptions.input is now { index, prototype, card }; build.modulePreload.polyfill is false.\",\"tests/dashboard/card-document.test.ts: no product exports. The vite probe config it writes and deletes is vite.card-document-comparison.config.ts, and its output is dist/card-document-comparison/.\"],\"tests\":[\"npm test -- tests/dashboard/card-document.test.ts: exit 0 (13/13)\",\"npm test -- tests/hub/server.test.ts: exit 0 (37/37)\",\"npm test -- tests/hub/metrics.test.ts: exit 0 (31/31)\",\"npm run typecheck: exit 0\",\"npm run lint: exit 0\",\"npm run build: exit 0 (main tsc 32 sources, dashboard vite, three HTML entries)\",\"whole suite: exit 0 (1426/1426, 38 files)\",\"five applied mutations each fail a named assertion: dropping modulePreload.polyfill=false, an inline <style> in card.html, a relative import instead of the @ alias, a node:fs import in the closure, and /card.html added to DASHBOARD_DOCUMENT_PATHS\"],\"warnings\":[\"Three comments stated as fact that the card document does not exist in the build (src/main/index.ts twice, src/notify/surface/card.ts, src/notify/surface/card-view.ts) and are now false. I corrected the four comment blocks and nothing else in those files; the not-wired posture they describe is unchanged, because the channel rather than the document is the remaining gap.\",\"docs/runbooks/notification-surface.md section 4 and docs/reviews/notification-surface-evidence.json still record the card document as absent and GET /card.html as a 404. Those are NT-9/NS-2's artefacts, not in this task's output list, so I left them; whoever re-runs the evidence (NS-2) should close the card-document-entry required change and the shipped-posture record.\",\"The two existing built documents are not byte-identical to the pre-task artefact: each differs in exactly two hashed asset names (index-BuVZAe63 -> index-DRRgU80U, host-tlRDr65u -> host-CpwCAEtM), because the shared PixiJS chunk both pages preload lost the 528-byte polyfill runtime as a direct consequence of stating modulePreload.polyfill false. Nothing else in either document changed, and the test proves that adding the card entry itself changes neither document nor any asset they load.\",\"tests/dashboard/card-document.test.ts builds the dashboard twice in beforeAll (~3s) and writes a temporary vite config into the repository root, because a config evaluated from anywhere else resolves vite.config.ts's path-derived root, outDir and alias wrongly. It is removed in afterAll; a hard kill mid-test would leave vite.card-document-comparison.config.ts and dist/card-document-comparison/ behind.\",\"The card document is inert by design until the renderer channel exists, so nothing in this change can put a card on a screen, and no test in this repository claims otherwise. NT-FR-12 stays open for the channel and the acknowledgement path.\",\"One full-suite run showed a single failure in tests/plugin/install.test.ts ('leaves nothing behind in the system temporary directory'), which counts agent-ping-stage-*/agent-ping-verify-* directories in the shared system temp dir. It is unrelated to this change - those prefixes appear in no other test file, it passes in isolation, and the suite passed in full on two subsequent runs including the final one. A separate run failed only because I had deleted dist/ and rebuilt just the dashboard, which removed the tsc output that script's preflight needs (the missing schema copy step NT-9 recorded); npm run build plus the documented schema copy restored it.\"],\"validationLimitations\":[\"No Electron process was started and no card was seen on any desktop from this checkout. Everything claimed here is about the built document, the served route, the counter and the module graph; whether a card window composites on any desktop remains unobserved and belongs to the verification run.\",\"The hub tests serve a stand-in dashboard root that mirrors the built artefact's shape (a card.html linking a hashed stylesheet and module script), not the real dist/dashboard, because the real build's asset names are hashed and would make the test assert against whatever was last built. The real bytes are the subject of tests/dashboard/card-document.test.ts, which builds the artefact itself; what the hub tests prove is the route, the content type and the headers.\",\"Nothing here says what a card looks like. jsdom applies no layout and no paint, and the contrast figures are computed from the declared tokens rather than read off a rendered pixel, so the palette is proven legible and the composition is not.\",\"The import-closure reader is a hand-written comment stripper: a backtick template is read as one string to its closing backtick, so a nested template inside a ${...} would end the scan early. No module in the card document's closure contains one, and the built chunk is checked independently for node built-ins, require and process.env, which does not depend on the stripper.\",\"The prototype page (src/dashboard/prototype/index.html) carries an inline <style> element that the hub's style-src 'self' refuses. That is pre-existing, it is one of the two pages this task was told not to reshape, and I did not touch it; it is a defect in a design-review artefact rather than in a served surface, and it is recorded here rather than fixed.\"]}\n```\n",
+      "validationLimitations": [
+        "No Electron process was started and no card was seen on any desktop from this checkout. Everything claimed here is about the built document, the served route, the counter and the module graph; whether a card window composites on any desktop remains unobserved and belongs to the verification run.",
+        "The hub tests serve a stand-in dashboard root that mirrors the built artefact's shape (a card.html linking a hashed stylesheet and module script), not the real dist/dashboard, because the real build's asset names are hashed and would make the test assert against whatever was last built. The real bytes are the subject of tests/dashboard/card-document.test.ts, which builds the artefact itself; what the hub tests prove is the route, the content type and the headers.",
+        "Nothing here says what a card looks like. jsdom applies no layout and no paint, and the contrast figures are computed from the declared tokens rather than read off a rendered pixel, so the palette is proven legible and the composition is not.",
+        "The import-closure reader is a hand-written comment stripper: a backtick template is read as one string to its closing backtick, so a nested template inside a ${...} would end the scan early. No module in the card document's closure contains one, and the built chunk is checked independently for node built-ins, require and process.env, which does not depend on the stripper.",
+        "The prototype page (src/dashboard/prototype/index.html) carries an inline <style> element that the hub's style-src 'self' refuses. That is pre-existing, it is one of the two pages this task was told not to reshape, and I did not touch it; it is a defect in a design-review artefact rather than in a served surface, and it is recorded here rather than fixed."
+      ],
+      "artifactId": "work-ns-1-001",
+      "inputArtifactIds": [
+        "work-nt-6-001",
+        "work-nt-7-001",
+        "work-nt-8-001",
+        "work-nt-9-001"
+      ]
+    },
+    "NS-2": {
+      "taskId": "NS-2",
+      "status": "pending",
+      "ownerAgent": "notification-engineer",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "NS-3": {
+      "taskId": "NS-3",
+      "status": "pending",
+      "ownerAgent": "hub-engineer",
+      "attempt": 0,
+      "outputFiles": []
+    },
+    "NS-4": {
+      "taskId": "NS-4",
+      "status": "pending",
+      "ownerAgent": "qa-engineer",
+      "attempt": 0,
+      "outputFiles": []
+    },
     "OA-1": {
       "taskId": "OA-1",
       "status": "complete",
@@ -1166,7 +1229,8 @@
       "taskId": "CP-3",
       "status": "pending",
       "attempt": 0,
-      "outputFiles": []
+      "outputFiles": [],
+      "errorMessage": "Human review required for 'CP-3'. Record operator evidence with workflow-engine approve-task, then resume. --yes does not approve human work."
     },
     "CP-4": {
       "taskId": "CP-4",
@@ -1180,7 +1244,8 @@
     "Manifest reconciliation added 4 pending task(s): NT-6, NT-7, NT-8, NT-9",
     "Manifest reconciliation removed 2 task(s): NT-4, NT-5",
     "Manifest reconciliation changed 16 existing task(s): NT-1, NT-2, NT-3, OA-5, OA-6, LD-1, LD-2, LD-3, LD-4, LD-5, IO-1, IO-2, IO-3, IO-4, IO-5, CP-4",
-    "Manifest reconciliation changed 16 existing task(s): NT-1, NT-2, NT-3, OA-5, OA-6, LD-1, LD-2, LD-3, LD-4, LD-5, IO-1, IO-2, IO-3, IO-4, IO-5, CP-4"
+    "Manifest reconciliation changed 16 existing task(s): NT-1, NT-2, NT-3, OA-5, OA-6, LD-1, LD-2, LD-3, LD-4, LD-5, IO-1, IO-2, IO-3, IO-4, IO-5, CP-4",
+    "Manifest reconciliation added 4 pending task(s): NS-1, NS-2, NS-3, NS-4"
   ],
   "auditLog": []
 }

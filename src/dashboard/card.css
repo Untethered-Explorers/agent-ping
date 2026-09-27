@@ -1,0 +1,217 @@
+/* The card document's own stylesheet: the drawing half of the card, and nothing else.
+ *
+ * Linked from card.html rather than inlined, because the hub sends the dashboard a
+ * strict `style-src 'self'` with no `unsafe-inline` and no `unsafe-eval`
+ * (DASHBOARD_CSP in src/hub/security.ts). A browser refuses an inline <style> element
+ * and a `style` attribute under that policy, which is precisely why
+ * src/notify/surface/card-view.ts writes every fact about a card as an *attribute* and
+ * never as a style (NT-FR-02, HC-FR-06, ADR-012).
+ *
+ * THEREFORE: THIS FILE INVENTS NO STATE.
+ * Every selector below is keyed on an attribute card-view.ts writes, and there is no
+ * rule here for a state that module cannot produce. The card's own table of
+ * attribute names is the list of selectors: `data-card`, `data-urgency`,
+ * `data-card-urgency-icon`, `data-card-urgency-word`, `data-card-title`,
+ * `data-card-body` and `data-motion-state-arrival`, plus this document's own
+ * `data-card-surface`. Three of the attributes the view writes are deliberately
+ * undrawn - `data-lifetime`, `data-expires-in` and `data-deep-link` - because they are
+ * facts about a card rather than its appearance, and painting them would put a meaning
+ * on the screen that the card's own words do not carry. A card that appears with an
+ * attribute this file has never heard of is therefore undressed rather than mis-dressed,
+ * which is the correct failure under a strict policy.
+ *
+ * COLOUR IS THE THIRD CHANNEL, NEVER THE ONLY ONE (APX-CON-07)
+ * The urgency is already a glyph and a word in real text - the icon and the word
+ * card-view.ts writes - so the fill and the border here add a third reading rather than
+ * carrying the meaning. Every text pair below is asserted at or above WCAG 2.1 AA
+ * against the background it is painted on, by name, in
+ * tests/dashboard/card-document.test.ts: 14.1:1 for the two lines on the card fill,
+ * 7.1:1 for the urgency word, 13.6:1 and 6.9:1 on the needs-you fill and 13.5:1 and
+ * 6.8:1 on the finished fill. The three border colours clear 3:1 against the fill they
+ * sit on, which is the non-text threshold, because a border a person cannot see is a
+ * card edge that does not exist.
+ *
+ * THE PAGE MUST PAINT NOTHING UNTIL A CARD IS THERE (NT-FR-10)
+ * The host window is created `transparent: true` and exists for the life of the hub, so
+ * the document's own background has to be transparent: an opaque page background would
+ * put a filled rectangle on the developer's screen for as long as the hub runs, which is
+ * the always-on panel ADR-009 declined. Every rule here therefore paints the card
+ * element, and none of them paints `html` or `body`.
+ */
+
+:root {
+  color-scheme: dark;
+
+  /* The card as it is drawn before a class says otherwise. */
+  --card-fill: #1f2430;
+  --card-border: #6b7c9c;
+  --card-text: #f2f4f8;
+  --card-text-muted: #a8b0c0;
+
+  /* A needs-you card: somebody is waiting on a decision (ADR-004). */
+  --card-block-fill: #3a1f24;
+  --card-block-border: #b55660;
+
+  /* A finished card: news, not a demand. */
+  --card-finished-fill: #1b2b24;
+  --card-finished-border: #3f8a63;
+}
+
+/* The page paints nothing. The card is the only thing this document draws. */
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  /* No `pointer-events` rule, deliberately: whether a click reaches this document at
+     all is the host's decision, made per card by `setClickThrough`
+     (src/notify/surface/host.ts), and a stylesheet that refused pointer events would
+     silently override it from the other end (NT-FR-04). */
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+/* The surface is the element cards are put inside. It is a full-size, invisible
+ * container rather than a visible one: a card arrives as a child, and an empty
+ * surface draws nothing at all. */
+[data-card-surface] {
+  width: 100%;
+  height: 100%;
+}
+
+/* --------------------------------------------------------------------------
+   The card
+   -------------------------------------------------------------------------- */
+
+/*
+ * A two-column grid at the window's own size (CARD_SIZE in
+ * src/notify/surface/position.ts, 320x96, itself derived from the pre-flight's
+ * measured rectangle rather than chosen). The second column is three rows - the urgency
+ * word, the repository, the sentence - and the icon spans all three, so the urgency sits
+ * in one place a person can find without reading either line.
+ *
+ * `overflow: hidden` and the ellipsis rules below are what make a long repository
+ * short name and a long sentence one line each. A card that grows would resize
+ * nothing - the window is `resizable: false` and its size is a placement input - so a
+ * wrapping line would be clipped rather than shown.
+ */
+[data-card] {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-content: center;
+  gap: 2px 8px;
+  width: 100%;
+  height: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  background: var(--card-fill);
+  color: var(--card-text);
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+/* The two class readings, by the attribute the view writes for them. `critical` is a
+ * needs-you card and `normal` is a finished one; `low` has no cell that renders a card
+ * (an fyi is refused before a model is built), and the view refuses to render one
+ * anyway, so there is deliberately no rule for it. */
+[data-card][data-urgency='critical'] {
+  border-color: var(--card-block-border);
+  background: var(--card-block-fill);
+}
+
+[data-card][data-urgency='normal'] {
+  border-color: var(--card-finished-border);
+  background: var(--card-finished-fill);
+}
+
+/* The four text markers, one rule because they are one behaviour: one line, ellipsised,
+ * never a second row. */
+[data-card-urgency-icon],
+[data-card-urgency-word],
+[data-card-title],
+[data-card-body] {
+  margin: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* The icon is aria-hidden in the document (the word beside it carries the meaning), so
+ * it is drawn large enough to read at a glance and never asked to say anything twice. */
+[data-card-urgency-icon] {
+  grid-row: 1 / span 3;
+  align-self: center;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* The word, which is the non-colour channel: legible with no colour at all, and the
+ * first thing a screen reader announces (APX-CON-07). */
+[data-card-urgency-word] {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--card-text-muted);
+}
+
+[data-card-title] {
+  font-weight: 600;
+  color: var(--card-text);
+}
+
+[data-card-body] {
+  color: var(--card-text-muted);
+}
+
+/* --------------------------------------------------------------------------
+   Motion
+   -------------------------------------------------------------------------- */
+
+/*
+ * The view writes `data-motion-state-arrival` as `instant` when the document's own
+ * media query says the developer asked for reduced motion, and `animated` otherwise
+ * (CARD_MOTION_ATTRIBUTE and cardPrefersReducedMotion in
+ * src/notify/surface/card-view.ts). Keyed on the attribute rather than on the media
+ * query alone, so the card's state is one a test can read out of the document - and so
+ * the stylesheet and the view cannot disagree about which of the two is in force.
+ *
+ * The arrival is a 140ms fade and rise. There is no exit animation at all: a card
+ * leaves by being removed (NT-FR-08), and a leave animation would be a card still on the
+ * screen after the lifetime table said it was gone.
+ */
+[data-card][data-motion-state-arrival='animated'] {
+  animation: card-arrive 140ms ease-out;
+}
+
+@keyframes card-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Reduced motion, stated twice on purpose: once as the attribute the view writes, and
+ * once as the preference itself, in case a card is ever rendered by a path that did not
+ * consult the view. The end state is identical, so the two rules cannot disagree. */
+[data-card][data-motion-state-arrival='instant'],
+[data-card]:not([data-motion-state-arrival]) {
+  animation: none;
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-card],
+  [data-card] * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>agent-ping card</title>
+    <!--
+      THE CARD DOCUMENT, AND THE THIRD ENTRY OF THE DASHBOARD BUILD
+      This is the document the notification surface's window loads, over the hub's own
+      loopback origin, at exactly the path src/notify/surface/electron-host.ts names as
+      SURFACE_DOCUMENT_PATH (`/card.html`). It is a third page in the same Vite build as
+      the live dashboard and the approved prototype, so the build that produces those two
+      also produces the one the surface asks for, and there is no second build, no copy
+      step and no script that assembles a document at run time (NT-FR-02, NT-FR-12).
+
+      It is NOT the dashboard. It draws one card and nothing else: no header, no canvas,
+      no repository groups, no session rows, no history, no chrome. The window it is
+      loaded into is 320x96, frameless, transparent, always-on-top and deliberately
+      unfocusable, so a card cannot take the keystroke someone is typing (NT-FR-04).
+
+      EVERY RULE OF THE HUB'S CONTENT-SECURITY-POLICY IS VISIBLE IN THIS FILE
+      The hub sends DASHBOARD_CSP with every page under this origin, and it carries
+      `style-src 'self'` and `script-src 'self'` with no `unsafe-inline` and no
+      `unsafe-eval` (src/hub/security.ts). A browser therefore refuses an inline <style>
+      element, an inline `<script>` and a `style` attribute here, and it would refuse
+      them silently enough to look like a rendering fault: LD-1 found a served page
+      refused for injecting one. So:
+
+        - the stylesheet is a linked file, card.css, painted by this product;
+        - the entry is a module script with a `src`, card-main.ts;
+        - there is no `style` attribute anywhere below, and no inline script.
+
+      tests/dashboard/card-document.test.ts asserts all of that against the *built*
+      artefact rather than against this source, because a source that satisfies it and a
+      build that does not are two different documents.
+
+      THE SURFACE ELEMENT IS WHERE A CARD GOES
+      `[data-card-surface]` is the parent src/notify/surface/card-view.ts is given: the
+      view puts a card inside it and takes it out again, and an empty surface draws
+      nothing at all - which is what keeps NT-FR-10 true on a window that exists for the
+      whole life of the hub. The name is the same one
+      scripts/verify-notification-surface.mjs reads, so the product's document and the
+      verification script's own report agree about where a card is.
+    -->
+    <link rel="stylesheet" href="./card.css" />
+  </head>
+  <body>
+    <!-- The card's container. Empty on load, and empty again after a card ends. -->
+    <div data-card-surface></div>
+    <script type="module" src="./card-main.ts"></script>
+  </body>
+</html>

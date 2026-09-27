@@ -255,8 +255,8 @@ export interface DesktopBridge {
    * reported as `not-wired` with a diagnostic rather than as a delivery - a
    * transparent rectangle on a developer's screen is not a card, and reporting it as
    * one would be the exact lie APX-FR-02 forbids. That is the honest state today: the
-   * card document is not in the built artefacts yet, and NT-9 records what that costs
-   * (NT-FR-01, APX-FR-02).
+   * card document is in the build and nothing can put a model in it, and NT-9 records
+   * what that costs (NT-FR-01, APX-FR-02).
    *
    * Absent entirely on a headless run, exactly as `tray` and `surface` are: no desktop,
    * no window, no card, and no stub pretending otherwise.
@@ -1483,11 +1483,13 @@ function electronTrayBridge(electron: ElectronModuleLike): TrayBridge {
  * window and nothing else, so the composition root finds `DesktopBridge.renderCard`
  * absent and reports the run as `not-wired` with a diagnostic rather than showing an
  * empty rectangle on somebody's screen (NT-FR-01, APX-FR-02). The reason is recorded
- * rather than worked around: the card document is not in the built artefacts yet
- * (`dist/dashboard/card.html` does not exist), and the main-to-renderer channel that
- * would hand a model to a document running under `contextIsolation` with no `require`
- * in it is a decision NT-7 named and left here. NT-9's evidence is where that gap is
- * recorded as a required product change.
+ * rather than worked around: the card document is in the built artefacts
+ * (`dist/dashboard/card.html`, the third entry of the dashboard build), and what is
+ * still missing is the main-to-renderer channel that would hand a model to that document
+ * running under `contextIsolation` with no `require` in it - a decision NT-7 named,
+ * NS-1 left alone and NT-9's evidence records as a required product change. Until that
+ * channel exists the document is inert, which is why an inert document cannot put an
+ * empty window on a screen (NT-FR-10, NT-FR-12).
  *
  * VERIFICATION STATE: the window primitives this bridge uses were proved by the
  * pre-flight on the authoring machine, and the host itself is unit-tested against a
