@@ -1,0 +1,2138 @@
+{
+  "probe": "probe-copilot-hooks",
+  "artifactVersion": 1,
+  "recordedBy": {
+    "script": "scripts/probe-copilot-hooks.mjs",
+    "node": "v22.22.2"
+  },
+  "cli": {
+    "binary": "copilot",
+    "version": "1.0.88",
+    "versionCommand": "copilot --version",
+    "versionOutput": "GitHub Copilot CLI 1.0.88.\nRun 'copilot update' to check for updates."
+  },
+  "documentation": {
+    "title": "GitHub Copilot hooks reference",
+    "url": "https://docs.github.com/en/copilot/reference/hooks-reference",
+    "cliHelpCommand": "copilot help config",
+    "cliHelpQuote": "`hooks`: inline hook definitions, keyed by event name (same schema as .github/hooks/*.json). - In global config.json these act as user-level hooks; in repo settings.json they act as repo-level hooks",
+    "cliHelpQuoteCommand": "copilot help config",
+    "vendoredAt": "2026-09-27",
+    "retrievedVia": "web page fetch of the URL above, quoted into this file as the vendored snapshot",
+    "onMachine": {
+      "command": "copilot help config",
+      "exitCode": 0,
+      "hookConfigDocumented": true,
+      "hookLines": [
+        "`disableAllHooks`: whether to disable all hooks (repo-level and user-level); defaults to `false`.",
+        "`hooks`: inline hook definitions, keyed by event name (same schema as .github/hooks/*.json).",
+        "- In global config.json these act as user-level hooks; in repo settings.json they act as repo-level hooks"
+      ],
+      "exitWithinTimeout": true
+    },
+    "environmentCaveat": {
+      "trustOptIn": "COPILOT_ALLOW_ALL=true",
+      "why": "documented: exactly \"true\" also trusts the working directory, and trusting the directory is what loads repository-level hooks",
+      "toolsAutoApproved": true,
+      "effectOnPermissionEvidence": "permissionRequest fired while every tool was auto-approved, which is evidence the hook runs before the permission service. The ACP runs in this probe emitted no session/request_permission for the same reason, so their empty agent-request list says nothing about the ACP permission signal; CP-1 ran without this flag and is the authority on that."
+    },
+    "strippedEnvironment": [],
+    "runMatrix": [
+      "pipe-user",
+      "acp-user",
+      "pipe-repo",
+      "acp-repo"
+    ],
+    "declaredTriggers": [
+      {
+        "event": "agentStop",
+        "firesWhen": "The main agent finishes a turn.",
+        "documentedInputKeys": [
+          "sessionId",
+          "timestamp",
+          "cwd",
+          "transcriptPath",
+          "stopReason",
+          "stop_hook_active"
+        ]
+      },
+      {
+        "event": "errorOccurred",
+        "firesWhen": "An error occurs during execution.",
+        "documentedInputKeys": [
+          "sessionId",
+          "timestamp",
+          "cwd",
+          "error",
+          "errorContext",
+          "recoverable"
+        ]
+      },
+      {
+        "event": "notification",
+        "firesWhen": "Fires asynchronously when the CLI emits a system notification (shell completion, agent completion or idle, permission prompts, elicitation dialogs). Fire-and-forget: never blocks the session.",
+        "documentedInputKeys": [
+          "sessionId",
+          "timestamp",
+          "cwd",
+          "hook_event_name",
+          "message",
+          "title",
+          "notification_type"
+        ]
+      },
+      {
+        "event": "permissionRequest",
+        "firesWhen": "Fires before the permission service runs (rules engine, session approvals, auto-allow/auto-deny, and user prompting).",
+        "documentedInputKeys": [
+          "hookName",
+          "sessionId",
+          "timestamp",
+          "cwd",
+          "toolName",
+          "toolInput",
+          "permissionSuggestions"
+        ]
+      },
+      {
+        "event": "postToolUse",
+        "firesWhen": "After each tool completes successfully.",
+        "documentedInputKeys": [
+          "sessionId",
+          "timestamp",
+          "cwd",
+          "toolName",
+          "toolArgs",
+          "toolResult"
+        ]
+      },
+      {
+        "event": "postToolUseFailure",
+        "firesWhen": "After a tool completes with a failure.",
+        "documentedInputKeys": [
+          "sessionId",
+          "timestamp",
+          "cwd",
+          "toolName",
+          "toolArgs",
+          "error"
+        ]
+      },
+      {
+        "event": "preCompact",
+        "firesWhen": "Context compaction is about to begin (manual or automatic).",
+        "documentedInputKeys": [
+          "sessionId",
+          "timestamp",
+          "cwd",
+          "transcriptPath",
+          "trigger",
+          "customInstructions"
+        ]
+      },
+      {
+        "event": "preToolUse",
+        "firesWhen": "Before each tool executes.",
+        "documentedInputKeys": [
+          "sessionId",
+          "timestamp",
+          "cwd",
+          "toolName",
+          "toolArgs"
+        ]
+      },
+      {
+        "event": "sessionEnd",
+        "firesWhen": "The session terminates.",
+        "documentedInputKeys": [
+          "sessionId",
+          "timestamp",
+          "cwd",
+          "reason"
+        ]
+      },
+      {
+        "event": "sessionStart",
+        "firesWhen": "A new or resumed session begins.",
+        "documentedInputKeys": [
+          "sessionId",
+          "timestamp",
+          "cwd",
+          "source",
+          "initialPrompt"
+        ]
+      },
+      {
+        "event": "subagentStart",
+        "firesWhen": "A subagent is spawned (before it runs).",
+        "documentedInputKeys": [
+          "sessionId",
+          "timestamp",
+          "cwd",
+          "transcriptPath",
+          "agentName",
+          "agentDisplayName",
+          "agentDescription"
+        ]
+      },
+      {
+        "event": "subagentStop",
+        "firesWhen": "A subagent completes.",
+        "documentedInputKeys": [
+          "sessionId",
+          "timestamp",
+          "cwd",
+          "transcriptPath",
+          "agentId",
+          "agentType",
+          "agentName",
+          "agentDisplayName",
+          "response",
+          "stopReason"
+        ]
+      },
+      {
+        "event": "userPromptSubmitted",
+        "firesWhen": "The user submits a prompt.",
+        "documentedInputKeys": [
+          "sessionId",
+          "timestamp",
+          "cwd",
+          "prompt"
+        ]
+      },
+      {
+        "event": "userPromptTransformed",
+        "firesWhen": "Fires after the runtime transforms a submitted prompt into its model-facing content, just before that content is emitted and persisted to session history.",
+        "documentedInputKeys": [
+          "sessionId",
+          "timestamp",
+          "cwd",
+          "prompt",
+          "transformedPrompt"
+        ]
+      }
+    ]
+  },
+  "declaredTriggers": [
+    {
+      "event": "agentStop",
+      "firesWhen": "The main agent finishes a turn.",
+      "documentedInputKeys": [
+        "sessionId",
+        "timestamp",
+        "cwd",
+        "transcriptPath",
+        "stopReason",
+        "stop_hook_active"
+      ]
+    },
+    {
+      "event": "errorOccurred",
+      "firesWhen": "An error occurs during execution.",
+      "documentedInputKeys": [
+        "sessionId",
+        "timestamp",
+        "cwd",
+        "error",
+        "errorContext",
+        "recoverable"
+      ]
+    },
+    {
+      "event": "notification",
+      "firesWhen": "Fires asynchronously when the CLI emits a system notification (shell completion, agent completion or idle, permission prompts, elicitation dialogs). Fire-and-forget: never blocks the session.",
+      "documentedInputKeys": [
+        "sessionId",
+        "timestamp",
+        "cwd",
+        "hook_event_name",
+        "message",
+        "title",
+        "notification_type"
+      ]
+    },
+    {
+      "event": "permissionRequest",
+      "firesWhen": "Fires before the permission service runs (rules engine, session approvals, auto-allow/auto-deny, and user prompting).",
+      "documentedInputKeys": [
+        "hookName",
+        "sessionId",
+        "timestamp",
+        "cwd",
+        "toolName",
+        "toolInput",
+        "permissionSuggestions"
+      ]
+    },
+    {
+      "event": "postToolUse",
+      "firesWhen": "After each tool completes successfully.",
+      "documentedInputKeys": [
+        "sessionId",
+        "timestamp",
+        "cwd",
+        "toolName",
+        "toolArgs",
+        "toolResult"
+      ]
+    },
+    {
+      "event": "postToolUseFailure",
+      "firesWhen": "After a tool completes with a failure.",
+      "documentedInputKeys": [
+        "sessionId",
+        "timestamp",
+        "cwd",
+        "toolName",
+        "toolArgs",
+        "error"
+      ]
+    },
+    {
+      "event": "preCompact",
+      "firesWhen": "Context compaction is about to begin (manual or automatic).",
+      "documentedInputKeys": [
+        "sessionId",
+        "timestamp",
+        "cwd",
+        "transcriptPath",
+        "trigger",
+        "customInstructions"
+      ]
+    },
+    {
+      "event": "preToolUse",
+      "firesWhen": "Before each tool executes.",
+      "documentedInputKeys": [
+        "sessionId",
+        "timestamp",
+        "cwd",
+        "toolName",
+        "toolArgs"
+      ]
+    },
+    {
+      "event": "sessionEnd",
+      "firesWhen": "The session terminates.",
+      "documentedInputKeys": [
+        "sessionId",
+        "timestamp",
+        "cwd",
+        "reason"
+      ]
+    },
+    {
+      "event": "sessionStart",
+      "firesWhen": "A new or resumed session begins.",
+      "documentedInputKeys": [
+        "sessionId",
+        "timestamp",
+        "cwd",
+        "source",
+        "initialPrompt"
+      ]
+    },
+    {
+      "event": "subagentStart",
+      "firesWhen": "A subagent is spawned (before it runs).",
+      "documentedInputKeys": [
+        "sessionId",
+        "timestamp",
+        "cwd",
+        "transcriptPath",
+        "agentName",
+        "agentDisplayName",
+        "agentDescription"
+      ]
+    },
+    {
+      "event": "subagentStop",
+      "firesWhen": "A subagent completes.",
+      "documentedInputKeys": [
+        "sessionId",
+        "timestamp",
+        "cwd",
+        "transcriptPath",
+        "agentId",
+        "agentType",
+        "agentName",
+        "agentDisplayName",
+        "response",
+        "stopReason"
+      ]
+    },
+    {
+      "event": "userPromptSubmitted",
+      "firesWhen": "The user submits a prompt.",
+      "documentedInputKeys": [
+        "sessionId",
+        "timestamp",
+        "cwd",
+        "prompt"
+      ]
+    },
+    {
+      "event": "userPromptTransformed",
+      "firesWhen": "Fires after the runtime transforms a submitted prompt into its model-facing content, just before that content is emitted and persisted to session history.",
+      "documentedInputKeys": [
+        "sessionId",
+        "timestamp",
+        "cwd",
+        "prompt",
+        "transformedPrompt"
+      ]
+    }
+  ],
+  "runs": [
+    {
+      "label": "pipe-user",
+      "mode": "non-interactive prompt mode (copilot -p)",
+      "hookLocation": "user level",
+      "argv": [
+        "-p",
+        "<the probe prompt>"
+      ],
+      "hookConfigLocation": "$COPILOT_HOME/hooks/agent-ping-probe.json (user level, isolated)",
+      "startedAt": "2026-09-27T11:29:18.390Z",
+      "finishedAt": "2026-09-27T11:29:33.502Z",
+      "exitCode": 0,
+      "runCompleted": true,
+      "invocationTotal": 8,
+      "installedEvents": [
+        "agentStop",
+        "errorOccurred",
+        "notification",
+        "permissionRequest",
+        "postToolUse",
+        "postToolUseFailure",
+        "preCompact",
+        "preToolUse",
+        "sessionEnd",
+        "sessionStart",
+        "subagentStart",
+        "subagentStop",
+        "userPromptSubmitted",
+        "userPromptTransformed"
+      ],
+      "declaredTriggerCount": 14,
+      "triggerStates": {
+        "agentStop": {
+          "state": "observed",
+          "invocationCount": 1,
+          "unparsedCount": 0,
+          "reason": "1 invocation(s) captured for this event"
+        },
+        "errorOccurred": {
+          "state": "not-triggered",
+          "invocationCount": 0,
+          "unparsedCount": 0,
+          "reason": "the session ran to completion and this event fired nothing during it"
+        },
+        "notification": {
+          "state": "not-triggered",
+          "invocationCount": 0,
+          "unparsedCount": 0,
+          "reason": "the session ran to completion and this event fired nothing during it"
+        },
+        "permissionRequest": {
+          "state": "observed",
+          "invocationCount": 1,
+          "unparsedCount": 0,
+          "reason": "1 invocation(s) captured for this event"
+        },
+        "postToolUse": {
+          "state": "observed",
+          "invocationCount": 1,
+          "unparsedCount": 0,
+          "reason": "1 invocation(s) captured for this event"
+        },
+        "postToolUseFailure": {
+          "state": "not-triggered",
+          "invocationCount": 0,
+          "unparsedCount": 0,
+          "reason": "the session ran to completion and this event fired nothing during it"
+        },
+        "preCompact": {
+          "state": "not-triggered",
+          "invocationCount": 0,
+          "unparsedCount": 0,
+          "reason": "the session ran to completion and this event fired nothing during it"
+        },
+        "preToolUse": {
+          "state": "observed",
+          "invocationCount": 1,
+          "unparsedCount": 0,
+          "reason": "1 invocation(s) captured for this event"
+        },
+        "sessionEnd": {
+          "state": "observed",
+          "invocationCount": 1,
+          "unparsedCount": 0,
+          "reason": "1 invocation(s) captured for this event"
+        },
+        "sessionStart": {
+          "state": "observed",
+          "invocationCount": 1,
+          "unparsedCount": 0,
+          "reason": "1 invocation(s) captured for this event"
+        },
+        "subagentStart": {
+          "state": "not-triggered",
+          "invocationCount": 0,
+          "unparsedCount": 0,
+          "reason": "the session ran to completion and this event fired nothing during it"
+        },
+        "subagentStop": {
+          "state": "not-triggered",
+          "invocationCount": 0,
+          "unparsedCount": 0,
+          "reason": "the session ran to completion and this event fired nothing during it"
+        },
+        "userPromptSubmitted": {
+          "state": "observed",
+          "invocationCount": 1,
+          "unparsedCount": 0,
+          "reason": "1 invocation(s) captured for this event"
+        },
+        "userPromptTransformed": {
+          "state": "observed",
+          "invocationCount": 1,
+          "unparsedCount": 0,
+          "reason": "1 invocation(s) captured for this event"
+        }
+      },
+      "invocations": {
+        "agentStop": [
+          {
+            "index": 0,
+            "shape": {
+              "sessionId": "ab00170b-b5d8-4f85-a041-216c39dfc33a",
+              "timestamp": 1790508570828,
+              "cwd": {
+                "$string": 46
+              },
+              "transcriptPath": {
+                "$string": 113
+              },
+              "stopReason": "end_turn",
+              "stop_hook_active": false
+            }
+          }
+        ],
+        "errorOccurred": [],
+        "notification": [],
+        "permissionRequest": [
+          {
+            "index": 0,
+            "shape": {
+              "hookName": "permissionRequest",
+              "sessionId": "ab00170b-b5d8-4f85-a041-216c39dfc33a",
+              "timestamp": 1790508568733,
+              "cwd": {
+                "$string": 46
+              },
+              "toolName": "bash",
+              "toolInput": {
+                "command": {
+                  "$string": 6
+                }
+              },
+              "permissionSuggestions": {
+                "$array": 0,
+                "items": []
+              }
+            }
+          }
+        ],
+        "postToolUse": [
+          {
+            "index": 0,
+            "shape": {
+              "sessionId": "ab00170b-b5d8-4f85-a041-216c39dfc33a",
+              "timestamp": 1790508568787,
+              "cwd": {
+                "$string": 46
+              },
+              "toolName": "bash",
+              "toolArgs": {
+                "command": {
+                  "$string": 6
+                },
+                "description": {
+                  "$string": 31
+                }
+              },
+              "toolResult": {
+                "resultType": "success",
+                "textResultForLlm": {
+                  "$string": 323
+                }
+              }
+            }
+          }
+        ],
+        "postToolUseFailure": [],
+        "preCompact": [],
+        "preToolUse": [
+          {
+            "index": 0,
+            "shape": {
+              "sessionId": "ab00170b-b5d8-4f85-a041-216c39dfc33a",
+              "timestamp": 1790508568692,
+              "cwd": {
+                "$string": 46
+              },
+              "toolName": "bash",
+              "toolArgs": {
+                "command": {
+                  "$string": 6
+                },
+                "description": {
+                  "$string": 31
+                }
+              }
+            }
+          }
+        ],
+        "sessionEnd": [
+          {
+            "index": 0,
+            "shape": {
+              "sessionId": "ab00170b-b5d8-4f85-a041-216c39dfc33a",
+              "timestamp": 1790508570833,
+              "cwd": {
+                "$string": 46
+              },
+              "reason": "complete"
+            }
+          }
+        ],
+        "sessionStart": [
+          {
+            "index": 0,
+            "shape": {
+              "sessionId": "ab00170b-b5d8-4f85-a041-216c39dfc33a",
+              "timestamp": 1790508564755,
+              "cwd": {
+                "$string": 46
+              },
+              "source": "new",
+              "initialPrompt": {
+                "$string": 102
+              }
+            }
+          }
+        ],
+        "subagentStart": [],
+        "subagentStop": [],
+        "userPromptSubmitted": [
+          {
+            "index": 0,
+            "shape": {
+              "sessionId": "ab00170b-b5d8-4f85-a041-216c39dfc33a",
+              "timestamp": 1790508564730,
+              "cwd": {
+                "$string": 46
+              },
+              "prompt": {
+                "$string": 102
+              }
+            }
+          }
+        ],
+        "userPromptTransformed": [
+          {
+            "index": 0,
+            "shape": {
+              "sessionId": "ab00170b-b5d8-4f85-a041-216c39dfc33a",
+              "timestamp": 1790508564742,
+              "cwd": {
+                "$string": 46
+              },
+              "prompt": {
+                "$string": 102
+              },
+              "transformedPrompt": {
+                "$string": 170
+              }
+            }
+          }
+        ]
+      },
+      "unparsedInvocations": [],
+      "permissionPath": {
+        "event": "permissionRequest",
+        "documented": true,
+        "documentedInputKeys": [
+          "hookName",
+          "sessionId",
+          "timestamp",
+          "cwd",
+          "toolName",
+          "toolInput",
+          "permissionSuggestions"
+        ],
+        "invocationCount": 1,
+        "observedInputKeys": [
+          "hookName",
+          "sessionId",
+          "timestamp",
+          "cwd",
+          "toolName",
+          "toolInput",
+          "permissionSuggestions"
+        ],
+        "undocumentedInputKeys": [
+          "$string",
+          "command",
+          "$string",
+          "$array",
+          "items"
+        ],
+        "payloadKey": "toolName",
+        "toolNames": [
+          "bash"
+        ],
+        "requests": [
+          {
+            "index": 0,
+            "shape": {
+              "hookName": "permissionRequest",
+              "sessionId": "ab00170b-b5d8-4f85-a041-216c39dfc33a",
+              "timestamp": 1790508568733,
+              "cwd": {
+                "$string": 46
+              },
+              "toolName": "bash",
+              "toolInput": {
+                "command": {
+                  "$string": 6
+                }
+              },
+              "permissionSuggestions": {
+                "$array": 0,
+                "items": []
+              }
+            }
+          }
+        ]
+      },
+      "turnEndSignal": {
+        "event": "agentStop",
+        "state": "observed",
+        "invocationCount": 1,
+        "stopReasons": [
+          "end_turn"
+        ],
+        "observedInputKeys": [
+          "sessionId",
+          "timestamp",
+          "cwd",
+          "transcriptPath",
+          "stopReason",
+          "stop_hook_active"
+        ],
+        "otherObservedInputKeys": {
+          "permissionRequest": 1,
+          "postToolUse": 1,
+          "preToolUse": 1,
+          "sessionEnd": 1,
+          "sessionStart": 1,
+          "userPromptSubmitted": 1,
+          "userPromptTransformed": 1
+        },
+        "means": "the main agent finishing a turn is directly observable as a hook, in the modes this probe ran"
+      },
+      "sessionEndSignal": {
+        "event": "sessionEnd",
+        "state": "observed",
+        "invocationCount": 1,
+        "documentedReasons": [
+          "complete",
+          "error",
+          "abort",
+          "timeout",
+          "user_exit"
+        ],
+        "observedReasons": [
+          "complete"
+        ],
+        "observedInputKeys": [
+          "sessionId",
+          "timestamp",
+          "cwd",
+          "reason"
+        ],
+        "scope": "one prompt, one session, one reason: a reason value is a property of how the session ended, not a per-turn classification"
+      },
+      "idleSignal": {
+        "question": "is there a dedicated idle signal for the main agent?",
+        "documentedEvent": "notification",
+        "documentedInputKeys": [
+          "sessionId",
+          "timestamp",
+          "cwd",
+          "hook_event_name",
+          "message",
+          "title",
+          "notification_type"
+        ],
+        "documentedTypes": [
+          "shell_completed",
+          "shell_detached_completed",
+          "agent_completed",
+          "agent_idle",
+          "permission_prompt",
+          "elicitation_dialog"
+        ],
+        "documentedTypeMeaning": {
+          "shell_completed": "A background (async) shell command finishes",
+          "shell_detached_completed": "A detached shell session completes",
+          "agent_completed": "A background subagent finishes (completed or failed)",
+          "agent_idle": "A background agent finishes a turn and enters idle state (waiting for `write_agent`)",
+          "permission_prompt": "The agent requests permission to execute a tool",
+          "elicitation_dialog": "The agent requests additional information from the user"
+        },
+        "notificationState": "not-triggered",
+        "notificationInvocationCount": 0,
+        "observedNotificationTypes": [],
+        "state": "unclear",
+        "perTurnAlternative": {
+          "event": "agentStop",
+          "state": "observed",
+          "note": "the per-turn signal for the main agent, and the one this probe observed"
+        },
+        "stateMeaning": {
+          "observed": "a dedicated idle notification carrying `notification_type: \"agent_idle\"` was captured in this run",
+          "not-triggered": "the notification event fired and carried no idle type, so the signal was exercised and said nothing",
+          "unclear": "the notification event did not fire, and the documented idle type is scoped to a background agent this run did not start, so nothing can be concluded either way"
+        }
+      },
+      "acp": null,
+      "logEvidence": {
+        "lines": [
+          "2026-09-27T11:29:19.998Z [WARNING] Loading repo hooks in prompt mode (folder is trusted or opt-in set)"
+        ],
+        "hookLineCount": 1
+      }
+    },
+    {
+      "label": "acp-user",
+      "mode": "ACP mode over stdio (copilot --acp)",
+      "hookLocation": "user level",
+      "argv": [
+        "--acp"
+      ],
+      "hookConfigLocation": "$COPILOT_HOME/hooks/agent-ping-probe.json (user level, isolated)",
+      "startedAt": "2026-09-27T11:29:33.507Z",
+      "finishedAt": "2026-09-27T11:29:45.714Z",
+      "exitCode": 0,
+      "runCompleted": true,
+      "invocationTotal": 8,
+      "installedEvents": [
+        "agentStop",
+        "errorOccurred",
+        "notification",
+        "permissionRequest",
+        "postToolUse",
+        "postToolUseFailure",
+        "preCompact",
+        "preToolUse",
+        "sessionEnd",
+        "sessionStart",
+        "subagentStart",
+        "subagentStop",
+        "userPromptSubmitted",
+        "userPromptTransformed"
+      ],
+      "declaredTriggerCount": 14,
+      "triggerStates": {
+        "agentStop": {
+          "state": "observed",
+          "invocationCount": 1,
+          "unparsedCount": 0,
+          "reason": "1 invocation(s) captured for this event"
+        },
+        "errorOccurred": {
+          "state": "not-triggered",
+          "invocationCount": 0,
+          "unparsedCount": 0,
+          "reason": "the session ran to completion and this event fired nothing during it"
+        },
+        "notification": {
+          "state": "not-triggered",
+          "invocationCount": 0,
+          "unparsedCount": 0,
+          "reason": "the session ran to completion and this event fired nothing during it"
+        },
+        "permissionRequest": {
+          "state": "observed",
+          "invocationCount": 1,
+          "unparsedCount": 0,
+          "reason": "1 invocation(s) captured for this event"
+        },
+        "postToolUse": {
+          "state": "observed",
+          "invocationCount": 1,
+          "unparsedCount": 0,
+          "reason": "1 invocation(s) captured for this event"
+        },
+        "postToolUseFailure": {
+          "state": "not-triggered",
+          "invocationCount": 0,
+          "unparsedCount": 0,
+          "reason": "the session ran to completion and this event fired nothing during it"
+        },
+        "preCompact": {
+          "state": "not-triggered",
+          "invocationCount": 0,
+          "unparsedCount": 0,
+          "reason": "the session ran to completion and this event fired nothing during it"
+        },
+        "preToolUse": {
+          "state": "observed",
+          "invocationCount": 1,
+          "unparsedCount": 0,
+          "reason": "1 invocation(s) captured for this event"
+        },
+        "sessionEnd": {
+          "state": "observed",
+          "invocationCount": 1,
+          "unparsedCount": 0,
+          "reason": "1 invocation(s) captured for this event"
+        },
+        "sessionStart": {
+          "state": "observed",
+          "invocationCount": 1,
+          "unparsedCount": 0,
+          "reason": "1 invocation(s) captured for this event"
+        },
+        "subagentStart": {
+          "state": "not-triggered",
+          "invocationCount": 0,
+          "unparsedCount": 0,
+          "reason": "the session ran to completion and this event fired nothing during it"
+        },
+        "subagentStop": {
+          "state": "not-triggered",
+          "invocationCount": 0,
+          "unparsedCount": 0,
+          "reason": "the session ran to completion and this event fired nothing during it"
+        },
+        "userPromptSubmitted": {
+          "state": "observed",
+          "invocationCount": 1,
+          "unparsedCount": 0,
+          "reason": "1 invocation(s) captured for this event"
+        },
+        "userPromptTransformed": {
+          "state": "observed",
+          "invocationCount": 1,
+          "unparsedCount": 0,
+          "reason": "1 invocation(s) captured for this event"
+        }
+      },
+      "invocations": {
+        "agentStop": [
+          {
+            "index": 0,
+            "shape": {
+              "sessionId": "1da4685b-8f6c-4b89-9bed-299bd48552ee",
+              "timestamp": 1790508585582,
+              "cwd": {
+                "$string": 46
+              },
+              "transcriptPath": {
+                "$string": 113
+              },
+              "stopReason": "end_turn",
+              "stop_hook_active": false
+            }
+          }
+        ],
+        "errorOccurred": [],
+        "notification": [],
+        "permissionRequest": [
+          {
+            "index": 0,
+            "shape": {
+              "hookName": "permissionRequest",
+              "sessionId": "1da4685b-8f6c-4b89-9bed-299bd48552ee",
+              "timestamp": 1790508583102,
+              "cwd": {
+                "$string": 46
+              },
+              "toolName": "bash",
+              "toolInput": {
+                "command": {
+                  "$string": 6
+                }
+              },
+              "permissionSuggestions": {
+                "$array": 0,
+                "items": []
+              }
+            }
+          }
+        ],
+        "postToolUse": [
+          {
+            "index": 0,
+            "shape": {
+              "sessionId": "1da4685b-8f6c-4b89-9bed-299bd48552ee",
+              "timestamp": 1790508583152,
+              "cwd": {
+                "$string": 46
+              },
+              "toolName": "bash",
+              "toolArgs": {
+                "command": {
+                  "$string": 6
+                },
+                "description": {
+                  "$string": 31
+                }
+              },
+              "toolResult": {
+                "resultType": "success",
+                "textResultForLlm": {
+                  "$string": 323
+                }
+              }
+            }
+          }
+        ],
+        "postToolUseFailure": [],
+        "preCompact": [],
+        "preToolUse": [
+          {
+            "index": 0,
+            "shape": {
+              "sessionId": "1da4685b-8f6c-4b89-9bed-299bd48552ee",
+              "timestamp": 1790508583056,
+              "cwd": {
+                "$string": 46
+              },
+              "toolName": "bash",
+              "toolArgs": {
+                "command": {
+                  "$string": 6
+                },
+                "description": {
+                  "$string": 31
+                }
+              }
+            }
+          }
+        ],
+        "sessionEnd": [
+          {
+            "index": 0,
+            "shape": {
+              "sessionId": "1da4685b-8f6c-4b89-9bed-299bd48552ee",
+              "timestamp": 1790508585589,
+              "cwd": {
+                "$string": 46
+              },
+              "reason": "complete"
+            }
+          }
+        ],
+        "sessionStart": [
+          {
+            "index": 0,
+            "shape": {
+              "sessionId": "1da4685b-8f6c-4b89-9bed-299bd48552ee",
+              "timestamp": 1790508579820,
+              "cwd": {
+                "$string": 46
+              },
+              "source": "new",
+              "initialPrompt": {
+                "$string": 102
+              }
+            }
+          }
+        ],
+        "subagentStart": [],
+        "subagentStop": [],
+        "userPromptSubmitted": [
+          {
+            "index": 0,
+            "shape": {
+              "sessionId": "1da4685b-8f6c-4b89-9bed-299bd48552ee",
+              "timestamp": 1790508579795,
+              "cwd": {
+                "$string": 46
+              },
+              "prompt": {
+                "$string": 102
+              }
+            }
+          }
+        ],
+        "userPromptTransformed": [
+          {
+            "index": 0,
+            "shape": {
+              "sessionId": "1da4685b-8f6c-4b89-9bed-299bd48552ee",
+              "timestamp": 1790508579803,
+              "cwd": {
+                "$string": 46
+              },
+              "prompt": {
+                "$string": 102
+              },
+              "transformedPrompt": {
+                "$string": 170
+              }
+            }
+          }
+        ]
+      },
+      "unparsedInvocations": [],
+      "permissionPath": {
+        "event": "permissionRequest",
+        "documented": true,
+        "documentedInputKeys": [
+          "hookName",
+          "sessionId",
+          "timestamp",
+          "cwd",
+          "toolName",
+          "toolInput",
+          "permissionSuggestions"
+        ],
+        "invocationCount": 1,
+        "observedInputKeys": [
+          "hookName",
+          "sessionId",
+          "timestamp",
+          "cwd",
+          "toolName",
+          "toolInput",
+          "permissionSuggestions"
+        ],
+        "undocumentedInputKeys": [
+          "$string",
+          "command",
+          "$string",
+          "$array",
+          "items"
+        ],
+        "payloadKey": "toolName",
+        "toolNames": [
+          "bash"
+        ],
+        "requests": [
+          {
+            "index": 0,
+            "shape": {
+              "hookName": "permissionRequest",
+              "sessionId": "1da4685b-8f6c-4b89-9bed-299bd48552ee",
+              "timestamp": 1790508583102,
+              "cwd": {
+                "$string": 46
+              },
+              "toolName": "bash",
+              "toolInput": {
+                "command": {
+                  "$string": 6
+                }
+              },
+              "permissionSuggestions": {
+                "$array": 0,
+                "items": []
+              }
+            }
+          }
+        ]
+      },
+      "turnEndSignal": {
+        "event": "agentStop",
+        "state": "observed",
+        "invocationCount": 1,
+        "stopReasons": [
+          "end_turn"
+        ],
+        "observedInputKeys": [
+          "sessionId",
+          "timestamp",
+          "cwd",
+          "transcriptPath",
+          "stopReason",
+          "stop_hook_active"
+        ],
+        "otherObservedInputKeys": {
+          "permissionRequest": 1,
+          "postToolUse": 1,
+          "preToolUse": 1,
+          "sessionEnd": 1,
+          "sessionStart": 1,
+          "userPromptSubmitted": 1,
+          "userPromptTransformed": 1
+        },
+        "means": "the main agent finishing a turn is directly observable as a hook, in the modes this probe ran"
+      },
+      "sessionEndSignal": {
+        "event": "sessionEnd",
+        "state": "observed",
+        "invocationCount": 1,
+        "documentedReasons": [
+          "complete",
+          "error",
+          "abort",
+          "timeout",
+          "user_exit"
+        ],
+        "observedReasons": [
+          "complete"
+        ],
+        "observedInputKeys": [
+          "sessionId",
+          "timestamp",
+          "cwd",
+          "reason"
+        ],
+        "scope": "one prompt, one session, one reason: a reason value is a property of how the session ended, not a per-turn classification"
+      },
+      "idleSignal": {
+        "question": "is there a dedicated idle signal for the main agent?",
+        "documentedEvent": "notification",
+        "documentedInputKeys": [
+          "sessionId",
+          "timestamp",
+          "cwd",
+          "hook_event_name",
+          "message",
+          "title",
+          "notification_type"
+        ],
+        "documentedTypes": [
+          "shell_completed",
+          "shell_detached_completed",
+          "agent_completed",
+          "agent_idle",
+          "permission_prompt",
+          "elicitation_dialog"
+        ],
+        "documentedTypeMeaning": {
+          "shell_completed": "A background (async) shell command finishes",
+          "shell_detached_completed": "A detached shell session completes",
+          "agent_completed": "A background subagent finishes (completed or failed)",
+          "agent_idle": "A background agent finishes a turn and enters idle state (waiting for `write_agent`)",
+          "permission_prompt": "The agent requests permission to execute a tool",
+          "elicitation_dialog": "The agent requests additional information from the user"
+        },
+        "notificationState": "not-triggered",
+        "notificationInvocationCount": 0,
+        "observedNotificationTypes": [],
+        "state": "unclear",
+        "perTurnAlternative": {
+          "event": "agentStop",
+          "state": "observed",
+          "note": "the per-turn signal for the main agent, and the one this probe observed"
+        },
+        "stateMeaning": {
+          "observed": "a dedicated idle notification carrying `notification_type: \"agent_idle\"` was captured in this run",
+          "not-triggered": "the notification event fired and carried no idle type, so the signal was exercised and said nothing",
+          "unclear": "the notification event did not fire, and the documented idle type is scoped to a background agent this run did not start, so nothing can be concluded either way"
+        }
+      },
+      "acp": {
+        "completed": true,
+        "sessionIdPresent": true,
+        "stopReason": "end_turn",
+        "notificationMethods": [
+          "session/update"
+        ],
+        "agentRequestMethods": []
+      },
+      "logEvidence": {
+        "lines": [],
+        "hookLineCount": 0
+      }
+    },
+    {
+      "label": "pipe-repo",
+      "mode": "non-interactive prompt mode (copilot -p)",
+      "hookLocation": "repository level",
+      "argv": [
+        "-p",
+        "<the probe prompt>"
+      ],
+      "hookConfigLocation": "<workspace>/.github/hooks/agent-ping-probe.json (repository level, isolated)",
+      "startedAt": "2026-09-27T11:29:45.716Z",
+      "finishedAt": "2026-09-27T11:29:57.686Z",
+      "exitCode": 0,
+      "runCompleted": true,
+      "invocationTotal": 8,
+      "installedEvents": [
+        "agentStop",
+        "errorOccurred",
+        "notification",
+        "permissionRequest",
+        "postToolUse",
+        "postToolUseFailure",
+        "preCompact",
+        "preToolUse",
+        "sessionEnd",
+        "sessionStart",
+        "subagentStart",
+        "subagentStop",
+        "userPromptSubmitted",
+        "userPromptTransformed"
+      ],
+      "declaredTriggerCount": 14,
+      "triggerStates": {
+        "agentStop": {
+          "state": "observed",
+          "invocationCount": 1,
+          "unparsedCount": 0,
+          "reason": "1 invocation(s) captured for this event"
+        },
+        "errorOccurred": {
+          "state": "not-triggered",
+          "invocationCount": 0,
+          "unparsedCount": 0,
+          "reason": "the session ran to completion and this event fired nothing during it"
+        },
+        "notification": {
+          "state": "not-triggered",
+          "invocationCount": 0,
+          "unparsedCount": 0,
+          "reason": "the session ran to completion and this event fired nothing during it"
+        },
+        "permissionRequest": {
+          "state": "observed",
+          "invocationCount": 1,
+          "unparsedCount": 0,
+          "reason": "1 invocation(s) captured for this event"
+        },
+        "postToolUse": {
+          "state": "observed",
+          "invocationCount": 1,
+          "unparsedCount": 0,
+          "reason": "1 invocation(s) captured for this event"
+        },
+        "postToolUseFailure": {
+          "state": "not-triggered",
+          "invocationCount": 0,
+          "unparsedCount": 0,
+          "reason": "the session ran to completion and this event fired nothing during it"
+        },
+        "preCompact": {
+          "state": "not-triggered",
+          "invocationCount": 0,
+          "unparsedCount": 0,
+          "reason": "the session ran to completion and this event fired nothing during it"
+        },
+        "preToolUse": {
+          "state": "observed",
+          "invocationCount": 1,
+          "unparsedCount": 0,
+          "reason": "1 invocation(s) captured for this event"
+        },
+        "sessionEnd": {
+          "state": "observed",
+          "invocationCount": 1,
+          "unparsedCount": 0,
+          "reason": "1 invocation(s) captured for this event"
+        },
+        "sessionStart": {
+          "state": "observed",
+          "invocationCount": 1,
+          "unparsedCount": 0,
+          "reason": "1 invocation(s) captured for this event"
+        },
+        "subagentStart": {
+          "state": "not-triggered",
+          "invocationCount": 0,
+          "unparsedCount": 0,
+          "reason": "the session ran to completion and this event fired nothing during it"
+        },
+        "subagentStop": {
+          "state": "not-triggered",
+          "invocationCount": 0,
+          "unparsedCount": 0,
+          "reason": "the session ran to completion and this event fired nothing during it"
+        },
+        "userPromptSubmitted": {
+          "state": "observed",
+          "invocationCount": 1,
+          "unparsedCount": 0,
+          "reason": "1 invocation(s) captured for this event"
+        },
+        "userPromptTransformed": {
+          "state": "observed",
+          "invocationCount": 1,
+          "unparsedCount": 0,
+          "reason": "1 invocation(s) captured for this event"
+        }
+      },
+      "invocations": {
+        "agentStop": [
+          {
+            "index": 0,
+            "shape": {
+              "sessionId": "3f11e39b-9b3d-4894-97a4-cd62d5aaee53",
+              "timestamp": 1790508595816,
+              "cwd": {
+                "$string": 46
+              },
+              "transcriptPath": {
+                "$string": 113
+              },
+              "stopReason": "end_turn",
+              "stop_hook_active": false
+            }
+          }
+        ],
+        "errorOccurred": [],
+        "notification": [],
+        "permissionRequest": [
+          {
+            "index": 0,
+            "shape": {
+              "hookName": "permissionRequest",
+              "sessionId": "3f11e39b-9b3d-4894-97a4-cd62d5aaee53",
+              "timestamp": 1790508593718,
+              "cwd": {
+                "$string": 46
+              },
+              "toolName": "bash",
+              "toolInput": {
+                "command": {
+                  "$string": 6
+                }
+              },
+              "permissionSuggestions": {
+                "$array": 0,
+                "items": []
+              }
+            }
+          }
+        ],
+        "postToolUse": [
+          {
+            "index": 0,
+            "shape": {
+              "sessionId": "3f11e39b-9b3d-4894-97a4-cd62d5aaee53",
+              "timestamp": 1790508593765,
+              "cwd": {
+                "$string": 46
+              },
+              "toolName": "bash",
+              "toolArgs": {
+                "command": {
+                  "$string": 6
+                },
+                "description": {
+                  "$string": 31
+                }
+              },
+              "toolResult": {
+                "resultType": "success",
+                "textResultForLlm": {
+                  "$string": 323
+                }
+              }
+            }
+          }
+        ],
+        "postToolUseFailure": [],
+        "preCompact": [],
+        "preToolUse": [
+          {
+            "index": 0,
+            "shape": {
+              "sessionId": "3f11e39b-9b3d-4894-97a4-cd62d5aaee53",
+              "timestamp": 1790508593675,
+              "cwd": {
+                "$string": 46
+              },
+              "toolName": "bash",
+              "toolArgs": {
+                "command": {
+                  "$string": 6
+                },
+                "description": {
+                  "$string": 31
+                }
+              }
+            }
+          }
+        ],
+        "sessionEnd": [
+          {
+            "index": 0,
+            "shape": {
+              "sessionId": "3f11e39b-9b3d-4894-97a4-cd62d5aaee53",
+              "timestamp": 1790508595827,
+              "cwd": {
+                "$string": 46
+              },
+              "reason": "complete"
+            }
+          }
+        ],
+        "sessionStart": [
+          {
+            "index": 0,
+            "shape": {
+              "sessionId": "3f11e39b-9b3d-4894-97a4-cd62d5aaee53",
+              "timestamp": 1790508591499,
+              "cwd": {
+                "$string": 46
+              },
+              "source": "new",
+              "initialPrompt": {
+                "$string": 102
+              }
+            }
+          }
+        ],
+        "subagentStart": [],
+        "subagentStop": [],
+        "userPromptSubmitted": [
+          {
+            "index": 0,
+            "shape": {
+              "sessionId": "3f11e39b-9b3d-4894-97a4-cd62d5aaee53",
+              "timestamp": 1790508591475,
+              "cwd": {
+                "$string": 46
+              },
+              "prompt": {
+                "$string": 102
+              }
+            }
+          }
+        ],
+        "userPromptTransformed": [
+          {
+            "index": 0,
+            "shape": {
+              "sessionId": "3f11e39b-9b3d-4894-97a4-cd62d5aaee53",
+              "timestamp": 1790508591485,
+              "cwd": {
+                "$string": 46
+              },
+              "prompt": {
+                "$string": 102
+              },
+              "transformedPrompt": {
+                "$string": 170
+              }
+            }
+          }
+        ]
+      },
+      "unparsedInvocations": [],
+      "permissionPath": {
+        "event": "permissionRequest",
+        "documented": true,
+        "documentedInputKeys": [
+          "hookName",
+          "sessionId",
+          "timestamp",
+          "cwd",
+          "toolName",
+          "toolInput",
+          "permissionSuggestions"
+        ],
+        "invocationCount": 1,
+        "observedInputKeys": [
+          "hookName",
+          "sessionId",
+          "timestamp",
+          "cwd",
+          "toolName",
+          "toolInput",
+          "permissionSuggestions"
+        ],
+        "undocumentedInputKeys": [
+          "$string",
+          "command",
+          "$string",
+          "$array",
+          "items"
+        ],
+        "payloadKey": "toolName",
+        "toolNames": [
+          "bash"
+        ],
+        "requests": [
+          {
+            "index": 0,
+            "shape": {
+              "hookName": "permissionRequest",
+              "sessionId": "3f11e39b-9b3d-4894-97a4-cd62d5aaee53",
+              "timestamp": 1790508593718,
+              "cwd": {
+                "$string": 46
+              },
+              "toolName": "bash",
+              "toolInput": {
+                "command": {
+                  "$string": 6
+                }
+              },
+              "permissionSuggestions": {
+                "$array": 0,
+                "items": []
+              }
+            }
+          }
+        ]
+      },
+      "turnEndSignal": {
+        "event": "agentStop",
+        "state": "observed",
+        "invocationCount": 1,
+        "stopReasons": [
+          "end_turn"
+        ],
+        "observedInputKeys": [
+          "sessionId",
+          "timestamp",
+          "cwd",
+          "transcriptPath",
+          "stopReason",
+          "stop_hook_active"
+        ],
+        "otherObservedInputKeys": {
+          "permissionRequest": 1,
+          "postToolUse": 1,
+          "preToolUse": 1,
+          "sessionEnd": 1,
+          "sessionStart": 1,
+          "userPromptSubmitted": 1,
+          "userPromptTransformed": 1
+        },
+        "means": "the main agent finishing a turn is directly observable as a hook, in the modes this probe ran"
+      },
+      "sessionEndSignal": {
+        "event": "sessionEnd",
+        "state": "observed",
+        "invocationCount": 1,
+        "documentedReasons": [
+          "complete",
+          "error",
+          "abort",
+          "timeout",
+          "user_exit"
+        ],
+        "observedReasons": [
+          "complete"
+        ],
+        "observedInputKeys": [
+          "sessionId",
+          "timestamp",
+          "cwd",
+          "reason"
+        ],
+        "scope": "one prompt, one session, one reason: a reason value is a property of how the session ended, not a per-turn classification"
+      },
+      "idleSignal": {
+        "question": "is there a dedicated idle signal for the main agent?",
+        "documentedEvent": "notification",
+        "documentedInputKeys": [
+          "sessionId",
+          "timestamp",
+          "cwd",
+          "hook_event_name",
+          "message",
+          "title",
+          "notification_type"
+        ],
+        "documentedTypes": [
+          "shell_completed",
+          "shell_detached_completed",
+          "agent_completed",
+          "agent_idle",
+          "permission_prompt",
+          "elicitation_dialog"
+        ],
+        "documentedTypeMeaning": {
+          "shell_completed": "A background (async) shell command finishes",
+          "shell_detached_completed": "A detached shell session completes",
+          "agent_completed": "A background subagent finishes (completed or failed)",
+          "agent_idle": "A background agent finishes a turn and enters idle state (waiting for `write_agent`)",
+          "permission_prompt": "The agent requests permission to execute a tool",
+          "elicitation_dialog": "The agent requests additional information from the user"
+        },
+        "notificationState": "not-triggered",
+        "notificationInvocationCount": 0,
+        "observedNotificationTypes": [],
+        "state": "unclear",
+        "perTurnAlternative": {
+          "event": "agentStop",
+          "state": "observed",
+          "note": "the per-turn signal for the main agent, and the one this probe observed"
+        },
+        "stateMeaning": {
+          "observed": "a dedicated idle notification carrying `notification_type: \"agent_idle\"` was captured in this run",
+          "not-triggered": "the notification event fired and carried no idle type, so the signal was exercised and said nothing",
+          "unclear": "the notification event did not fire, and the documented idle type is scoped to a background agent this run did not start, so nothing can be concluded either way"
+        }
+      },
+      "acp": null,
+      "logEvidence": {
+        "lines": [
+          "2026-09-27T11:29:47.428Z [WARNING] Loading repo hooks in prompt mode (folder is trusted or opt-in set)"
+        ],
+        "hookLineCount": 1
+      }
+    },
+    {
+      "label": "acp-repo",
+      "mode": "ACP mode over stdio (copilot --acp)",
+      "hookLocation": "repository level",
+      "argv": [
+        "--acp"
+      ],
+      "hookConfigLocation": "<workspace>/.github/hooks/agent-ping-probe.json (repository level, isolated)",
+      "startedAt": "2026-09-27T11:29:57.689Z",
+      "finishedAt": "2026-09-27T11:30:10.538Z",
+      "exitCode": 0,
+      "runCompleted": true,
+      "invocationTotal": 0,
+      "installedEvents": [
+        "agentStop",
+        "errorOccurred",
+        "notification",
+        "permissionRequest",
+        "postToolUse",
+        "postToolUseFailure",
+        "preCompact",
+        "preToolUse",
+        "sessionEnd",
+        "sessionStart",
+        "subagentStart",
+        "subagentStop",
+        "userPromptSubmitted",
+        "userPromptTransformed"
+      ],
+      "declaredTriggerCount": 14,
+      "triggerStates": {
+        "agentStop": {
+          "state": "not-triggered",
+          "invocationCount": 0,
+          "unparsedCount": 0,
+          "reason": "the session ran to completion and this event fired nothing during it"
+        },
+        "errorOccurred": {
+          "state": "not-triggered",
+          "invocationCount": 0,
+          "unparsedCount": 0,
+          "reason": "the session ran to completion and this event fired nothing during it"
+        },
+        "notification": {
+          "state": "not-triggered",
+          "invocationCount": 0,
+          "unparsedCount": 0,
+          "reason": "the session ran to completion and this event fired nothing during it"
+        },
+        "permissionRequest": {
+          "state": "not-triggered",
+          "invocationCount": 0,
+          "unparsedCount": 0,
+          "reason": "the session ran to completion and this event fired nothing during it"
+        },
+        "postToolUse": {
+          "state": "not-triggered",
+          "invocationCount": 0,
+          "unparsedCount": 0,
+          "reason": "the session ran to completion and this event fired nothing during it"
+        },
+        "postToolUseFailure": {
+          "state": "not-triggered",
+          "invocationCount": 0,
+          "unparsedCount": 0,
+          "reason": "the session ran to completion and this event fired nothing during it"
+        },
+        "preCompact": {
+          "state": "not-triggered",
+          "invocationCount": 0,
+          "unparsedCount": 0,
+          "reason": "the session ran to completion and this event fired nothing during it"
+        },
+        "preToolUse": {
+          "state": "not-triggered",
+          "invocationCount": 0,
+          "unparsedCount": 0,
+          "reason": "the session ran to completion and this event fired nothing during it"
+        },
+        "sessionEnd": {
+          "state": "not-triggered",
+          "invocationCount": 0,
+          "unparsedCount": 0,
+          "reason": "the session ran to completion and this event fired nothing during it"
+        },
+        "sessionStart": {
+          "state": "not-triggered",
+          "invocationCount": 0,
+          "unparsedCount": 0,
+          "reason": "the session ran to completion and this event fired nothing during it"
+        },
+        "subagentStart": {
+          "state": "not-triggered",
+          "invocationCount": 0,
+          "unparsedCount": 0,
+          "reason": "the session ran to completion and this event fired nothing during it"
+        },
+        "subagentStop": {
+          "state": "not-triggered",
+          "invocationCount": 0,
+          "unparsedCount": 0,
+          "reason": "the session ran to completion and this event fired nothing during it"
+        },
+        "userPromptSubmitted": {
+          "state": "not-triggered",
+          "invocationCount": 0,
+          "unparsedCount": 0,
+          "reason": "the session ran to completion and this event fired nothing during it"
+        },
+        "userPromptTransformed": {
+          "state": "not-triggered",
+          "invocationCount": 0,
+          "unparsedCount": 0,
+          "reason": "the session ran to completion and this event fired nothing during it"
+        }
+      },
+      "invocations": {
+        "agentStop": [],
+        "errorOccurred": [],
+        "notification": [],
+        "permissionRequest": [],
+        "postToolUse": [],
+        "postToolUseFailure": [],
+        "preCompact": [],
+        "preToolUse": [],
+        "sessionEnd": [],
+        "sessionStart": [],
+        "subagentStart": [],
+        "subagentStop": [],
+        "userPromptSubmitted": [],
+        "userPromptTransformed": []
+      },
+      "unparsedInvocations": [],
+      "permissionPath": {
+        "event": "permissionRequest",
+        "documented": true,
+        "documentedInputKeys": [
+          "hookName",
+          "sessionId",
+          "timestamp",
+          "cwd",
+          "toolName",
+          "toolInput",
+          "permissionSuggestions"
+        ],
+        "invocationCount": 0,
+        "observedInputKeys": [],
+        "undocumentedInputKeys": [],
+        "payloadKey": "toolName",
+        "toolNames": [],
+        "requests": []
+      },
+      "turnEndSignal": {
+        "event": "agentStop",
+        "state": "not-triggered",
+        "invocationCount": 0,
+        "stopReasons": [],
+        "observedInputKeys": [],
+        "otherObservedInputKeys": {},
+        "means": "no per-turn hook fired, so a turn boundary would have to come from somewhere else"
+      },
+      "sessionEndSignal": {
+        "event": "sessionEnd",
+        "state": "not-triggered",
+        "invocationCount": 0,
+        "documentedReasons": [
+          "complete",
+          "error",
+          "abort",
+          "timeout",
+          "user_exit"
+        ],
+        "observedReasons": [],
+        "observedInputKeys": [],
+        "scope": "one prompt, one session, one reason: a reason value is a property of how the session ended, not a per-turn classification"
+      },
+      "idleSignal": {
+        "question": "is there a dedicated idle signal for the main agent?",
+        "documentedEvent": "notification",
+        "documentedInputKeys": [
+          "sessionId",
+          "timestamp",
+          "cwd",
+          "hook_event_name",
+          "message",
+          "title",
+          "notification_type"
+        ],
+        "documentedTypes": [
+          "shell_completed",
+          "shell_detached_completed",
+          "agent_completed",
+          "agent_idle",
+          "permission_prompt",
+          "elicitation_dialog"
+        ],
+        "documentedTypeMeaning": {
+          "shell_completed": "A background (async) shell command finishes",
+          "shell_detached_completed": "A detached shell session completes",
+          "agent_completed": "A background subagent finishes (completed or failed)",
+          "agent_idle": "A background agent finishes a turn and enters idle state (waiting for `write_agent`)",
+          "permission_prompt": "The agent requests permission to execute a tool",
+          "elicitation_dialog": "The agent requests additional information from the user"
+        },
+        "notificationState": "not-triggered",
+        "notificationInvocationCount": 0,
+        "observedNotificationTypes": [],
+        "state": "unclear",
+        "perTurnAlternative": {
+          "event": "agentStop",
+          "state": "not-triggered",
+          "note": "the per-turn signal for the main agent, and the one this probe observed"
+        },
+        "stateMeaning": {
+          "observed": "a dedicated idle notification carrying `notification_type: \"agent_idle\"` was captured in this run",
+          "not-triggered": "the notification event fired and carried no idle type, so the signal was exercised and said nothing",
+          "unclear": "the notification event did not fire, and the documented idle type is scoped to a background agent this run did not start, so nothing can be concluded either way"
+        }
+      },
+      "acp": {
+        "completed": true,
+        "sessionIdPresent": true,
+        "stopReason": "end_turn",
+        "notificationMethods": [
+          "session/update"
+        ],
+        "agentRequestMethods": []
+      },
+      "logEvidence": {
+        "lines": [],
+        "hookLineCount": 0
+      }
+    }
+  ],
+  "signals": {
+    "permission": {
+      "question": "can a permission block be reported?",
+      "acp": {
+        "state": "observed",
+        "source": "docs/research/copilot-acp-capture.json",
+        "method": "session/request_permission",
+        "frameKind": "agent-request",
+        "note": "captured by probe-copilot-acp over the ACP wire"
+      },
+      "hook": {
+        "state": "observed",
+        "event": "permissionRequest",
+        "mode": "non-interactive prompt mode (copilot -p)",
+        "observedInputKeys": [
+          "hookName",
+          "sessionId",
+          "timestamp",
+          "cwd",
+          "toolName",
+          "toolInput",
+          "permissionSuggestions"
+        ]
+      },
+      "hookByMode": {
+        "userLevel": {
+          "acpInvocations": 8,
+          "pipeInvocations": 16
+        },
+        "repositoryLevel": {
+          "acpInvocations": 0,
+          "pipeInvocations": 8
+        }
+      }
+    },
+    "finished": {
+      "question": "can a finished turn be reported?",
+      "acp": {
+        "state": "observed",
+        "mechanism": "the response to session/prompt carrying stopReason",
+        "dedicatedIdleNotificationObserved": false,
+        "source": "docs/research/copilot-acp-capture.json"
+      },
+      "hook": {
+        "state": "observed",
+        "event": "agentStop",
+        "mode": "non-interactive prompt mode (copilot -p)",
+        "stopReasons": [
+          "end_turn"
+        ]
+      },
+      "hookByMode": {
+        "userLevel": {
+          "acpInvocations": 8,
+          "pipeInvocations": 16
+        },
+        "repositoryLevel": {
+          "acpInvocations": 0,
+          "pipeInvocations": 8
+        }
+      }
+    },
+    "idle": {
+      "question": "is there a dedicated idle signal, separate from a finished turn?",
+      "acp": {
+        "dedicatedIdleNotificationObserved": false,
+        "idleMarkersMatched": [],
+        "state": "not-triggered"
+      },
+      "hook": {
+        "state": "unclear",
+        "mode": "non-interactive prompt mode (copilot -p)",
+        "observedNotificationTypes": []
+      }
+    }
+  },
+  "observed": {
+    "runs": 4,
+    "invocationTotal": 24,
+    "declaredTriggers": 14,
+    "declaredTriggersObserved": 8,
+    "declaredTriggersNotTriggered": 6,
+    "declaredTriggersUnclear": 0,
+    "matrix": [
+      {
+        "hookLocation": "user level ($COPILOT_HOME/hooks)",
+        "acpMode": true,
+        "pipeMode": true,
+        "acpInvocations": 8,
+        "pipeInvocations": 8,
+        "runs": [
+          "pipe-user",
+          "acp-user"
+        ]
+      },
+      {
+        "hookLocation": "repository level (.github/hooks)",
+        "acpMode": false,
+        "pipeMode": true,
+        "acpInvocations": 0,
+        "pipeInvocations": 8,
+        "runs": [
+          "pipe-repo",
+          "acp-repo"
+        ]
+      }
+    ],
+    "userLevelTotal": 16,
+    "repositoryLevelTotal": 8,
+    "eventsFiredInEveryRun": []
+  },
+  "redaction": {
+    "policy": "A hook payload is captured structurally. Key names, numbers, booleans, nulls and array lengths are verbatim; a string is kept verbatim only when its key is in redaction.literalKeys and is otherwise replaced by a {\"$string\": <length>} marker. A hook payload carries the prompt, the tool arguments and the tool output, so this is what keeps conversation content out of a committed artefact (APX-FR-01). The home directory is rewritten to ~ and the probe's temporary workspace to <workspace>.",
+    "literalKeys": [
+      "errorContext",
+      "hookName",
+      "hook_event_name",
+      "notification_type",
+      "reason",
+      "recoverable",
+      "resultType",
+      "sessionId",
+      "source",
+      "stopReason",
+      "toolName",
+      "trigger"
+    ],
+    "contentBearingKeys": [
+      "prompt",
+      "initialPrompt",
+      "transformedPrompt",
+      "toolArgs",
+      "toolInput",
+      "toolResult",
+      "textResultForLlm",
+      "error",
+      "message",
+      "title",
+      "response",
+      "customInstructions",
+      "cwd",
+      "transcriptPath",
+      "permissionSuggestions",
+      "diff",
+      "patch"
+    ],
+    "caveat": "The hook file the probe installs is deliberately outside any repository: it is written into an isolated COPILOT_HOME so the run cannot depend on, or leave anything in, a developer's own Copilot configuration."
+  },
+  "permissionHookObserved": true,
+  "permissionAcpObserved": true,
+  "turnFinishedHookObserved": true,
+  "dedicatedIdleHookState": "unclear",
+  "userLevelHooksFireInAcpMode": true,
+  "repositoryLevelHooksFireInAcpMode": false,
+  "declaredTriggersObserved": 8,
+  "declaredTriggersTotal": 14,
+  "decision": {
+    "verdict": "pass",
+    "exitCode": 0,
+    "assertionsExpected": 10,
+    "assertionsRun": 10,
+    "assertions": [
+      {
+        "name": "cli version captured",
+        "outcome": "pass",
+        "detail": "version=1.0.88 output=\"GitHub Copilot CLI 1.0.88.\\nRun 'copilot update' to check for updates.\""
+      },
+      {
+        "name": "the CLI documents a hook configuration surface of its own",
+        "outcome": "pass",
+        "detail": "command=\"copilot help config\" matched=[\"`disableAllHooks`: whether to disable all hooks (repo-level and user-level); defaults to `false`.\",\"`hooks`: inline hook definitions, keyed by event name (same schema as .github/hooks/*.json).\",\"- In global config.json these act as user-level hooks; in repo settings.json they act as repo-level hooks\"]"
+      },
+      {
+        "name": "every declared trigger has a hook installed for it",
+        "outcome": "pass",
+        "detail": "declared=14 installed=[\"agentStop\",\"errorOccurred\",\"notification\",\"permissionRequest\",\"postToolUse\",\"postToolUseFailure\",\"preCompact\",\"preToolUse\",\"sessionEnd\",\"sessionStart\",\"subagentStart\",\"subagentStop\",\"userPromptSubmitted\",\"userPromptTransformed\"]"
+      },
+      {
+        "name": "at least one hook invocation was captured in the driven session",
+        "outcome": "pass",
+        "detail": "invocationTotal=8 runCompleted=true"
+      },
+      {
+        "name": "every captured invocation parsed as a JSON object",
+        "outcome": "pass",
+        "detail": "unparsed=[]"
+      },
+      {
+        "name": "the permission path is recorded distinctly, with its own section",
+        "outcome": "pass",
+        "detail": "event=permissionRequest count=1 keys=[\"hookName\",\"sessionId\",\"timestamp\",\"cwd\",\"toolName\",\"toolInput\",\"permissionSuggestions\"] tools=[\"bash\"]"
+      },
+      {
+        "name": "a turn-finished signal was captured with a stop reason",
+        "outcome": "pass",
+        "detail": "event=agentStop state=observed stopReasons=[\"end_turn\"]"
+      },
+      {
+        "name": "a session-end signal was captured with a reason",
+        "outcome": "pass",
+        "detail": "state=observed observed=[\"complete\"] documented=[\"complete\",\"error\",\"abort\",\"timeout\",\"user_exit\"]"
+      },
+      {
+        "name": "the idle question has an explicit state and names the per-turn alternative",
+        "outcome": "pass",
+        "detail": "state=unclear notification=not-triggered types=[] perTurn=observed"
+      },
+      {
+        "name": "every declared trigger carries an explicit state and the location-by-mode matrix is complete",
+        "outcome": "pass",
+        "detail": "stated=14/14 matrix=[\"user level ($COPILOT_HOME/hooks): acp=8 pipe=8\",\"repository level (.github/hooks): acp=0 pipe=8\"] hasAbsentState=false"
+      }
+    ],
+    "failures": []
+  }
+}

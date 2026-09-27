@@ -1,0 +1,206 @@
+{
+  "_comment": "A sanitised replay of a real `copilot` 1.0.88 hook-probe run, in the `--capture` input shape (raw per-event stdin lines, one JSON document per invocation). Key names, enum values, numbers, booleans and array shapes are exactly what the CLI sent; the strings under content-bearing keys are placeholders of the same length class, because a live prompt and a live tool result must not be committed. Two runs, matching the probe's location-by-mode matrix: a user-level hook file, and a repository-level one, each captured in non-interactive prompt mode. The ACP cells are omitted on purpose - a test that supplied them would be testing a fixture, not the matrix logic.",
+  "cli": {
+    "binary": "copilot",
+    "version": "1.0.88",
+    "versionCommand": "copilot --version",
+    "versionOutput": "GitHub Copilot CLI 1.0.88.\nRun 'copilot update' to check for updates."
+  },
+  "documentation": {
+    "onMachine": {
+      "command": "copilot help config",
+      "exitCode": 0,
+      "hookConfigDocumented": true,
+      "hookLines": [
+        "`disableAllHooks`: whether to disable all hooks (repo-level and user-level); defaults to `false`.",
+        "`hooks`: inline hook definitions, keyed by event name (same schema as .github/hooks/*.json).",
+        "- In global config.json these act as user-level hooks; in repo settings.json they act as repo-level hooks"
+      ],
+      "exitWithinTimeout": true
+    }
+  },
+  "runs": [
+    {
+      "label": "pipe-user",
+      "mode": "non-interactive prompt mode (copilot -p)",
+      "hookLocation": "user level",
+      "argv": ["-p", "<the probe prompt>"],
+      "hookConfigLocation": "$COPILOT_HOME/hooks/agent-ping-probe.json (user level, isolated)",
+      "startedAt": "2026-09-27T11:29:18.390Z",
+      "finishedAt": "2026-09-27T11:29:31.001Z",
+      "exitCode": 0,
+      "runCompleted": true,
+      "rawByEvent": {
+        "sessionStart": [
+          "{\"sessionId\":\"ab00170b-b5d8-4f85-a041-216c39dfc33a\",\"timestamp\":1790508564755,\"cwd\":\"/tmp/agent-ping-copilot-hooks-PLACEHOLDER/workspace\",\"source\":\"new\",\"initialPrompt\":\"PROBE-PROMPT-PLACEHOLDER\"}"
+        ],
+        "userPromptSubmitted": [
+          "{\"sessionId\":\"ab00170b-b5d8-4f85-a041-216c39dfc33a\",\"timestamp\":1790508564730,\"cwd\":\"/tmp/agent-ping-copilot-hooks-PLACEHOLDER/workspace\",\"prompt\":\"PROBE-PROMPT-PLACEHOLDER\"}"
+        ],
+        "userPromptTransformed": [
+          "{\"sessionId\":\"ab00170b-b5d8-4f85-a041-216c39dfc33a\",\"timestamp\":1790508564742,\"cwd\":\"/tmp/agent-ping-copilot-hooks-PLACEHOLDER/workspace\",\"prompt\":\"PROBE-PROMPT-PLACEHOLDER\",\"transformedPrompt\":\"PROBE-TRANSFORMED-PROMPT-PLACEHOLDER\"}"
+        ],
+        "preToolUse": [
+          "{\"sessionId\":\"ab00170b-b5d8-4f85-a041-216c39dfc33a\",\"timestamp\":1790508568692,\"cwd\":\"/tmp/agent-ping-copilot-hooks-PLACEHOLDER/workspace\",\"toolName\":\"bash\",\"toolArgs\":{\"command\":\"TOOL-COMMAND-PLACEHOLDER\",\"description\":\"TOOL-DESCRIPTION-PLACEHOLDER\"}}"
+        ],
+        "permissionRequest": [
+          "{\"hookName\":\"permissionRequest\",\"sessionId\":\"ab00170b-b5d8-4f85-a041-216c39dfc33a\",\"timestamp\":1790508568733,\"cwd\":\"/tmp/agent-ping-copilot-hooks-PLACEHOLDER/workspace\",\"toolName\":\"bash\",\"toolInput\":{\"command\":\"TOOL-COMMAND-PLACEHOLDER\"},\"permissionSuggestions\":[]}"
+        ],
+        "postToolUse": [
+          "{\"sessionId\":\"ab00170b-b5d8-4f85-a041-216c39dfc33a\",\"timestamp\":1790508568787,\"cwd\":\"/tmp/agent-ping-copilot-hooks-PLACEHOLDER/workspace\",\"toolName\":\"bash\",\"toolArgs\":{\"command\":\"TOOL-COMMAND-PLACEHOLDER\",\"description\":\"TOOL-DESCRIPTION-PLACEHOLDER\"},\"toolResult\":{\"resultType\":\"success\",\"textResultForLlm\":\"TOOL-RESULT-PLACEHOLDER\"}}"
+        ],
+        "postToolUseFailure": [],
+        "agentStop": [
+          "{\"sessionId\":\"ab00170b-b5d8-4f85-a041-216c39dfc33a\",\"timestamp\":1790508570828,\"cwd\":\"/tmp/agent-ping-copilot-hooks-PLACEHOLDER/workspace\",\"transcriptPath\":\"/tmp/agent-ping-copilot-hooks-PLACEHOLDER/copilot-home/session-state/PLACEHOLDER/events.jsonl\",\"stopReason\":\"end_turn\",\"stop_hook_active\":false}"
+        ],
+        "notification": [],
+        "errorOccurred": [],
+        "preCompact": [],
+        "sessionEnd": [
+          "{\"sessionId\":\"ab00170b-b5d8-4f85-a041-216c39dfc33a\",\"timestamp\":1790508570833,\"cwd\":\"/tmp/agent-ping-copilot-hooks-PLACEHOLDER/workspace\",\"reason\":\"complete\"}"
+        ],
+        "subagentStart": [],
+        "subagentStop": []
+      },
+      "logLines": [
+        "2026-09-27T11:29:19.998Z [WARNING] Loading repo hooks in prompt mode (folder is trusted or opt-in set)"
+      ],
+      "acp": null
+    },
+    {
+      "label": "acp-user",
+      "mode": "ACP mode over stdio (copilot --acp)",
+      "hookLocation": "user level",
+      "argv": ["--acp"],
+      "hookConfigLocation": "$COPILOT_HOME/hooks/agent-ping-probe.json (user level, isolated)",
+      "startedAt": "2026-09-27T11:29:31.002Z",
+      "finishedAt": "2026-09-27T11:29:43.220Z",
+      "exitCode": 0,
+      "runCompleted": true,
+      "rawByEvent": {
+        "sessionStart": [
+          "{\"sessionId\":\"ab00170b-b5d8-4f85-a041-216c39dfc33a\",\"timestamp\":1790508564755,\"cwd\":\"/tmp/agent-ping-copilot-hooks-PLACEHOLDER/workspace\",\"source\":\"new\",\"initialPrompt\":\"PROBE-PROMPT-PLACEHOLDER\"}"
+        ],
+        "userPromptSubmitted": [
+          "{\"sessionId\":\"ab00170b-b5d8-4f85-a041-216c39dfc33a\",\"timestamp\":1790508564730,\"cwd\":\"/tmp/agent-ping-copilot-hooks-PLACEHOLDER/workspace\",\"prompt\":\"PROBE-PROMPT-PLACEHOLDER\"}"
+        ],
+        "userPromptTransformed": [
+          "{\"sessionId\":\"ab00170b-b5d8-4f85-a041-216c39dfc33a\",\"timestamp\":1790508564742,\"cwd\":\"/tmp/agent-ping-copilot-hooks-PLACEHOLDER/workspace\",\"prompt\":\"PROBE-PROMPT-PLACEHOLDER\",\"transformedPrompt\":\"PROBE-TRANSFORMED-PROMPT-PLACEHOLDER\"}"
+        ],
+        "preToolUse": [
+          "{\"sessionId\":\"ab00170b-b5d8-4f85-a041-216c39dfc33a\",\"timestamp\":1790508568692,\"cwd\":\"/tmp/agent-ping-copilot-hooks-PLACEHOLDER/workspace\",\"toolName\":\"bash\",\"toolArgs\":{\"command\":\"TOOL-COMMAND-PLACEHOLDER\",\"description\":\"TOOL-DESCRIPTION-PLACEHOLDER\"}}"
+        ],
+        "permissionRequest": [
+          "{\"hookName\":\"permissionRequest\",\"sessionId\":\"ab00170b-b5d8-4f85-a041-216c39dfc33a\",\"timestamp\":1790508568733,\"cwd\":\"/tmp/agent-ping-copilot-hooks-PLACEHOLDER/workspace\",\"toolName\":\"bash\",\"toolInput\":{\"command\":\"TOOL-COMMAND-PLACEHOLDER\"},\"permissionSuggestions\":[]}"
+        ],
+        "postToolUse": [
+          "{\"sessionId\":\"ab00170b-b5d8-4f85-a041-216c39dfc33a\",\"timestamp\":1790508568787,\"cwd\":\"/tmp/agent-ping-copilot-hooks-PLACEHOLDER/workspace\",\"toolName\":\"bash\",\"toolArgs\":{\"command\":\"TOOL-COMMAND-PLACEHOLDER\",\"description\":\"TOOL-DESCRIPTION-PLACEHOLDER\"},\"toolResult\":{\"resultType\":\"success\",\"textResultForLlm\":\"TOOL-RESULT-PLACEHOLDER\"}}"
+        ],
+        "postToolUseFailure": [],
+        "agentStop": [
+          "{\"sessionId\":\"ab00170b-b5d8-4f85-a041-216c39dfc33a\",\"timestamp\":1790508570828,\"cwd\":\"/tmp/agent-ping-copilot-hooks-PLACEHOLDER/workspace\",\"transcriptPath\":\"/tmp/agent-ping-copilot-hooks-PLACEHOLDER/copilot-home/session-state/PLACEHOLDER/events.jsonl\",\"stopReason\":\"end_turn\",\"stop_hook_active\":false}"
+        ],
+        "notification": [],
+        "errorOccurred": [],
+        "preCompact": [],
+        "sessionEnd": [
+          "{\"sessionId\":\"ab00170b-b5d8-4f85-a041-216c39dfc33a\",\"timestamp\":1790508570833,\"cwd\":\"/tmp/agent-ping-copilot-hooks-PLACEHOLDER/workspace\",\"reason\":\"complete\"}"
+        ],
+        "subagentStart": [],
+        "subagentStop": []
+      },
+      "logLines": [],
+      "acp": {
+        "completed": true,
+        "sessionIdPresent": true,
+        "stopReason": "end_turn",
+        "notificationMethods": ["session/update"],
+        "agentRequestMethods": [],
+        "failure": null
+      }
+    },
+    {
+      "label": "pipe-repo",
+      "mode": "non-interactive prompt mode (copilot -p)",
+      "hookLocation": "repository level",
+      "argv": ["-p", "<the probe prompt>"],
+      "hookConfigLocation": "<workspace>/.github/hooks/agent-ping-probe.json (repository level, isolated)",
+      "startedAt": "2026-09-27T11:29:43.221Z",
+      "finishedAt": "2026-09-27T11:29:55.400Z",
+      "exitCode": 0,
+      "runCompleted": true,
+      "rawByEvent": {
+        "sessionStart": [
+          "{\"sessionId\":\"ab00170b-b5d8-4f85-a041-216c39dfc33a\",\"timestamp\":1790508564755,\"cwd\":\"/tmp/agent-ping-copilot-hooks-PLACEHOLDER/workspace\",\"source\":\"new\",\"initialPrompt\":\"PROBE-PROMPT-PLACEHOLDER\"}"
+        ],
+        "userPromptSubmitted": [
+          "{\"sessionId\":\"ab00170b-b5d8-4f85-a041-216c39dfc33a\",\"timestamp\":1790508564730,\"cwd\":\"/tmp/agent-ping-copilot-hooks-PLACEHOLDER/workspace\",\"prompt\":\"PROBE-PROMPT-PLACEHOLDER\"}"
+        ],
+        "userPromptTransformed": [
+          "{\"sessionId\":\"ab00170b-b5d8-4f85-a041-216c39dfc33a\",\"timestamp\":1790508564742,\"cwd\":\"/tmp/agent-ping-copilot-hooks-PLACEHOLDER/workspace\",\"prompt\":\"PROBE-PROMPT-PLACEHOLDER\",\"transformedPrompt\":\"PROBE-TRANSFORMED-PROMPT-PLACEHOLDER\"}"
+        ],
+        "preToolUse": [
+          "{\"sessionId\":\"ab00170b-b5d8-4f85-a041-216c39dfc33a\",\"timestamp\":1790508568692,\"cwd\":\"/tmp/agent-ping-copilot-hooks-PLACEHOLDER/workspace\",\"toolName\":\"bash\",\"toolArgs\":{\"command\":\"TOOL-COMMAND-PLACEHOLDER\",\"description\":\"TOOL-DESCRIPTION-PLACEHOLDER\"}}"
+        ],
+        "permissionRequest": [
+          "{\"hookName\":\"permissionRequest\",\"sessionId\":\"ab00170b-b5d8-4f85-a041-216c39dfc33a\",\"timestamp\":1790508568733,\"cwd\":\"/tmp/agent-ping-copilot-hooks-PLACEHOLDER/workspace\",\"toolName\":\"bash\",\"toolInput\":{\"command\":\"TOOL-COMMAND-PLACEHOLDER\"},\"permissionSuggestions\":[]}"
+        ],
+        "postToolUse": [
+          "{\"sessionId\":\"ab00170b-b5d8-4f85-a041-216c39dfc33a\",\"timestamp\":1790508568787,\"cwd\":\"/tmp/agent-ping-copilot-hooks-PLACEHOLDER/workspace\",\"toolName\":\"bash\",\"toolArgs\":{\"command\":\"TOOL-COMMAND-PLACEHOLDER\",\"description\":\"TOOL-DESCRIPTION-PLACEHOLDER\"},\"toolResult\":{\"resultType\":\"success\",\"textResultForLlm\":\"TOOL-RESULT-PLACEHOLDER\"}}"
+        ],
+        "postToolUseFailure": [],
+        "agentStop": [
+          "{\"sessionId\":\"ab00170b-b5d8-4f85-a041-216c39dfc33a\",\"timestamp\":1790508570828,\"cwd\":\"/tmp/agent-ping-copilot-hooks-PLACEHOLDER/workspace\",\"transcriptPath\":\"/tmp/agent-ping-copilot-hooks-PLACEHOLDER/copilot-home/session-state/PLACEHOLDER/events.jsonl\",\"stopReason\":\"end_turn\",\"stop_hook_active\":false}"
+        ],
+        "notification": [],
+        "errorOccurred": [],
+        "preCompact": [],
+        "sessionEnd": [
+          "{\"sessionId\":\"ab00170b-b5d8-4f85-a041-216c39dfc33a\",\"timestamp\":1790508570833,\"cwd\":\"/tmp/agent-ping-copilot-hooks-PLACEHOLDER/workspace\",\"reason\":\"complete\"}"
+        ],
+        "subagentStart": [],
+        "subagentStop": []
+      },
+      "logLines": [
+        "2026-09-27T11:29:44.100Z [WARNING] Loading repo hooks in prompt mode (folder is trusted or opt-in set)"
+      ],
+      "acp": null
+    },
+    {
+      "label": "acp-repo",
+      "mode": "ACP mode over stdio (copilot --acp)",
+      "hookLocation": "repository level",
+      "argv": ["--acp"],
+      "hookConfigLocation": "<workspace>/.github/hooks/agent-ping-probe.json (repository level, isolated)",
+      "startedAt": "2026-09-27T11:29:55.401Z",
+      "finishedAt": "2026-09-27T11:30:08.700Z",
+      "exitCode": 0,
+      "runCompleted": true,
+      "rawByEvent": {
+        "sessionStart": [],
+        "userPromptSubmitted": [],
+        "userPromptTransformed": [],
+        "preToolUse": [],
+        "permissionRequest": [],
+        "postToolUse": [],
+        "postToolUseFailure": [],
+        "agentStop": [],
+        "notification": [],
+        "errorOccurred": [],
+        "preCompact": [],
+        "sessionEnd": [],
+        "subagentStart": [],
+        "subagentStop": []
+      },
+      "logLines": [],
+      "acp": {
+        "completed": true,
+        "sessionIdPresent": true,
+        "stopReason": "end_turn",
+        "notificationMethods": ["session/update"],
+        "agentRequestMethods": [],
+        "failure": null
+      }
+    }
+  ]
+}

@@ -1,10 +1,10 @@
 # Project Progress
 
 ## Current State
-**Phase**: NOTIFICATION-AND-TRAY-PRESENCE-3
+**Phase**: COPILOT-CLI-ACP-SPIKE-1
 **Status**: In Progress
 **Validation Gaps**: 82 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-27T11:14:02.058Z
+**Last Updated**: 2026-09-27T11:41:45.572Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -64,6 +64,8 @@
   - Files: src/plugin/opencode/poll-fallback.ts, src/plugin/opencode/index.ts, tests/plugin/poll-fallback.test.ts, src/plugin/opencode/translate.ts, tests/plugin/install.test.ts, tests/plugin/opencode-translate.test.ts
 - [x] Phase COPILOT-CLI-ACP-SPIKE-1, Task CP-1: Probe the real Copilot ACP surface (@connector-engineer)
   - Files: scripts/probe-copilot-acp.mjs, tests/scripts/probe-copilot-acp.test.ts, docs/research/copilot-acp-capture.json, tests/scripts/fixtures/copilot-acp-capture.json
+- [x] Phase COPILOT-CLI-ACP-SPIKE-1, Task CP-2: Probe the Copilot hook surface and write the report (@connector-engineer)
+  - Files: scripts/probe-copilot-hooks.mjs, docs/research/copilot-acp-probe.md, docs/research/copilot-hooks-capture.json, tests/scripts/fixtures/copilot-hooks-capture.json, tests/scripts/probe-copilot-hooks.test.ts
 
 ## Current Task
 - None currently running
@@ -77,7 +79,6 @@
 - [ ] Phase INSTALL-AUTOSTART-AND-OPERATIONS-1: Phase 1: Package and command line
 - [ ] Phase INSTALL-AUTOSTART-AND-OPERATIONS-2: Phase 2: Autostart
 - [ ] Phase INSTALL-AUTOSTART-AND-OPERATIONS-3: Phase 3: Live operations verification and gate
-- [ ] Phase COPILOT-CLI-ACP-SPIKE-1: Phase 1: Probes
 - [ ] Phase COPILOT-CLI-ACP-SPIKE-2: Phase 2: Gate decision and authorised outcome
 
 ## Blockers
