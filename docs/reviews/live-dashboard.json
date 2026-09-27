@@ -1,0 +1,13 @@
+{
+  "taskId": "LD-5",
+  "taskDigest": "3dee9ed2696676931a6d114b3ccc97cae54a2c5225a90e0b7e82cb21f18d4e44",
+  "reviewer": "Doug McCusker",
+  "reviewedAt": "2026-09-27T19:40:40.574Z",
+  "decision": "approved",
+  "evidence": [
+    {
+      "path": "docs/reviews/LD-5-console-review.md",
+      "sha256": "e374fe9c0bc21efd502c6ca5d48eb070f2b1710e9cc9a3dbba9c626717f19f57"
+    }
+  ]
+}

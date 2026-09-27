@@ -1,0 +1,13 @@
+{
+  "taskId": "OA-6",
+  "taskDigest": "3fa7c4397c7379ac2c6d10b1964c66d72db3e0d15e15028d5abde9c5f891354d",
+  "reviewer": "Doug McCusker",
+  "reviewedAt": "2026-09-27T19:40:40.008Z",
+  "decision": "approved",
+  "evidence": [
+    {
+      "path": "docs/reviews/OA-6-console-review.md",
+      "sha256": "2e8888a02a2eb6aeac5c68ba3121ce10d75820c7a8108709edbd212e91ef9b8e"
+    }
+  ]
+}

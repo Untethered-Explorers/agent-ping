@@ -1,0 +1,13 @@
+{
+  "taskId": "IO-5",
+  "taskDigest": "0f248a46897719e30139d8d0b0b95284f479d9fdc7840ea26d5d2171601b5443",
+  "reviewer": "Doug McCusker",
+  "reviewedAt": "2026-09-27T19:40:41.155Z",
+  "decision": "approved",
+  "evidence": [
+    {
+      "path": "docs/reviews/IO-5-console-review.md",
+      "sha256": "86e60757501af496ff3d1d468b0ebb7e857997bbd78e802575d182c2b51d6b74"
+    }
+  ]
+}

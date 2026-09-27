@@ -305,3 +305,7 @@
 {"timestamp":"2026-09-27T18:53:52.302Z","action":"phase.started","runId":"7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8","phaseId":"OPENCODE-PLUGIN-ADAPTER-3"}
 {"timestamp":"2026-09-27T18:53:52.303Z","action":"phase.started","runId":"7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8","phaseId":"LIVE-DASHBOARD-1"}
 {"timestamp":"2026-09-27T18:53:52.336Z","action":"run.paused","runId":"7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8","note":"Stop/pause requested (control file or signal)"}
+{"timestamp":"2026-09-27T19:42:34.613Z","action":"run.started","runId":"7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8","note":"harness=opencode"}
+{"timestamp":"2026-09-27T19:42:38.522Z","action":"phase.started","runId":"7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8","phaseId":"OPENCODE-PLUGIN-ADAPTER-3"}
+{"timestamp":"2026-09-27T19:42:38.522Z","action":"phase.started","runId":"7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8","phaseId":"LIVE-DASHBOARD-1"}
+{"timestamp":"2026-09-27T19:42:38.529Z","action":"task.complete","runId":"7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8","taskId":"OA-6","note":"Human attestation: docs/reviews/opencode-adapter.json"}

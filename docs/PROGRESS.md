@@ -2,9 +2,9 @@
 
 ## Current State
 **Phase**: OPENCODE-PLUGIN-ADAPTER-3
-**Status**: Paused
+**Status**: In Progress
 **Validation Gaps**: 119 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-27T18:53:52.354Z
+**Last Updated**: 2026-09-27T19:42:38.537Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -72,6 +72,8 @@
   - Files: src/plugin/opencode/poll-fallback.ts, src/plugin/opencode/index.ts, tests/plugin/poll-fallback.test.ts, src/plugin/opencode/translate.ts, tests/plugin/install.test.ts, tests/plugin/opencode-translate.test.ts
 - [x] Phase OPENCODE-PLUGIN-ADAPTER-2, Task OA-5: Write the live opencode verification script (@qa-engineer)
   - Files: scripts/verify-opencode-live.mjs, tests/scripts/verify-opencode-live.test.ts
+- [x] Phase OPENCODE-PLUGIN-ADAPTER-3, Task OA-6: Confirm a real opencode session is caught end to end
+  - Files: docs/reviews/opencode-adapter.json
 - [x] Phase LIVE-DASHBOARD-1, Task LD-1: Wire the dashboard to live hub state (@dashboard-engineer)
   - Files: src/dashboard/index.html, src/dashboard/main.ts, src/dashboard/live/stream-client.ts, src/dashboard/live/session-list.ts, tests/dashboard/session-list.test.ts, tests/dashboard/stream-client.test.ts, src/dashboard/a11y/dom-mirror.ts, src/dashboard/prototype/index.html, src/dashboard/prototype/main.ts, src/dashboard/prototype/scene.ts, vite.config.ts, src/dashboard/dashboard.css, src/dashboard/host.ts, tests/dashboard/live-harness.ts
 - [x] Phase COPILOT-CLI-ACP-SPIKE-1, Task CP-1: Probe the real Copilot ACP surface (@connector-engineer)
@@ -87,7 +89,6 @@
 - None currently running
 
 ## Remaining
-- [ ] Phase OPENCODE-PLUGIN-ADAPTER-3: Phase 3: Live adapter gate
 - [ ] Phase LIVE-DASHBOARD-1: Phase 1: Live state on the approved layout
 - [ ] Phase LIVE-DASHBOARD-2: Phase 2: Interactions against the real API
 - [ ] Phase LIVE-DASHBOARD-3: Phase 3: End-to-end journey and review
