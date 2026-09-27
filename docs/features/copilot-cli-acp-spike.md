@@ -12,8 +12,53 @@
 | CP-FR-04 | This feature | owns |
 | CP-FR-05 | This feature | owns |
 | CP-FR-06 | This feature | owns |
+| CP-FR-07 | This feature | owns |
 
 **PRD:** [docs/PRD.md](../PRD.md)
+
+---
+
+## 0. What this spike concluded, including about its own plan
+
+The gate recorded **deferral**: v1 ships opencode only, because the ACP permission
+signal is `observed` but the per-turn boundary an *attaching* client would receive is
+unproven, the documented idle hook type is `unclear` — which the probe's own rule
+forbids mapping on — and the work detection the quietness gate depends on was never
+exercised. The decision, its evidence and its residual risk are in
+[docs/reviews/CP-3-console-review.md](../reviews/CP-3-console-review.md).
+
+**CP-4 originally failed three times, and the fault was the plan's, not the work's.**
+Its contract asked for two mutually exclusive things: a description that said a
+deferred decision means "no adapter code", and an `expectedOutputs` list that
+unconditionally named `src/plugin/copilot/index.ts` and `translate.ts`. The engine's
+output gate requires every declared output to exist, so the deferral branch could
+never pass however correct the work was. It burned 39.9 minutes of harness time
+across three attempts and failed the run.
+
+Four things came out of that failure, and they are the reason this section exists:
+
+- **`CP-FR-05` and `CP-FR-06` were conditional on authorisation**, so on the deferral
+  branch they imposed no obligation at all and the record had no requirement to
+  satisfy. Both are now unconditional, and `CP-FR-07` states the deferral branch's
+  obligation directly.
+- **CP-4 is now the deferral record**, not a fork whose losing branch was dead scope.
+  A gate decision is a point-in-time record; if a future gate authorises an adapter,
+  that is a new task, not a revival of this one.
+- **The deliverable that matters is the test, not the prose.** `tests/plugin/
+  copilot-translate.test.ts` asserts that no adapter module exists, that the recorded
+  decision and both evidence digests still hold, that no `copilot-cli` row reaches
+  `needs-you` or `finished`, and that every claim the record makes is present in the
+  record's own text. That turns "we decided not to build this" into something that
+  fails loudly if a later change crosses the line the gate drew.
+- **The general lesson, which has now happened four times in this project:** a forge
+  contract's failure modes are not the ones a reviewer imagines. A task can pass every
+  gate and omit the integration three sibling tasks share; it can assert an artefact
+  nothing builds; it can assert a policy is *applied* rather than that the product
+  still *starts*; and it can describe a branch its own output list makes unreachable.
+  In each case the acceptance criteria were individually reasonable and collectively
+  insufficient, and in each case the thing that caught it was an evidence file rather
+  than a gate. Contracts that describe a fork must make **both** branches satisfiable,
+  or the losing branch must be removed once the fork is decided.
 
 ---
 
@@ -56,11 +101,15 @@
 ```
 
 ```forge-requirement
-{"id":"CP-FR-05","kind":"requirement","text":"If authorised, the adapter maps ACP notifications and hooks onto the same normalized envelope as the opencode adapter, deduplicates against polled state, and degrades to the documented heuristic rather than failing silently."}
+{"id":"CP-FR-05","kind":"requirement","text":"The recorded gate decision names exactly one outcome. If it authorises an adapter or a heuristic, that implementation maps the named ACP notifications and hook payloads onto the same normalized envelope as the opencode adapter, deduplicates against polled state, and degrades to the documented heuristic rather than failing silently. If it defers, no adapter, no heuristic and no classification row for that harness is written, and the obligation becomes CP-FR-07."}
 ```
 
 ```forge-requirement
-{"id":"CP-FR-06","kind":"requirement","text":"No harness-specific path may bypass the hub's classification, pending and delivery rules; a Copilot event is stored and classified exactly like an opencode event."}
+{"id":"CP-FR-06","kind":"requirement","text":"No harness-specific path may bypass the hub's classification, pending and delivery rules; a Copilot event is stored and classified exactly like an opencode event. That holds for a deferred harness too, whose absence of a path is asserted by a test rather than assumed."}
+```
+
+```forge-requirement
+{"id":"CP-FR-07","kind":"requirement","text":"If the gate defers, the deferral record states that v1 ships opencode only, names every signal the decision rests on with the state the probe recorded for it, gives the load-bearing reason rather than the incidental one, says what would have to change to revisit, and binds itself to its evidence by digest; and a test asserts that no adapter module for the deferred harness exists, that the recorded decision and its evidence digests still hold, and that each of the record's own claims is present in its text."}
 ```
 
 **Priority:** every requirement in this feature is Should, because this feature is the evidence-gated part of v1 and a deferral is a legitimate outcome.
@@ -171,26 +220,28 @@ Task review table, kept outside the phase contracts as authoring evidence.
 ```forge-task
 {
   "id": "CP-4",
-  "title": "Build the authorised Copilot adapter or record the deferral",
-  "description": "Implement exactly what the gate decision authorised, and nothing more. Read the decision recorded in docs/reviews/copilot-gate.json and the evidence in docs/research/copilot-acp-probe.md before writing any code. If the decision was full adapter or heuristic-only, translate the ACP notifications and hook payloads named in the decision into the same normalized envelope the opencode adapter produces, using the same dedupe keys, and deliver it to the hub through the existing transport so classification, pending state and delivery stay in one place. Implement the documented degradation for a signal that does not arrive, so a Copilot block that cannot be detected is reported rather than silently absent, and cover it with a test that exercises the missing-signal path. If the decision was deferral, produce the deferral record instead: a runbook stating that Copilot is not supported in v1, which signals were missing, and what would have to change, with no adapter code. Exclude any change to the hub's rules, the notification surface or the dashboard.",
+  "title": "Produce the Copilot deferral record",
+  "description": "The gate recorded DEFERRAL, so this task is the deferral record and not an adapter. Read the decision in docs/reviews/copilot-gate.json and the evidence in docs/research/copilot-acp-probe.md before writing anything, and treat the decision as settled: the question of whether to build a Copilot adapter was answered by a human against captured evidence, and answering it again in this task would be re-opening a closed gate. Write the record a developer reads when they ask why agent-ping ignores their Copilot sessions, and make it a promise that can be checked rather than a note. It states that v1 ships opencode only and that Copilot CLI is not supported; names every signal the decision rests on with the state the probe recorded for it, distinguishing observed from not-triggered and from unclear rather than collapsing the three; gives the load-bearing reason for the deferral, which is the never-exercised quietness gate and not the incidental shape of the finished signal; says what a Copilot developer actually loses, including that a block in their session is not merely un-notified but un-recorded; says what would have to change to revisit, and that revisiting needs a new recorded gate decision rather than a code change; and binds itself to its evidence by digest so a regenerated probe report cannot pass quietly against a stale decision. Write NO adapter, NO heuristic, and NO classification row for this harness. An unauthorised adapter is worse than a missing one, because it makes a deferred harness look supported - so the deliverable that matters most is the test proving the adapter directory stays absent. Make that test the executable half of the record: it asserts the gate still records deferral, that both evidence files still hash to the digests the decision bound itself to, that no Copilot adapter module exists, that no copilot-cli row in the classifier reaches needs-you or finished, and that each claim the record makes is present in the record's own text. Exclude any change to the hub's classification, pending or delivery rules, to the notification surface, to the dashboard, and to the opencode adapter.",
   "ownerAgent": "connector-engineer",
   "dependencies": ["CP-3"],
-  "expectedOutputs": ["src/plugin/copilot/index.ts", "src/plugin/copilot/translate.ts", "tests/plugin/copilot-translate.test.ts", "docs/runbooks/copilot-support.md"],
+  "expectedOutputs": ["docs/runbooks/copilot-support.md", "tests/plugin/copilot-translate.test.ts"],
   "validationCommands": ["npm test -- tests/plugin/copilot-translate.test.ts", "npm run typecheck"],
   "contract": {
     "version": 2,
     "kind": "implementation",
     "requirements": [],
-    "requirementRefs": ["docs/features/copilot-cli-acp-spike.md#CP-FR-05", "docs/features/copilot-cli-acp-spike.md#CP-FR-06"],
+    "requirementRefs": ["docs/features/copilot-cli-acp-spike.md#CP-FR-07", "docs/features/copilot-cli-acp-spike.md#CP-FR-05", "docs/features/copilot-cli-acp-spike.md#CP-FR-06"],
     "acceptanceCriteria": [
-      "A table-driven test asserts each signal named in the gate decision maps to the class the decision assigned, and no other mapping exists",
-      "A test asserts the missing-signal path produces the documented degradation rather than silence",
-      "A test asserts a Copilot envelope is stored and classified by the same hub path as an opencode envelope, with no harness-specific branch",
-      "The runbook states the supported Copilot surface, or states the deferral with the missing signals and what would change it"
+      "A test asserts there is no src/plugin/copilot directory, and that no file under the plugin tree is a Copilot translation, entry point or map",
+      "A test asserts the recorded gate decision is deferral, that it refuses an adapter and a heuristic alike, and that both evidence files still hash to the digests the decision bound itself to",
+      "A test asserts no copilot-cli row in the classifier table reaches needs-you or finished, and that the table is not vacuously empty",
+      "A test asserts each claim the deferral record makes is present in the record's own text, including the supported surface, the missing signals with their states, the load-bearing reason, and what would have to change to revisit",
+      "A test asserts the record binds itself to its evidence by digest and names the gate decision it came from",
+      "The record states plainly what it does not claim, so silence is not read as a finding"
     ],
     "constraints": ["No harness-specific path may bypass the hub's classification, pending and delivery rules", "Identity is the repository short name"],
     "constraintRefs": ["docs/PRD.md#APX-CON-13", "docs/PRD.md#APX-CON-09"],
-    "references": ["docs/features/copilot-cli-acp-spike.md#3. Functional Requirements", "docs/features/copilot-cli-acp-spike.md#8. Open Questions"]
+    "references": ["docs/features/copilot-cli-acp-spike.md#3. Functional Requirements", "docs/features/copilot-cli-acp-spike.md#8. Open Questions", "docs/reviews/CP-3-console-review.md"]
   }
 }
 ```

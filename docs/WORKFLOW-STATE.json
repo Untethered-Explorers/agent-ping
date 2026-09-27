@@ -1,12 +1,12 @@
 {
   "runId": "7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8",
   "startedAt": "2026-09-26T10:43:05.421Z",
-  "lastUpdatedAt": "2026-09-27T16:41:48.870Z",
+  "lastUpdatedAt": "2026-09-27T18:11:00.210Z",
   "manifestPath": "/home/mcfuzzysquirrel/Projects/agent-ping/docs/EXECUTION-MANIFEST.json",
   "manifestVersion": "1.0",
   "harness": "opencode",
   "status": "running",
-  "currentPhase": "NOTIFICATION-AND-TRAY-PRESENCE-4",
+  "currentPhase": "COPILOT-CLI-ACP-SPIKE-2",
   "tasks": {
     "DP-1": {
       "taskId": "DP-1",
@@ -1326,10 +1326,52 @@
     },
     "CP-4": {
       "taskId": "CP-4",
-      "status": "pending",
+      "status": "complete",
       "ownerAgent": "connector-engineer",
-      "attempt": 0,
-      "outputFiles": []
+      "attempt": 4,
+      "outputFiles": [
+        "docs/runbooks/copilot-support.md",
+        "tests/plugin/copilot-translate.test.ts"
+      ],
+      "startedAt": "2026-09-27T18:01:52.194Z",
+      "attemptHistory": [
+        {
+          "attempt": 1,
+          "outcome": "failed",
+          "reason": "expected outputs missing: src/plugin/copilot/index.ts, src/plugin/copilot/translate.ts, tests/plugin/copilot-translate.test.ts",
+          "resultPath": "docs/artifacts/CP-4.2026-09-27T16-52-24-091Z.attempt-1.result.json"
+        },
+        {
+          "attempt": 2,
+          "outcome": "failed",
+          "reason": "expected outputs missing: src/plugin/copilot/index.ts, src/plugin/copilot/translate.ts",
+          "resultPath": "docs/artifacts/CP-4.2026-09-27T16-59-21-546Z.attempt-2.result.json"
+        },
+        {
+          "attempt": 3,
+          "outcome": "failed",
+          "reason": "expected outputs missing: src/plugin/copilot/index.ts, src/plugin/copilot/translate.ts",
+          "resultPath": "docs/artifacts/CP-4.2026-09-27T17-21-54-395Z.attempt-3.result.json"
+        },
+        {
+          "attempt": 4,
+          "outcome": "passed",
+          "resultPath": "docs/artifacts/CP-4.2026-09-27T18-11-00-084Z.attempt-4.result.json"
+        }
+      ],
+      "completedAt": "2026-09-27T18:11:00.210Z",
+      "agentOutput": "I'll start by reading the execution file to understand the task scope.\nBoth deliverables already exist from the prior attempt. Let me verify them against the acceptance criteria by running the validation commands.\nValidation passes. Now let me verify the record's factual claims against the source rather than assuming, and check for gaps against the acceptance criteria.\nLet me verify the exact strings I intend to pin in the test against the record.\nNow let me strengthen the test where the record's own claims are pinned more weakly than CP-FR-07 requires. First, the decision and digest assertions:\nNow the claims list — the digest binding and the load-bearing reason:\nTests pass (45 → 57). Now let me prove the new assertions can actually fail — a test that cannot fail is worthless:\nLet me update the suite's header comment so it still accurately enumerates what it asserts:\nAll checks are green. Here is the outcome.\n\n## What I did\n\n**Read first:** `docs/artifacts/CP-4.md`, then the settled decision in `docs/reviews/CP-3-console-review.md` (§\"Decision: **deferral**\"), the machine-readable gate `docs/reviews/copilot-gate.json`, and the captured evidence in `docs/research/copilot-acp-probe.md`. I also verified the record's factual claims against source rather than trusting them: the 8 `copilot-cli` rows in `HARNESS_SIGNAL_TABLE` (4 suppressed, 2 `fyi`, 2 `unresolved`), the absence of `src/cli/`, and the absence of `src/plugin/copilot/`.\n\n**The gate recorded DEFERRAL, so the deliverables are the record and its test — and no adapter.** Both expected outputs already existed from the prior attempt; I kept them and closed the two real gaps I found against CP-FR-07:\n\n- `docs/runbooks/copilot-support.md` §3 gave the two never-fired rows in the probe's *§10 idiom* (\"never fired\", \"never exercised\") but not the **state label §2 actually recorded** (`not-triggered`). That is precisely the observed/not-triggered/unclear distinction CP-FR-07 demands, so each row now carries both.\n- `tests/plugin/copilot-translate.test.ts` pinned only the *heading* of the missing-signals table and one bare digest. Added a table-driven block asserting every signal the decision rests on is named **with its recorded state on the same row**, that all three ladder states appear so they cannot be collapsed, and that no cell is `absent`; plus the decision heading, the load-bearing-vs-incidental contrast sentence, the two load-bearing revisitation conditions, and a loop asserting a digest for **both** evidence files.\n\n**I proved the suite can fail** (six mutations, each reverted): paraphrasing away a state label, recording a signal as `absent`, deleting the load-bearing contrast, dropping one digest, and shipping a partial adapter (`src/plugin/copilot/translate.ts` with no entry point). Every one failed loudly; the tree was restored identical each time.\n\n### On the attempt-3 rejection\n\nAttempt 3 was rejected for missing `src/plugin/copilot/index.ts` and `src/plugin/copilot/translate.ts` — the adapter files. That expectation is stale: the gate forbids them, and the current manifest plus the repaired feature doc name only the two deferral outputs. I did not create them. Writing an unauthorised adapter would make a deferred harness look supported, which the task calls the one failure this work exists to prevent.\n\n### Validation (all run by me)\n\n| Command | Result |\n|---|---|\n| `npm test -- tests/plugin/copilot-translate.test.ts` | 57 passed |\n| `npm run typecheck` | exit 0 |\n| `npm run lint` | clean |\n| `npm test` (whole suite) | 1544 passed, 41 files |\n\n### Files created or changed\n\n- `docs/runbooks/copilot-support.md` — the deferral record (carried from the prior attempt; §3 state column edited to name the probe's recorded state labels)\n- `tests/plugin/copilot-translate.test.ts` — the executable half of the record (carried from the prior attempt; extended from 45 to 57 tests)\n\nNo file under `src/` was created or modified. `docs/artifacts/` was not touched.\n\n```forge-result\n{\"summary\":\"Produced the CP-4 deferral record and its executable test. The gate in docs/reviews/CP-3-console-review.md recorded DEFERRAL (v1 ships opencode only, no adapter and no heuristic), so no adapter, no heuristic and no classification row was written: src/plugin/copilot/ does not exist and the only copilot-cli rows remain the domain owner's six suppressed/fyi rows and two unresolved ones, none reaching needs-you or finished. docs/runbooks/copilot-support.md states the supported surface, names every signal the decision rests on with the state the probe recorded (observed / not-triggered / unclear, never absent), gives the never-exercised quietness gate as the load-bearing reason and rules out the incidental one, says a block is un-recorded rather than merely un-notified, states what would have to change to revisit and that revisiting needs a new recorded gate decision, binds itself to both evidence files by digest, and states plainly what it does not claim. tests/plugin/copilot-translate.test.ts is the executable half: it asserts the decision is still deferral and refuses adapter and heuristic alike, that both evidence files still hash to the digests the gate bound itself to, that no Copilot adapter module exists and no plugin file names Copilot, that no copilot-cli row reaches needs-you or finished and the table is not vacuous, that the two ACP signals raise a named unresolved-signal error, that a copilot-cli event travels the same classify() and the same lifecycle.record() path as an opencode one with identity as the repository short name, and that each claim the record makes is present in the record's own text. I strengthened it to pin the per-signal states on their table rows, the non-collapse of the three states, both evidence digests, and the load-bearing-versus-incidental reason, and verified all six of those assertions fail under deliberate mutation. Required validation: npm test -- tests/plugin/copilot-translate.test.ts 57 passed; npm run typecheck exit 0. Also clean: npm run lint, and the whole suite at 1544 passed across 41 files.\",\"unresolved\":[],\"decisions\":[\"Attempt 3 was rejected for missing src/plugin/copilot/index.ts and src/plugin/copilot/translate.ts. That expectation is stale and contradicts the recorded gate, so I did not create them: the gate refuses an adapter and a heuristic alike, and the current manifest plus the repaired feature doc name only the two deferral outputs. Writing an unauthorised adapter would make a deferred harness look supported, which is the one failure this task exists to prevent.\",\"The two deliverables already existed from the prior attempt and were sound, so I preserved them and closed only the gaps I could evidence against CP-FR-07 rather than rewriting working material.\",\"The record's two never-fired rows carried the probe's section 10 idiom (never fired, never exercised) but not the state label section 2 recorded (not-triggered). CP-FR-07 asks for the state the probe recorded, so each row now carries both; this also keeps observed, not-triggered and unclear visibly distinct rather than summarised into one phrase.\"],\"tests\":[\"npm test -- tests/plugin/copilot-translate.test.ts: 57 passed, exit 0\",\"npm run typecheck: exit 0\",\"npm run lint: clean\",\"npm test (whole suite): 1544 passed across 41 files\",\"Mutation checks, each reverted and the tree restored byte-identical: dropping the probe's state label from the fyi row fails 1; replacing that state with absent fails 1; a state cell of exactly absent fails 2; deleting the load-bearing contrast sentence fails 1; citing a digest for only one evidence file fails 1; shipping src/plugin/copilot/translate.ts with no entry point fails 2\"],\"warnings\":[\"The engine's attempt-3 rejection message names src/plugin/copilot/index.ts and src/plugin/copilot/translate.ts as missing expected outputs, which contradicts the DEFERRAL decision this task executes. The current manifest and the feature document's CP-4 task block name only docs/runbooks/copilot-support.md and tests/plugin/copilot-translate.test.ts, and both exist. If a future attempt is failed again on those two adapter paths, the manifest is stale rather than the work being incomplete.\",\"The gate's machine-readable record carries \\\"decision\\\": \\\"approved\\\", which approves the CP-3 gate task rather than naming the authorised outcome; the outcome is the deferral written in the review file it names by digest. The record and the test both state that distinction explicitly so a future reader is not misled by the JSON field alone.\",\"The pre-existing uncommitted working-tree changes (docs/PRD.md, docs/features/copilot-cli-acp-spike.md, docs/agent-responsibility-matrix.md, docs/reviews/copilot-gate.json, tests/plugin/install.test.ts and the engine's own state files) predate this attempt. I read them and changed none of them; tests/plugin/install.test.ts in particular is unrelated to CP-4.\"],\"validationLimitations\":[\"Every finding the record rests on is bound to GitHub Copilot CLI 1.0.88 on one machine on 2026-09-27, taken from CP-1 and CP-2's captures rather than from a live re-probe in this task. The record states this binding in its own section 8 and tells a future reader to re-probe rather than inherit.\",\"The record's claim that doctor does not exist yet is a statement about this tree (src/cli/ absent, IO-1 through IO-3 not yet run), so it will become false the moment the packaging feature lands, and the test that pins the runbook's sentence will then need updating rather than silently passing.\",\"I did not drive a real Copilot session in this task. That is deliberate: there is no adapter, and the live evidence belongs to the two probes already cited by digest.\"]}\n```\n",
+      "validationLimitations": [
+        "Every finding the record rests on is bound to GitHub Copilot CLI 1.0.88 on one machine on 2026-09-27, taken from CP-1 and CP-2's captures rather than from a live re-probe in this task. The record states this binding in its own section 8 and tells a future reader to re-probe rather than inherit.",
+        "The record's claim that doctor does not exist yet is a statement about this tree (src/cli/ absent, IO-1 through IO-3 not yet run), so it will become false the moment the packaging feature lands, and the test that pins the runbook's sentence will then need updating rather than silently passing.",
+        "I did not drive a real Copilot session in this task. That is deliberate: there is no adapter, and the live evidence belongs to the two probes already cited by digest."
+      ],
+      "artifactId": "work-cp-4-001",
+      "inputArtifactIds": [
+        "work-cp-3-001",
+        "work-cp-1-001",
+        "work-cp-2-001"
+      ]
     }
   },
   "blockers": [

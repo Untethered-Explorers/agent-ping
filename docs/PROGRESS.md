@@ -1,10 +1,10 @@
 # Project Progress
 
 ## Current State
-**Phase**: NOTIFICATION-AND-TRAY-PRESENCE-4
+**Phase**: COPILOT-CLI-ACP-SPIKE-2
 **Status**: In Progress
-**Validation Gaps**: 109 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-27T16:41:48.902Z
+**Validation Gaps**: 112 unverified check(s) - see "Validation Gaps"
+**Last Updated**: 2026-09-27T18:11:00.238Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -78,6 +78,8 @@
   - Files: scripts/probe-copilot-hooks.mjs, docs/research/copilot-acp-probe.md, docs/research/copilot-hooks-capture.json, tests/scripts/fixtures/copilot-hooks-capture.json, tests/scripts/probe-copilot-hooks.test.ts
 - [x] Phase COPILOT-CLI-ACP-SPIKE-2, Task CP-3: Decide whether a Copilot adapter is authorised
   - Files: docs/reviews/copilot-gate.json
+- [x] Phase COPILOT-CLI-ACP-SPIKE-2, Task CP-4: Produce the Copilot deferral record (@connector-engineer)
+  - Files: docs/runbooks/copilot-support.md, tests/plugin/copilot-translate.test.ts
 
 ## Current Task
 - None currently running
@@ -91,7 +93,6 @@
 - [ ] Phase INSTALL-AUTOSTART-AND-OPERATIONS-1: Phase 1: Package and command line
 - [ ] Phase INSTALL-AUTOSTART-AND-OPERATIONS-2: Phase 2: Autostart
 - [ ] Phase INSTALL-AUTOSTART-AND-OPERATIONS-3: Phase 3: Live operations verification and gate
-- [ ] Phase COPILOT-CLI-ACP-SPIKE-2: Phase 2: Gate decision and authorised outcome
 
 ## Blockers
 - Manifest reconciliation added 4 pending task(s): NT-6, NT-7, NT-8, NT-9
@@ -210,6 +211,9 @@
 - Task CP-1: The permission finding is from one run on one machine against one Copilot version. It is evidence, not a proof across versions, and the gate decision should cite the version alongside the claim.
 - Task CP-1: The hook surface is untouched: CP-2 owns the documented Copilot hook triggers and the consolidated report.
 - Task CP-1: The stub-binary deadline test executes a shebang script directly, so it assumes a POSIX-style platform, consistent with the existing tests/tooling/runner-convention.test.ts, which already spawns npm by bare name.
+- Task CP-4: Every finding the record rests on is bound to GitHub Copilot CLI 1.0.88 on one machine on 2026-09-27, taken from CP-1 and CP-2's captures rather than from a live re-probe in this task. The record states this binding in its own section 8 and tells a future reader to re-probe rather than inherit.
+- Task CP-4: The record's claim that doctor does not exist yet is a statement about this tree (src/cli/ absent, IO-1 through IO-3 not yet run), so it will become false the moment the packaging feature lands, and the test that pins the runbook's sentence will then need updating rather than silently passing.
+- Task CP-4: I did not drive a real Copilot session in this task. That is deliberate: there is no adapter, and the live evidence belongs to the two probes already cited by digest.
 
 ## Notes
 - Workflow engine run 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8

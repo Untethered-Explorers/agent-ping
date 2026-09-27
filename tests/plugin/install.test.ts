@@ -574,33 +574,68 @@ describe('what the installer touches', () => {
     //
     // Two paths leaked here, and both are exercised below: a repeat install of an
     // unchanged product, which is the most common thing an operator does, and a direct
-    // `verifyPluginFile` call, which is what `doctor` makes. Neither passes a `stateDir`,
+    // `verifyPluginFile` call, which is what `doctor` makes. Neither passes a `stageDir`,
     // so each has to clean up after itself.
-    const before = scratchCounts()
-    const { home, env } = temporaryHome()
+    //
+    // WHY THE COUNT IS TAKEN IN A PRIVATE ROOT RATHER THAN THE REAL ONE. The staging
+    // path is still the default - no `stageDir` is passed, so the code under test still
+    // resolves `tmpdir()` itself, which is the configuration this test exists to cover.
+    // What changed is what `tmpdir()` resolves *to*: `TMPDIR` is pointed at a directory
+    // this test creates, so the count is over state nothing else can touch. The first
+    // version of this test snapshotted the real `/tmp` and compared counts, and it was
+    // wrong in a way that only showed up under load: two suites in this repository can
+    // create these directories (this one and `tests/scripts/verify-opencode-live.test.ts`),
+    // and vitest runs the files in parallel, so a sibling worker's scratch directory
+    // appearing or disappearing inside the window moved the count and failed a build
+    // whose code was correct. It reproduced at roughly one run in two. The assertion was
+    // about shared mutable state from inside a parallel run, which is the same category
+    // of mistake as the four recorded in this feature's section 0: a check asserting on
+    // something its contract never scoped.
+    //
+    // Scoping it also makes the assertion STRONGER rather than merely stable. The old
+    // one could only say "the count did not change", so a leak that removed as many
+    // directories as it created would have passed. This one says the count is zero.
+    const realTmpdir = tmpdir()
+    const scratchRoot = mkdtempSync(path.join(realTmpdir, 'agent-ping-scratch-root-'))
+    const previousTmpdir = process.env['TMPDIR']
+    process.env['TMPDIR'] = scratchRoot
+    try {
+      const { home, env } = temporaryHome()
 
-    const first = install(env, home)
-    expect(first.outcome).toBe('installed')
-    // `unchanged`: the path that re-verifies the published file without writing it.
-    expect(install(env, home).outcome).toBe('unchanged')
-    // And the verifier called the way a caller with no state directory calls it, which
-    // is `doctor`'s call and the one that has to clean up after itself.
-    expect(verifyPluginFile(first.pluginFile).ok).toBe(true)
-    // A conflict returns before any staging, and a removal stages nothing either.
-    expect(install(env, home, '9.9.9').outcome).toBe('conflict')
-    expect(remove(env, home).outcome).toBe('removed')
+      const first = install(env, home)
+      expect(first.outcome).toBe('installed')
+      // `unchanged`: the path that re-verifies the published file without writing it.
+      expect(install(env, home).outcome).toBe('unchanged')
+      // And the verifier called the way a caller with no state directory calls it, which
+      // is `doctor`'s call and the one that has to clean up after itself.
+      expect(verifyPluginFile(first.pluginFile).ok).toBe(true)
+      // A conflict returns before any staging, and a removal stages nothing either.
+      expect(install(env, home, '9.9.9').outcome).toBe('conflict')
+      expect(remove(env, home).outcome).toBe('removed')
 
-    expect(scratchCounts()).toEqual(before)
+      // Absolute, because the root is this test's own and started empty. The root
+      // itself is named `agent-ping-scratch-root-`, which matches neither prefix, so it
+      // cannot count itself.
+      expect(scratchCounts()).toEqual({ stage: 0, verify: 0 })
+    } finally {
+      // `os.tmpdir()` reads TMPDIR on every call, so this restores it for every later
+      // test in this file and for the shared teardown that removes `temporaries`.
+      if (previousTmpdir === undefined) delete process.env['TMPDIR']
+      else process.env['TMPDIR'] = previousTmpdir
+      rmSync(scratchRoot, { recursive: true, force: true })
+    }
   }, 180_000)
 })
 
 /**
- * What the installer has left in the system temporary directory.
+ * What the installer has left in the temporary directory it resolves.
  *
  * Counted by prefix and for both kinds, so a leak on either path fails the assertion
- * above. `mkdtemp` names are unique, so any difference means a directory this code made
- * and did not remove; leftovers from an earlier run are on both sides of the count and
- * cancel out.
+ * above. The caller points `TMPDIR` at a private root first, so a non-zero count means
+ * this code made a directory and did not remove it - with no sibling worker's churn able
+ * to move the number. Both files and directories are counted, because the staging and
+ * verification scratch paths are `mkdtemp` directories while the verification child's
+ * session path is a fixed name handed to it as an argument.
  */
 function scratchCounts(): { stage: number; verify: number } {
   const entries = readdirSync(tmpdir())

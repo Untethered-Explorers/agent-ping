@@ -414,4 +414,4 @@ One owning definition per ID. Feature documents reference these IDs; they never 
 | OA-FR-01..09 | requirement | opencode Plugin Adapter | none, terminal feature |
 | LD-FR-01..11 | requirement | Live Dashboard | none, terminal feature |
 | IO-FR-01..09 | requirement | Install Autostart and Operations | none, terminal feature |
-| CP-FR-01..06 | requirement | Copilot CLI ACP Spike | none, terminal feature |
+| CP-FR-01..07 | requirement | Copilot CLI ACP Spike | none, terminal feature |
