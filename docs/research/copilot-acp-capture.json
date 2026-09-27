@@ -1,0 +1,1442 @@
+{
+  "probe": "probe-copilot-acp",
+  "artifactVersion": 1,
+  "recordedBy": {
+    "script": "scripts/probe-copilot-acp.mjs",
+    "node": "v22.22.2"
+  },
+  "cli": {
+    "binary": "copilot",
+    "argv": [
+      "--acp"
+    ],
+    "version": "1.0.88",
+    "versionCommand": "copilot --version",
+    "versionOutput": "GitHub Copilot CLI 1.0.88.\nRun 'copilot update' to check for updates."
+  },
+  "timestamps": {
+    "startedAt": "2026-09-27T09:27:00.963Z",
+    "handshakeAt": "2026-09-27T09:27:02.507Z",
+    "turnEndedAt": [
+      "2026-09-27T09:27:12.390Z",
+      "2026-09-27T09:27:14.230Z"
+    ],
+    "finishedAt": "2026-09-27T09:27:14.230Z",
+    "source": "live",
+    "strippedEnvironment": []
+  },
+  "handshake": {
+    "completed": true,
+    "reason": null,
+    "responseCount": 4,
+    "protocolVersion": 1,
+    "agentCapabilities": {
+      "loadSession": true,
+      "mcpCapabilities": {
+        "http": true,
+        "sse": true
+      },
+      "promptCapabilities": {
+        "image": true,
+        "audio": false,
+        "embeddedContext": true
+      },
+      "sessionCapabilities": {
+        "close": {},
+        "list": {}
+      }
+    },
+    "authMethods": [
+      {
+        "id": "copilot-login",
+        "name": "Log in with Copilot CLI",
+        "description": "Run `copilot login` in the terminal",
+        "_meta": {
+          "terminal-auth": {
+            "command": "~/.local/bin/copilot",
+            "args": [
+              "login"
+            ],
+            "label": "Copilot Login"
+          }
+        }
+      }
+    ],
+    "authMethodsCount": 1,
+    "agentInfo": {
+      "name": "Copilot",
+      "title": "Copilot",
+      "version": "1.0.88"
+    },
+    "raw": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "mcpCapabilities": {
+          "http": true,
+          "sse": true
+        },
+        "promptCapabilities": {
+          "image": true,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "sessionCapabilities": {
+          "close": {},
+          "list": {}
+        }
+      },
+      "agentInfo": {
+        "name": "Copilot",
+        "title": "Copilot",
+        "version": "1.0.88"
+      },
+      "authMethods": [
+        {
+          "id": "copilot-login",
+          "name": "Log in with Copilot CLI",
+          "description": "Run `copilot login` in the terminal",
+          "_meta": {
+            "terminal-auth": {
+              "command": "~/.local/bin/copilot",
+              "args": [
+                "login"
+              ],
+              "label": "Copilot Login"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "session": {
+    "created": true,
+    "sessionId": "176ca5f9-d59d-49a7-858e-bed5fa622ea9",
+    "modes": null,
+    "configOptions": {
+      "$array": 4,
+      "items": [
+        {
+          "type": "select",
+          "id": {
+            "$string": 4
+          },
+          "name": "Mode",
+          "currentValue": {
+            "$string": 60
+          },
+          "options": {
+            "$array": 3,
+            "items": [
+              {
+                "value": {
+                  "$string": 60
+                },
+                "name": "Agent",
+                "description": {
+                  "$string": 50
+                }
+              },
+              {
+                "value": {
+                  "$string": 59
+                },
+                "name": "Plan",
+                "description": {
+                  "$string": 53
+                }
+              },
+              {
+                "value": {
+                  "$string": 64
+                },
+                "name": "Autopilot",
+                "description": {
+                  "$string": 109
+                }
+              }
+            ]
+          },
+          "category": {
+            "$string": 4
+          },
+          "description": {
+            "$string": 105
+          }
+        },
+        {
+          "type": "select",
+          "id": {
+            "$string": 5
+          },
+          "name": "Model",
+          "category": {
+            "$string": 5
+          },
+          "description": {
+            "$string": 48
+          },
+          "currentValue": {
+            "$string": 15
+          },
+          "options": {
+            "$array": 31,
+            "items": [
+              {
+                "value": {
+                  "$string": 4
+                },
+                "name": "Auto",
+                "description": {
+                  "$string": 31
+                },
+                "_meta": null
+              },
+              {
+                "value": {
+                  "$string": 15
+                },
+                "name": "Claude Sonnet 5",
+                "description": {
+                  "$string": 15
+                },
+                "_meta": {
+                  "copilotUsage": {
+                    "$string": 2
+                  },
+                  "copilotEnablement": {
+                    "$string": 7
+                  },
+                  "copilotPriceCategory": {
+                    "$string": 6
+                  }
+                }
+              },
+              {
+                "value": {
+                  "$string": 16
+                },
+                "name": "Claude Fable 5.1",
+                "description": {
+                  "$string": 16
+                },
+                "_meta": {
+                  "copilotUsage": {
+                    "$string": 3
+                  },
+                  "copilotEnablement": {
+                    "$string": 7
+                  },
+                  "copilotPriceCategory": {
+                    "$string": 9
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "select",
+          "id": {
+            "$string": 16
+          },
+          "name": "Reasoning Effort",
+          "category": {
+            "$string": 13
+          },
+          "description": {
+            "$string": 112
+          },
+          "currentValue": {
+            "$string": 6
+          },
+          "options": {
+            "$array": 5,
+            "items": [
+              {
+                "value": {
+                  "$string": 3
+                },
+                "name": "low",
+                "description": {
+                  "$string": 36
+                }
+              },
+              {
+                "value": {
+                  "$string": 6
+                },
+                "name": "medium",
+                "description": {
+                  "$string": 29
+                }
+              },
+              {
+                "value": {
+                  "$string": 4
+                },
+                "name": "high",
+                "description": {
+                  "$string": 42
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "models": null
+  },
+  "permissionPath": {
+    "state": "observed",
+    "method": "session/request_permission",
+    "frameKind": "agent-request",
+    "requestCount": 1,
+    "turnsObserved": 2,
+    "turnsWithRequest": 1,
+    "turnsWithoutRequest": 1,
+    "requests": [
+      {
+        "frameIndex": 7,
+        "sessionId": "176ca5f9-d59d-49a7-858e-bed5fa622ea9",
+        "toolCallId": "call_oOV3p8KGGVYJHZC5smNksOQh",
+        "toolKind": "execute",
+        "toolStatus": "pending",
+        "options": [
+          {
+            "optionId": "allow_once",
+            "kind": "allow_once",
+            "name": "Allow once"
+          },
+          {
+            "optionId": "allow_always",
+            "kind": "allow_always",
+            "name": "Always allow"
+          },
+          {
+            "optionId": "reject_once",
+            "kind": "reject_once",
+            "name": "Deny"
+          }
+        ]
+      }
+    ],
+    "answered": [
+      {
+        "frameIndex": 7,
+        "method": "session/request_permission",
+        "answered": "selected",
+        "optionId": "allow_once"
+      }
+    ],
+    "answeredNote": null,
+    "stateMeaning": {
+      "observed": "the agent asked the client for permission at least once during this run",
+      "not-triggered": "a tool call happened and no permission request was emitted for it",
+      "unresolved": "the path was never exercised, so the signal is undetermined, not absent"
+    }
+  },
+  "turnEndSignal": {
+    "state": "not-triggered",
+    "idleNotificationObserved": false,
+    "idleMarkersMatched": [],
+    "turnBoundariesObserved": true,
+    "stopReasons": [
+      "end_turn",
+      "end_turn"
+    ],
+    "turnBoundaryRequestMethods": [
+      "session/prompt"
+    ],
+    "turnBoundaryAttribution": "known",
+    "notificationMethodsObserved": [
+      "session/update"
+    ],
+    "sessionUpdateVariantsObserved": [
+      "agent_message_chunk",
+      "available_commands_update",
+      "config_option_update",
+      "session_info_update",
+      "tool_call",
+      "tool_call_update",
+      "usage_update"
+    ]
+  },
+  "observed": {
+    "frameCount": 17,
+    "agentRequestMethods": [
+      "session/request_permission"
+    ],
+    "notificationMethods": [
+      "session/update"
+    ],
+    "sessionUpdateVariants": [
+      "agent_message_chunk",
+      "available_commands_update",
+      "config_option_update",
+      "session_info_update",
+      "tool_call",
+      "tool_call_update",
+      "usage_update"
+    ],
+    "toolCallCount": 1,
+    "responseCount": 4
+  },
+  "unparsedLines": [],
+  "frames": [
+    {
+      "index": 0,
+      "kind": "response",
+      "method": null,
+      "id": 0,
+      "receivedAt": null,
+      "shape": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "result": {
+          "protocolVersion": 1,
+          "agentCapabilities": {
+            "loadSession": true,
+            "mcpCapabilities": {
+              "http": true,
+              "sse": true
+            },
+            "promptCapabilities": {
+              "image": true,
+              "audio": false,
+              "embeddedContext": true
+            },
+            "sessionCapabilities": {
+              "close": {},
+              "list": {}
+            }
+          },
+          "agentInfo": {
+            "name": "Copilot",
+            "title": {
+              "$string": 7
+            },
+            "version": {
+              "$string": 6
+            }
+          },
+          "authMethods": {
+            "$array": 1,
+            "items": [
+              {
+                "id": {
+                  "$string": 13
+                },
+                "name": "Log in with Copilot CLI",
+                "description": {
+                  "$string": 35
+                },
+                "_meta": {
+                  "terminal-auth": {
+                    "command": {
+                      "$string": 40
+                    },
+                    "args": {
+                      "$array": 1,
+                      "items": [
+                        {
+                          "$string": 5
+                        }
+                      ]
+                    },
+                    "label": {
+                      "$string": 13
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "index": 1,
+      "kind": "response",
+      "method": null,
+      "id": 1,
+      "receivedAt": null,
+      "shape": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "sessionId": "176ca5f9-d59d-49a7-858e-bed5fa622ea9",
+          "models": {
+            "availableModels": {
+              "$array": 31,
+              "items": [
+                {
+                  "modelId": {
+                    "$string": 4
+                  },
+                  "name": "Auto",
+                  "description": {
+                    "$string": 31
+                  }
+                },
+                {
+                  "modelId": {
+                    "$string": 15
+                  },
+                  "name": "Claude Sonnet 5",
+                  "description": {
+                    "$string": 15
+                  },
+                  "_meta": {
+                    "copilotUsage": {
+                      "$string": 2
+                    },
+                    "copilotEnablement": {
+                      "$string": 7
+                    },
+                    "copilotPriceCategory": {
+                      "$string": 6
+                    }
+                  }
+                },
+                {
+                  "modelId": {
+                    "$string": 16
+                  },
+                  "name": "Claude Fable 5.1",
+                  "description": {
+                    "$string": 16
+                  },
+                  "_meta": {
+                    "copilotUsage": {
+                      "$string": 3
+                    },
+                    "copilotEnablement": {
+                      "$string": 7
+                    },
+                    "copilotPriceCategory": {
+                      "$string": 9
+                    }
+                  }
+                }
+              ]
+            },
+            "currentModelId": {
+              "$string": 15
+            }
+          },
+          "modes": {
+            "availableModes": {
+              "$array": 3,
+              "items": [
+                {
+                  "id": {
+                    "$string": 60
+                  },
+                  "name": "Agent",
+                  "description": {
+                    "$string": 50
+                  }
+                },
+                {
+                  "id": {
+                    "$string": 59
+                  },
+                  "name": "Plan",
+                  "description": {
+                    "$string": 53
+                  }
+                },
+                {
+                  "id": {
+                    "$string": 64
+                  },
+                  "name": "Autopilot",
+                  "description": {
+                    "$string": 109
+                  }
+                }
+              ]
+            },
+            "currentModeId": {
+              "$string": 60
+            }
+          },
+          "configOptions": {
+            "$array": 4,
+            "items": [
+              {
+                "type": "select",
+                "id": {
+                  "$string": 4
+                },
+                "name": "Mode",
+                "currentValue": {
+                  "$string": 60
+                },
+                "options": {
+                  "$array": 3,
+                  "items": [
+                    {
+                      "value": {
+                        "$string": 60
+                      },
+                      "name": "Agent",
+                      "description": {
+                        "$string": 50
+                      }
+                    },
+                    {
+                      "value": {
+                        "$string": 59
+                      },
+                      "name": "Plan",
+                      "description": {
+                        "$string": 53
+                      }
+                    },
+                    {
+                      "value": {
+                        "$string": 64
+                      },
+                      "name": "Autopilot",
+                      "description": {
+                        "$string": 109
+                      }
+                    }
+                  ]
+                },
+                "category": {
+                  "$string": 4
+                },
+                "description": {
+                  "$string": 105
+                }
+              },
+              {
+                "type": "select",
+                "id": {
+                  "$string": 5
+                },
+                "name": "Model",
+                "category": {
+                  "$string": 5
+                },
+                "description": {
+                  "$string": 48
+                },
+                "currentValue": {
+                  "$string": 15
+                },
+                "options": {
+                  "$array": 31,
+                  "items": [
+                    {
+                      "value": {
+                        "$string": 4
+                      },
+                      "name": "Auto",
+                      "description": {
+                        "$string": 31
+                      },
+                      "_meta": null
+                    },
+                    {
+                      "value": {
+                        "$string": 15
+                      },
+                      "name": "Claude Sonnet 5",
+                      "description": {
+                        "$string": 15
+                      },
+                      "_meta": {
+                        "copilotUsage": {
+                          "$string": 2
+                        },
+                        "copilotEnablement": {
+                          "$string": 7
+                        },
+                        "copilotPriceCategory": {
+                          "$string": 6
+                        }
+                      }
+                    },
+                    {
+                      "value": {
+                        "$string": 16
+                      },
+                      "name": "Claude Fable 5.1",
+                      "description": {
+                        "$string": 16
+                      },
+                      "_meta": {
+                        "copilotUsage": {
+                          "$string": 3
+                        },
+                        "copilotEnablement": {
+                          "$string": 7
+                        },
+                        "copilotPriceCategory": {
+                          "$string": 9
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "type": "select",
+                "id": {
+                  "$string": 16
+                },
+                "name": "Reasoning Effort",
+                "category": {
+                  "$string": 13
+                },
+                "description": {
+                  "$string": 112
+                },
+                "currentValue": {
+                  "$string": 6
+                },
+                "options": {
+                  "$array": 5,
+                  "items": [
+                    {
+                      "value": {
+                        "$string": 3
+                      },
+                      "name": "low",
+                      "description": {
+                        "$string": 36
+                      }
+                    },
+                    {
+                      "value": {
+                        "$string": 6
+                      },
+                      "name": "medium",
+                      "description": {
+                        "$string": 29
+                      }
+                    },
+                    {
+                      "value": {
+                        "$string": 4
+                      },
+                      "name": "high",
+                      "description": {
+                        "$string": 42
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "index": 2,
+      "kind": "notification",
+      "method": "session/update",
+      "id": null,
+      "receivedAt": null,
+      "shape": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "176ca5f9-d59d-49a7-858e-bed5fa622ea9",
+          "update": {
+            "sessionUpdate": "available_commands_update",
+            "availableCommands": {
+              "$array": 62,
+              "items": [
+                {
+                  "name": "add-dir",
+                  "description": {
+                    "$string": 96
+                  },
+                  "input": {
+                    "hint": {
+                      "$string": 9
+                    }
+                  }
+                },
+                {
+                  "name": "allow-all",
+                  "description": {
+                    "$string": 22
+                  },
+                  "input": {
+                    "hint": {
+                      "$string": 13
+                    }
+                  }
+                },
+                {
+                  "name": "permissions",
+                  "description": {
+                    "$string": 31
+                  },
+                  "input": {
+                    "hint": {
+                      "$string": 33
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "index": 3,
+      "kind": "notification",
+      "method": "session/update",
+      "id": null,
+      "receivedAt": null,
+      "shape": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "176ca5f9-d59d-49a7-858e-bed5fa622ea9",
+          "update": {
+            "sessionUpdate": "session_info_update",
+            "title": {
+              "$string": 98
+            },
+            "updatedAt": {
+              "$string": 24
+            }
+          }
+        }
+      }
+    },
+    {
+      "index": 4,
+      "kind": "notification",
+      "method": "session/update",
+      "id": null,
+      "receivedAt": null,
+      "shape": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "176ca5f9-d59d-49a7-858e-bed5fa622ea9",
+          "update": {
+            "sessionUpdate": "config_option_update",
+            "configOptions": {
+              "$array": 4,
+              "items": [
+                {
+                  "type": "select",
+                  "id": {
+                    "$string": 4
+                  },
+                  "name": "Mode",
+                  "currentValue": {
+                    "$string": 60
+                  },
+                  "options": {
+                    "$array": 3,
+                    "items": [
+                      {
+                        "value": {
+                          "$string": 60
+                        },
+                        "name": "Agent",
+                        "description": {
+                          "$string": 50
+                        }
+                      },
+                      {
+                        "value": {
+                          "$string": 59
+                        },
+                        "name": "Plan",
+                        "description": {
+                          "$string": 53
+                        }
+                      },
+                      {
+                        "value": {
+                          "$string": 64
+                        },
+                        "name": "Autopilot",
+                        "description": {
+                          "$string": 109
+                        }
+                      }
+                    ]
+                  },
+                  "category": {
+                    "$string": 4
+                  },
+                  "description": {
+                    "$string": 105
+                  }
+                },
+                {
+                  "type": "select",
+                  "id": {
+                    "$string": 5
+                  },
+                  "name": "Model",
+                  "category": {
+                    "$string": 5
+                  },
+                  "description": {
+                    "$string": 48
+                  },
+                  "currentValue": {
+                    "$string": 12
+                  },
+                  "options": {
+                    "$array": 31,
+                    "items": [
+                      {
+                        "value": {
+                          "$string": 4
+                        },
+                        "name": "Auto",
+                        "description": {
+                          "$string": 31
+                        },
+                        "_meta": null
+                      },
+                      {
+                        "value": {
+                          "$string": 15
+                        },
+                        "name": "Claude Sonnet 5",
+                        "description": {
+                          "$string": 15
+                        },
+                        "_meta": {
+                          "copilotUsage": {
+                            "$string": 2
+                          },
+                          "copilotEnablement": {
+                            "$string": 7
+                          },
+                          "copilotPriceCategory": {
+                            "$string": 6
+                          }
+                        }
+                      },
+                      {
+                        "value": {
+                          "$string": 16
+                        },
+                        "name": "Claude Fable 5.1",
+                        "description": {
+                          "$string": 16
+                        },
+                        "_meta": {
+                          "copilotUsage": {
+                            "$string": 3
+                          },
+                          "copilotEnablement": {
+                            "$string": 7
+                          },
+                          "copilotPriceCategory": {
+                            "$string": 9
+                          }
+                        }
+                      }
+                    ]
+                  }
+                },
+                {
+                  "type": "select",
+                  "id": {
+                    "$string": 16
+                  },
+                  "name": "Reasoning Effort",
+                  "category": {
+                    "$string": 13
+                  },
+                  "description": {
+                    "$string": 112
+                  },
+                  "currentValue": {
+                    "$string": 6
+                  },
+                  "options": {
+                    "$array": 6,
+                    "items": [
+                      {
+                        "value": {
+                          "$string": 4
+                        },
+                        "name": "none",
+                        "description": {
+                          "$string": 43
+                        }
+                      },
+                      {
+                        "value": {
+                          "$string": 3
+                        },
+                        "name": "low",
+                        "description": {
+                          "$string": 36
+                        }
+                      },
+                      {
+                        "value": {
+                          "$string": 6
+                        },
+                        "name": "medium",
+                        "description": {
+                          "$string": 29
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "index": 5,
+      "kind": "notification",
+      "method": "session/update",
+      "id": null,
+      "receivedAt": null,
+      "shape": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "176ca5f9-d59d-49a7-858e-bed5fa622ea9",
+          "update": {
+            "sessionUpdate": "usage_update",
+            "used": 17132,
+            "size": 200000
+          }
+        }
+      }
+    },
+    {
+      "index": 6,
+      "kind": "notification",
+      "method": "session/update",
+      "id": null,
+      "receivedAt": null,
+      "shape": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "176ca5f9-d59d-49a7-858e-bed5fa622ea9",
+          "update": {
+            "sessionUpdate": "tool_call",
+            "toolCallId": "call_oOV3p8KGGVYJHZC5smNksOQh",
+            "title": {
+              "$string": 31
+            },
+            "kind": "execute",
+            "status": "pending",
+            "rawInput": {
+              "command": {
+                "$string": 2
+              },
+              "description": {
+                "$string": 31
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "index": 7,
+      "kind": "agent-request",
+      "method": "session/request_permission",
+      "id": 0,
+      "receivedAt": null,
+      "shape": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "method": "session/request_permission",
+        "params": {
+          "sessionId": "176ca5f9-d59d-49a7-858e-bed5fa622ea9",
+          "toolCall": {
+            "toolCallId": "call_oOV3p8KGGVYJHZC5smNksOQh",
+            "title": {
+              "$string": 31
+            },
+            "kind": "execute",
+            "status": "pending",
+            "rawInput": {
+              "command": {
+                "$string": 2
+              },
+              "commands": {
+                "$array": 1,
+                "items": [
+                  {
+                    "$string": 2
+                  }
+                ]
+              }
+            }
+          },
+          "options": {
+            "$array": 3,
+            "items": [
+              {
+                "optionId": "allow_once",
+                "kind": "allow_once",
+                "name": "Allow once"
+              },
+              {
+                "optionId": "allow_always",
+                "kind": "allow_always",
+                "name": "Always allow"
+              },
+              {
+                "optionId": "reject_once",
+                "kind": "reject_once",
+                "name": "Deny"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "index": 8,
+      "kind": "notification",
+      "method": "session/update",
+      "id": null,
+      "receivedAt": null,
+      "shape": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "176ca5f9-d59d-49a7-858e-bed5fa622ea9",
+          "update": {
+            "sessionUpdate": "tool_call_update",
+            "toolCallId": "call_oOV3p8KGGVYJHZC5smNksOQh",
+            "content": {
+              "$array": 1,
+              "items": [
+                {
+                  "type": "content",
+                  "content": {
+                    "type": "text",
+                    "text": {
+                      "$string": 10
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "index": 9,
+      "kind": "notification",
+      "method": "session/update",
+      "id": null,
+      "receivedAt": null,
+      "shape": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "176ca5f9-d59d-49a7-858e-bed5fa622ea9",
+          "update": {
+            "sessionUpdate": "tool_call_update",
+            "toolCallId": "call_oOV3p8KGGVYJHZC5smNksOQh",
+            "content": {
+              "$array": 1,
+              "items": [
+                {
+                  "type": "content",
+                  "content": {
+                    "type": "text",
+                    "text": {
+                      "$string": 10
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "index": 10,
+      "kind": "notification",
+      "method": "session/update",
+      "id": null,
+      "receivedAt": null,
+      "shape": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "176ca5f9-d59d-49a7-858e-bed5fa622ea9",
+          "update": {
+            "sessionUpdate": "tool_call_update",
+            "toolCallId": "call_oOV3p8KGGVYJHZC5smNksOQh",
+            "status": "completed",
+            "content": {
+              "$array": 1,
+              "items": [
+                {
+                  "type": "content",
+                  "content": {
+                    "type": "text",
+                    "text": {
+                      "$string": 49
+                    }
+                  }
+                }
+              ]
+            },
+            "rawOutput": {
+              "content": {
+                "$string": 49
+              },
+              "detailedContent": {
+                "$string": 49
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "index": 11,
+      "kind": "notification",
+      "method": "session/update",
+      "id": null,
+      "receivedAt": null,
+      "shape": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "176ca5f9-d59d-49a7-858e-bed5fa622ea9",
+          "update": {
+            "sessionUpdate": "usage_update",
+            "used": 17216,
+            "size": 200000
+          }
+        }
+      }
+    },
+    {
+      "index": 12,
+      "kind": "notification",
+      "method": "session/update",
+      "id": null,
+      "receivedAt": null,
+      "shape": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "176ca5f9-d59d-49a7-858e-bed5fa622ea9",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": {
+                "$string": 4
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "index": 13,
+      "kind": "response",
+      "method": null,
+      "id": 2,
+      "receivedAt": null,
+      "shape": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "stopReason": "end_turn",
+          "usage": {
+            "inputTokens": 32404,
+            "outputTokens": 56,
+            "totalTokens": 32460,
+            "thoughtTokens": 24,
+            "cachedReadTokens": 16160,
+            "cachedWriteTokens": 16238
+          }
+        }
+      }
+    },
+    {
+      "index": 14,
+      "kind": "notification",
+      "method": "session/update",
+      "id": null,
+      "receivedAt": null,
+      "shape": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "176ca5f9-d59d-49a7-858e-bed5fa622ea9",
+          "update": {
+            "sessionUpdate": "usage_update",
+            "used": 17262,
+            "size": 200000
+          }
+        }
+      }
+    },
+    {
+      "index": 15,
+      "kind": "notification",
+      "method": "session/update",
+      "id": null,
+      "receivedAt": null,
+      "shape": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "176ca5f9-d59d-49a7-858e-bed5fa622ea9",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": {
+                "$string": 2
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "index": 16,
+      "kind": "response",
+      "method": null,
+      "id": 3,
+      "receivedAt": null,
+      "shape": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": {
+          "stopReason": "end_turn",
+          "usage": {
+            "inputTokens": 48693,
+            "outputTokens": 61,
+            "totalTokens": 48754,
+            "thoughtTokens": 24,
+            "cachedReadTokens": 32398,
+            "cachedWriteTokens": 16286
+          }
+        }
+      }
+    }
+  ],
+  "permissionRequestEmitted": true,
+  "permissionPathState": "observed",
+  "turnBoundaryMechanism": "the response to session/prompt carrying stopReason",
+  "dedicatedIdleNotificationObserved": false,
+  "decision": {
+    "verdict": "pass",
+    "exitCode": 0,
+    "assertionsExpected": 10,
+    "assertionsRun": 10,
+    "assertions": [
+      {
+        "name": "cli version captured",
+        "outcome": "pass",
+        "detail": "version=1.0.88 output=\"GitHub Copilot CLI 1.0.88.\\nRun 'copilot update' to check for updates.\""
+      },
+      {
+        "name": "initialize handshake completed",
+        "outcome": "pass",
+        "detail": "initialize response received"
+      },
+      {
+        "name": "negotiated protocol version recorded",
+        "outcome": "pass",
+        "detail": "protocolVersion=1"
+      },
+      {
+        "name": "agent capabilities recorded",
+        "outcome": "pass",
+        "detail": "agentCapabilities={\"loadSession\":true,\"mcpCapabilities\":{\"http\":true,\"sse\":true},\"promptCapabilities\":{\"image\":true,\"audio\":false,\"embeddedContext\":true},\"sessionCapabilities\":{\"close\":{},\"list\":{}}}"
+      },
+      {
+        "name": "authentication methods recorded",
+        "outcome": "pass",
+        "detail": "authMethodsPresent=true count=1 ids=[\"copilot-login\"]"
+      },
+      {
+        "name": "session created",
+        "outcome": "pass",
+        "detail": "sessionId=\"176ca5f9-d59d-49a7-858e-bed5fa622ea9\""
+      },
+      {
+        "name": "session/update notifications observed",
+        "outcome": "pass",
+        "detail": "notificationMethods=[\"session/update\"] frameCount=17"
+      },
+      {
+        "name": "a tool call was observed in the driven turn",
+        "outcome": "pass",
+        "detail": "toolCallCount=1"
+      },
+      {
+        "name": "a turn boundary was observed",
+        "outcome": "pass",
+        "detail": "stopReasons=[\"end_turn\",\"end_turn\"]"
+      },
+      {
+        "name": "at least one line was captured and every captured line parsed as a JSON-RPC frame",
+        "outcome": "pass",
+        "detail": "frameCount=17 unparsedLineCount=0 reasons=[]"
+      }
+    ],
+    "failures": []
+  },
+  "redaction": {
+    "policy": "Frame capture is structural. Key names, enum values, numbers, booleans and array lengths are verbatim; a string is kept verbatim only when its key is in redaction.literalKeys, and is otherwise replaced by a {\"$string\": <length>} marker. Prompt, response and tool-output text therefore cannot appear here (APX-FR-01). The home directory is rewritten to ~ so the artefact does not carry the operator username.",
+    "literalKeys": [
+      "jsonrpc",
+      "kind",
+      "method",
+      "name",
+      "optionId",
+      "outcome",
+      "protocolVersion",
+      "sessionId",
+      "sessionUpdate",
+      "status",
+      "stopReason",
+      "toolCallId",
+      "type"
+    ],
+    "contentBearingKeys": [
+      "text",
+      "thought",
+      "content",
+      "prompt",
+      "rawInput",
+      "rawOutput",
+      "arguments",
+      "title",
+      "description",
+      "diff",
+      "patch"
+    ],
+    "caveat": "The hand-rolled session, mcp servers, hooks and skills are listed as captured names only. Whatever the developer has configured in their own Copilot installation is outside this capture."
+  }
+}

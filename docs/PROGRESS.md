@@ -1,10 +1,10 @@
 # Project Progress
 
 ## Current State
-**Phase**: NOTIFICATION-AND-TRAY-PRESENCE-3
+**Phase**: COPILOT-CLI-ACP-SPIKE-1
 **Status**: In Progress
-**Validation Gaps**: 77 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-27T09:04:17.321Z
+**Validation Gaps**: 80 unverified check(s) - see "Validation Gaps"
+**Last Updated**: 2026-09-27T09:30:27.790Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -60,6 +60,8 @@
   - Files: src/plugin/install/global-plugin.ts, tests/plugin/install.test.ts, assets/images/agent-ping-logo.png
 - [x] Phase OPENCODE-PLUGIN-ADAPTER-2, Task OA-4: Add the polling fallback for non-pushing sessions (@connector-engineer)
   - Files: src/plugin/opencode/poll-fallback.ts, src/plugin/opencode/index.ts, tests/plugin/poll-fallback.test.ts, src/plugin/opencode/translate.ts, tests/plugin/install.test.ts, tests/plugin/opencode-translate.test.ts
+- [x] Phase COPILOT-CLI-ACP-SPIKE-1, Task CP-1: Probe the real Copilot ACP surface (@connector-engineer)
+  - Files: scripts/probe-copilot-acp.mjs, tests/scripts/probe-copilot-acp.test.ts, docs/research/copilot-acp-capture.json, tests/scripts/fixtures/copilot-acp-capture.json
 
 ## Current Task
 - None currently running
@@ -161,6 +163,9 @@
 - Task OA-4: No live opencode session was run and no real opencode server was polled. The three route shapes come from the SDK's type declarations, and the tests answer them from a real loopback server built to those declarations - so what is proven is that the fallback reads and enforces that contract, not that a running opencode answers it.
 - Task OA-4: The end-to-end dedupe test starts a real hub from the real entry point on an ephemeral port and a real opencode-shaped server, but both run in this test process; the process boundary a real harness would add is unproven here.
 - Task OA-4: The poll-fallback module is not yet exercised through OA-3's installed single-file artefact in a real opencode session. That the installer inlines it is asserted (the generated closure includes plugin/opencode/poll-fallback.ts and the file loads in a child Node process), but OA-3's live probe predates this module.
+- Task CP-1: The permission finding is from one run on one machine against one Copilot version. It is evidence, not a proof across versions, and the gate decision should cite the version alongside the claim.
+- Task CP-1: The hook surface is untouched: CP-2 owns the documented Copilot hook triggers and the consolidated report.
+- Task CP-1: The stub-binary deadline test executes a shebang script directly, so it assumes a POSIX-style platform, consistent with the existing tests/tooling/runner-convention.test.ts, which already spawns npm by bare name.
 
 ## Notes
 - Workflow engine run 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
