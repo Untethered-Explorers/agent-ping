@@ -182,11 +182,11 @@ export interface HubIdentity {
  * faults into one. The `database.readable` field is how the two are told apart.
  *
  * The top-level `status` follows PRD 10's own definition of `degraded` - the database
- * is unavailable - rather than widening it to cover a failed notification. A delivery
+ * is unavailable - rather than widening it to cover a failed delivery. A delivery
  * failure is reported in `delivery.status` instead, because the two are different
- * facts with different remedies: one needs the log reopened, the other needs
- * `notify-send`. A doctor run reads both, and a hub whose notifier failed once is not
- * the same thing as a hub that cannot read its own log.
+ * facts with different remedies: one needs the log reopened, the other needs a window
+ * that will show a card. A doctor run reads both, and a hub whose surface failed once
+ * is not the same thing as a hub that cannot read its own log.
  *
  * Every field is a count, a timestamp, a path the local user already knows, a row key
  * or a closed token. None of them can carry conversation content (APX-FR-01,

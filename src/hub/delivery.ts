@@ -56,11 +56,19 @@
 // the health route that `doctor` reads (HC-FR-07, NT-FR-09). The attempt is never
 // retried - one attempt, one bound, one record - because a hub whose notifier is
 // failing must not become a hub that retries forever against it (APX-CON-10). The
-// event stays stored and the pending item stays pending either way: a failed toast is
+// event stays stored and the pending item stays pending either way: a failed card is
 // a missing notification, never a lost block, and the badge is what carries the
 // block (ADR-010). `deliver` resolves with the outcome and never throws, so the
 // composition root's port adapter is what turns a failure back into a rejection the
 // ingest pipeline records as a drop (HC-FR-09).
+//
+// AND A REFUSAL IS NEITHER A DELIVERY NOR A FAILURE (NT-FR-09)
+// The third thing a notifier can say is "this class never leaves the app", and this
+// port's two-valued vocabulary could not express it until NT-8: it resolved, and every
+// `fyi` was counted as a notification nobody saw, against a counter PRD 11 measures
+// notification restraint with. `DeliverySuppressedError` is the typed answer, declared
+// here because this module *is* the boundary, and `callNotifier` classifies it as
+// `suppressed` - recorded, visible, and counted as neither a delivery nor a fault.
 //
 // WHERE THE COUNTERS LIVE, AND WHY NOT HERE
 // The counts in this module are the policy's own, in memory, and they are not the local
@@ -118,11 +126,13 @@ export const DELIVERY_MAX_OUTCOME_RECORDS = 200
 /**
  * How many replayed deliveries may be in flight at once.
  *
- * Eight. A restart with two hundred pending blocks must not hand two hundred
- * platform notifications to the same desktop in one millisecond - on Linux that is
- * two hundred `notify-send` processes, which is the retry-storm shape APX-CON-10
+ * Eight. A restart with two hundred pending blocks must not repaint one screen two
+ * hundred times in the same millisecond, which is the retry-storm shape APX-CON-10
  * exists to avoid even though nothing here is retrying. Oldest first, so a developer
- * who has been away sees the block that has been waiting longest.
+ * who has been away sees the block that has been waiting longest. The bound is still
+ * needed after ADR-012, and for a different reason than it was: a card is a document in
+ * a window this product owns, so two hundred of them at once is two hundred re-renders
+ * of the same window rather than two hundred processes.
  */
 export const DELIVERY_REPLAY_CONCURRENCY = 8
 
@@ -135,10 +145,12 @@ export const DELIVERY_REPLAY_CONCURRENCY = 8
  *
  * Two of these say an attempt happened (`new-event`, `restart-replay`), two say the
  * hub itself declined to try (`already-delivered-this-run`, `not-wired`), and two
- * report what the notifier did (`notifier-failed`, `notifier-timeout`). The last one,
- * `refused-while-closing`, is the answer for an attempt that arrived after the hub
- * began stopping: refusing it is HC-FR-10's "stops accepting events" reaching the
- * delivery path, and it is recorded rather than dropped silently.
+ * report what the notifier did (`notifier-failed`, `notifier-timeout`). The last two
+ * are attempts this module declined: `refused-while-closing` is the answer for one
+ * that arrived after the hub began stopping - refusing it is HC-FR-10's "stops
+ * accepting events" reaching the delivery path, and it is recorded rather than
+ * dropped silently - and `class-refused` is the answer for one the notifier declined
+ * because its class never leaves the app, which is every `fyi` (NT-FR-02, ADR-004).
  *
  * Every value is a closed token. A reason that could carry a notifier's error message
  * would put an arbitrary string into a record this product keeps and serves
@@ -148,6 +160,7 @@ export type DeliveryReason =
   | 'new-event'
   | 'restart-replay'
   | 'already-delivered-this-run'
+  | 'class-refused'
   | 'not-wired'
   | 'notifier-failed'
   | 'notifier-timeout'
@@ -156,9 +169,14 @@ export type DeliveryReason =
 /**
  * What became of one attempt.
  *
- * `delivered` is the only one that means somebody was told. The other four are all
- * visible facts about the same kind of gap, and none of them may be reported as a
- * success (APX-FR-02).
+ * `delivered` is the only one that means somebody was shown something. `failed` and
+ * `timed-out` are gaps and none of them may be reported as a success (APX-FR-02).
+ * `not-wired` is the run's own answer for a hub with no notifier behind the port.
+ * `suppressed` is the one outcome that is not a gap at all: the hub declined to try
+ * again, the hub was stopping, or the notifier's class policy declined because that
+ * class never leaves the app (NT-FR-09). It is recorded, because a silence with a
+ * name is worth more than a missing record, and it is never counted as a delivery -
+ * that separation is the defect NT-8 fixed.
  */
 export type DeliveryOutcome =
   | 'delivered'
@@ -173,15 +191,18 @@ export type DeliveryOutcome =
  * Total over the two unions, so a record is always explainable and a new outcome or
  * reason is a compile error in the table rather than an unexplained value in a
  * ledger. `delivered` has two because it has two legitimate sources and they are
- * different facts for `doctor`; `suppressed` has two because declining to try and
- * declining to try again are different problems.
+ * different facts for `doctor`; `suppressed` has three because declining to try,
+ * declining to try again and declining the class are three different problems - and
+ * the last of them is the one NT-FR-09 added: a refused class is a correct outcome
+ * that must not be counted as a delivery, because PRD 11 measures notification
+ * restraint with the delivery counter.
  */
 export const DELIVERY_OUTCOME_REASONS: Readonly<Record<DeliveryOutcome, readonly DeliveryReason[]>> = {
   delivered: ['new-event', 'restart-replay'],
   failed: ['notifier-failed'],
   'timed-out': ['notifier-timeout'],
   'not-wired': ['not-wired'],
-  suppressed: ['already-delivered-this-run', 'refused-while-closing'],
+  suppressed: ['already-delivered-this-run', 'class-refused', 'refused-while-closing'],
 }
 
 /** Where a delivery came from. The notifier is told, and must not decide on it. */
@@ -415,6 +436,45 @@ export class DeliveryFailedError extends Error {
 }
 
 /**
+ * A notifier that declined the request, as a *typed* rejection.
+ *
+ * The third answer, and the one this port's two-valued vocabulary could not express
+ * until NT-8. A notifier that resolved meant delivered and a notifier that threw
+ * meant failed, so a class the class policy refused - every `fyi`, which by design
+ * never leaves the app (NT-FR-02, ADR-004) - had to resolve and was recorded as a
+ * delivered notification. Nothing about the developer's experience was wrong: no card
+ * appeared, no block was lost, no health verdict changed. But the delivery counter and
+ * this ledger counted a notification nobody was shown, and PRD 11's notification
+ * restraint is measured against that counter.
+ *
+ * A refusal is therefore a typed throw, declared *here* rather than in the notifier's
+ * own vocabulary, because this module is the boundary: the notifier implements the
+ * port, and the port's vocabulary is this file's. `callNotifier` recognises exactly
+ * this type and classifies it as `suppressed` with the reason `class-refused` - not
+ * as a failure, because a hub that reported `degraded` for every routine fyi would be
+ * reporting a fault that did not happen, and not as a delivery, because nobody was
+ * told (APX-FR-02, NT-FR-09, ADR-010).
+ *
+ * The message quotes nothing from the event: it names the class policy's decision and
+ * the fact that the event is stored, which is the whole of what an operator needs to
+ * know that nothing is wrong.
+ */
+export class DeliverySuppressedError extends Error {
+  /** The one suppression a notifier may report, as a closed token. */
+  readonly suppression: 'class-refused'
+
+  constructor(detail: string) {
+    super(
+      `the notifier declined this delivery (${detail}). The class policy decided it stays in the ` +
+        'app, so no notification was made and none is counted: the event is stored and the pending ' +
+        'set is unchanged, and the dashboard is where this class is visible (NT-FR-02, NT-FR-09).',
+    )
+    this.name = 'DeliverySuppressedError'
+    this.suppression = 'class-refused'
+  }
+}
+
+/**
  * The delivery policy a hub, `doctor` and a test read.
  *
  * Six members. None of them names a harness action, none of them writes to the log,
@@ -600,6 +660,24 @@ export function createDeliveryPolicy(options: DeliveryPolicyOptions): DeliveryPo
         pendingCount: request.pendingCount,
       })
     }
+    if (outcome === 'suppressed') {
+      // The notifier's own answer was "this class never leaves the app", and it said so
+      // with a type rather than by resolving. Nothing was shown, so this is a
+      // suppression: not a delivery, not a failure, and not a health verdict. It is
+      // recorded anyway, because a record that explained a silence is worth more than
+      // a missing one (NT-FR-09, ADR-010). No diagnostic line either - `fyi` events
+      // are routine on a busy repository, and a line per routine decision would bury
+      // the failures this product must never hide.
+      return record({
+        event,
+        class: eventClass,
+        source,
+        outcome: 'suppressed',
+        reason: 'class-refused',
+        elapsedMs: now() - startedAt,
+        pendingCount: request.pendingCount,
+      })
+    }
     if (outcome === 'failed') {
       // Reported, not swallowed, and not retried (APX-FR-02, APX-CON-10). The message
       // is deliberately absent: a notifier's error text belongs in its own log, and a
@@ -763,22 +841,23 @@ export function decideDelivery(input: {
 }
 
 /**
- * Call the notifier once, with a real bound, and report which of the three things
+ * Call the notifier once, with a real bound, and report which of the four things
  * happened.
  *
  * `race`, not `all`: the two things that end an attempt are the notifier returning and
  * the bound expiring, and a notifier that never settles must not hold a shutdown open
  * for ever. An attempt that lost the race is abandoned, not retried, and its eventual
  * settlement is ignored - recording it would turn one attempt into two records
- * (APX-CON-10). A throw is caught and reported as a failure, because a notifier that
- * throws has not delivered anything and the requirement is that this is never silent
- * (APX-FR-02).
+ * (APX-CON-10). A throw is classified rather than flattened: a `DeliverySuppressedError`
+ * is a decision, recorded as `suppressed`, and anything else is a failure, because a
+ * notifier that failed has delivered nothing and the requirement is that this is never
+ * silent (APX-FR-02, NT-FR-09).
  */
 async function callNotifier(
   notifier: Notifier | undefined,
   request: NotificationRequest,
   timeoutMs: number,
-): Promise<'delivered' | 'failed' | 'timed-out'> {
+): Promise<'delivered' | 'failed' | 'timed-out' | 'suppressed'> {
   if (notifier === undefined) return 'failed'
   let timer: NodeJS.Timeout | undefined
   const bound = new Promise<'timed-out'>((resolve) => {
@@ -789,12 +868,12 @@ async function callNotifier(
     // waiting for it must stay alive to finish it. The bound, not the loop, is what
     // ends it.
   })
-  const attempt = (async (): Promise<'delivered' | 'failed'> => {
+  const attempt = (async (): Promise<'delivered' | 'failed' | 'suppressed'> => {
     try {
       await notifier(request)
       return 'delivered'
-    } catch {
-      return 'failed'
+    } catch (cause) {
+      return cause instanceof DeliverySuppressedError ? 'suppressed' : 'failed'
     } finally {
       if (timer !== undefined) clearTimeout(timer)
     }

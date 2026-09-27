@@ -70,6 +70,7 @@ import {
   DELIVERY_OUTCOME_REASONS,
   DELIVERY_REPLAY_CONCURRENCY,
   DeliveryFailedError,
+  DeliverySuppressedError,
   createDeliveryPolicy,
   decideDelivery,
   type DeliveryAttemptRecord,
@@ -283,6 +284,25 @@ async function healthOf(hub: RunningHub): Promise<HealthPayload> {
   return response.json<HealthPayload>()
 }
 
+/** The policy's most recent recorded attempt, which one post just produced. */
+function lastAttemptOf(hub: RunningHub): DeliveryAttemptRecord {
+  const last = hub.delivery.outcomes().at(-1)
+  if (last === undefined) throw new Error('the policy recorded no attempt')
+  return last
+}
+
+/** An fyi: the class that never leaves the app, and is therefore refused (NT-FR-02). */
+function fyiBody(transitionId = 'fyi-1'): Record<string, unknown> {
+  return {
+    harness: 'opencode',
+    eventName: 'session.error',
+    sessionId: SESSION,
+    repoFullPath: REPO_PATH,
+    transitionId,
+    occurredAt: OCCURRED_AT,
+  }
+}
+
 /** A delivery request for one stored block, for the unit half. */
 function requestFor(
   store: EventStore,
@@ -389,6 +409,7 @@ describe('the delivery decision table', () => {
     const everyReason: readonly DeliveryReason[] = Object.values(DELIVERY_OUTCOME_REASONS).flat()
     expect([...new Set(everyReason)].sort()).toEqual([
       'already-delivered-this-run',
+      'class-refused',
       'new-event',
       'not-wired',
       'notifier-failed',
@@ -400,6 +421,98 @@ describe('the delivery decision table', () => {
     // legitimate sources and they are different facts for `doctor`.
     const shared = everyReason.filter((reason) => DELIVERY_OUTCOME_REASONS.delivered.includes(reason))
     expect([...new Set(shared)].sort()).toEqual(['new-event', 'restart-replay'])
+    // And a refused class is a suppression, never a delivery and never a failure: that
+    // separation is NT-FR-09, and the counter PRD 11 measures notification restraint
+    // with is incremented from `delivered` alone.
+    expect(DELIVERY_OUTCOME_REASONS.suppressed).toContain('class-refused')
+    expect(DELIVERY_OUTCOME_REASONS.delivered).not.toContain('class-refused')
+    expect(DELIVERY_OUTCOME_REASONS.failed).not.toContain('class-refused')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// NT-FR-09: a refused class is a suppression, not a delivery and not a failure
+// ---------------------------------------------------------------------------
+
+describe('a notifier that declines the delivery records a suppression and no delivery', () => {
+  it('classifies the typed refusal as suppressed, with its own reason', async () => {
+    // The defect ADR-012 names and NT-8 fixed: a notifier that refused - which is every
+    // `fyi`, the class that never leaves the app (NT-FR-02) - used to resolve, and the
+    // policy recorded it as delivered. Nothing was ever shown; the counter and the ledger
+    // both said otherwise. The port's answer is a type now, and the policy classifies it
+    // rather than counting it.
+    const seen: NotificationRequest[] = []
+    const hub = await startFixtureHub(async (request) => {
+      seen.push(request)
+      throw new DeliverySuppressedError('refused-in-app-only')
+    })
+
+    const response = await post(hub, fyiBody())
+    expect(response.status).toBe(202)
+    await hub.ingest.idle()
+
+    // The notifier was asked, and it said no: one attempt, one record.
+    expect(seen).toHaveLength(1)
+    expect(seen[0]?.class).toBe('fyi')
+    const attempt = lastAttemptOf(hub)
+    expect(attempt.outcome).toBe('suppressed')
+    expect(attempt.reason).toBe('class-refused')
+    // Not a delivery, and not a failure: the ledger, the counts, the health verdict and
+    // the pipeline's own record all agree that nothing went wrong (APX-FR-02).
+    const delivery = hub.delivery.status()
+    expect(delivery.delivered).toBe(0)
+    expect(delivery.suppressed).toBe(1)
+    expect(delivery.failed).toBe(0)
+    expect(delivery.timedOut).toBe(0)
+    expect(delivery.lastFailure).toBeNull()
+    expect(delivery.status).toBe('ok')
+    expect(hub.ingest.droppedEvents()).toEqual([])
+  })
+
+  it('counts a refusal and a delivery in the same run, side by side', async () => {
+    // The contrast that makes the case above mean something: one hub, one notifier that
+    // refuses an fyi and delivers a block, and the two counts do not contaminate each
+    // other. PRD 11's restraint figure is exactly this pair of numbers.
+    const hub = await startFixtureHub((request) => {
+      if (request.class === 'fyi') throw new DeliverySuppressedError('refused-in-app-only')
+    })
+
+    await post(hub, fyiBody())
+    await hub.ingest.idle()
+    await post(hub, blockBody('block-after-fyi'))
+    await hub.ingest.idle()
+
+    const delivery = hub.delivery.status()
+    expect(delivery.attempted).toBe(2)
+    expect(delivery.delivered).toBe(1)
+    expect(delivery.suppressed).toBe(1)
+    expect(delivery.failed).toBe(0)
+    expect(delivery.status).toBe('ok')
+    // The durable counter is the one PRD 11 is measured against, and the health payload
+    // is what `doctor` reads: both agree on one delivery, and neither counted the fyi.
+    const health = await healthOf(hub)
+    expect(health.delivery.delivered).toBe(1)
+    expect(health.delivery.suppressed).toBe(1)
+    expect(health.delivery.failed).toBe(0)
+    expect(health.status).toBe('ok')
+  })
+
+  it('still treats any other throw as a failure, so the two cannot be confused', async () => {
+    // The classification is narrow on purpose: only the suppression type is a decision.
+    // A notifier that fails has told nobody, and that is a fault nobody may miss
+    // (APX-FR-02, ADR-010).
+    const hub = await startFixtureHub(() => {
+      throw new Error('the surface window could not be created')
+    })
+    await post(hub, blockBody())
+    await hub.ingest.idle()
+    const attempt = lastAttemptOf(hub)
+    expect(attempt.outcome).toBe('failed')
+    expect(attempt.reason).toBe('notifier-failed')
+    const delivery = hub.delivery.status()
+    expect(delivery.failed).toBe(1)
+    expect(delivery.status).toBe('degraded')
+    expect(delivery.lastFailure).not.toBeNull()
   })
 })
 

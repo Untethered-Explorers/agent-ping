@@ -87,7 +87,8 @@ import {
 } from '@/hub/tray'
 import { badgeFor, drawTrayIcon, type TrayIcon } from '@/tray/badge'
 import { DEEP_LINK_QUERY_KEY } from '@/hub/metrics'
-import { planNotification } from '@/notify/policy'
+import type { CardModel } from '@/notify/surface/card'
+import type { NotificationSurfaceHost } from '@/notify/surface/host'
 import { createChangeFeed, type StateChange } from '@/hub/sse'
 import { WRITE_TOKEN_HEADER } from '@/hub/security'
 import type { MetricsPayload } from '@/hub/routes/metrics'
@@ -449,6 +450,30 @@ function mountTray(options: {
     quit: options.quit ?? ((): void => undefined),
     onDiagnostic: (message) => diagnostics.push(message),
   })
+}
+
+/**
+ * A surface host that says yes to everything.
+ *
+ * The card surface is not what this file is about, so the host is the smallest thing
+ * that answers: the one test that needs a card (the deep-link agreement) needs a window
+ * that can be shown and a renderer that records what was drawn, and everything else
+ * about a window belongs to tests/notify.
+ */
+function availableSurfaceHost(): NotificationSurfaceHost {
+  return {
+    probe: async (): Promise<{ available: true; reason: 'available' }> => ({
+      available: true,
+      reason: 'available',
+    }),
+    show: async (): Promise<{ available: true; reason: 'available' }> => ({
+      available: true,
+      reason: 'available',
+    }),
+    hide: (): void => undefined,
+    setClickThrough: (): void => undefined,
+    destroy: (): void => undefined,
+  }
 }
 
 /** `count` pending items, as the store's accessor would report them. */
@@ -841,24 +866,43 @@ describe('clicking the icon resolves a deep link to the session that has waited 
     expect(await counterOf(hub, 'deep_link_opens')).toBe(0)
   })
 
-  it('resolves the same link the notifier builds for a toast, so the two agree', () => {
-    // NT-FR-07 has two consumers: the link a toast carries (built by the one class
-    // policy) and the link a tray click resolves. If they disagreed, a developer would
-    // follow one and land somewhere the other was not - and the two are built in
-    // different files by different tasks, so "they agree" is a fact to check rather
-    // than a consequence of there being one URL builder.
+  it('resolves the same link the card carries, so the two agree', async () => {
+    // NT-FR-07 has two consumers: the link a card carries (built by the one class
+    // policy, rendered by the surface notifier) and the link a tray click resolves. If
+    // they disagreed, a developer would follow one and land somewhere the other was not
+    // - and the two are built in different files by different tasks, so "they agree" is
+    // a fact to check rather than a consequence of there being one URL builder.
+    //
+    // It is the *card's* link this asserts, not a plan's: a card is what a developer
+    // actually looks at, so the string on it and the string a click resolves are the
+    // two halves of NT-FR-07. Both come from one real hub, so the origins cannot differ
+    // by accident either.
     const desktop = fakeDesktop()
-    const tray = mountTray({ desktop, pending: (): PendingItem[] => pendingItems(1, SESSION) })
-    tray.activate()
-    const plan = planNotification({
-      class: 'needs-you',
-      repoShortName: REPO_NAME,
-      origin: 'http://127.0.0.1:43117',
-      sessionId: SESSION,
+    const cards: CardModel[] = []
+    const hub = await startFixtureHub({
+      // An empty delivery override, so the composition root's own surface notifier stays
+      // wired: the default fixture stub exists to keep a full `npm test` from putting a
+      // real card on a developer's desktop, and this test is the one that wants the card.
+      delivery: {},
+      desktop: {
+        isPrimaryInstance: true,
+        tray: desktop,
+        surface: { create: (): NotificationSurfaceHost => availableSurfaceHost() },
+        renderCard: {
+          present: (model: CardModel): void => {
+            cards.push(model)
+          },
+        },
+      },
     })
-    if (plan.kind !== 'deliver') throw new Error('a needs-you plan must deliver')
-    expect(desktop.opened).toEqual([plan.request.deepLink])
-    expect(desktop.opened[0]).toBe(`http://127.0.0.1:43117/?${DEEP_LINK_QUERY_KEY}=${SESSION}`)
+    await ingest(hub, blockBody('block-1', SESSION))
+    expect(cards).toHaveLength(1)
+
+    const tray = hub.tray
+    if (tray === null) throw new Error('the hub mounted no tray')
+    tray.activate()
+    expect(desktop.opened).toEqual([cards[0]?.deepLink])
+    expect(desktop.opened[0]).toBe(`${hub.origin}/?${DEEP_LINK_QUERY_KEY}=${SESSION}`)
   })
 
   it('reports a click that opened nothing, and counts nothing for it', async () => {

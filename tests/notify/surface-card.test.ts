@@ -338,7 +338,9 @@ function notifyModules(directory = 'src/notify'): string[] {
  * be matched by this product's own prose.
  */
 const FORBIDDEN_CALLS = [
-  'new Notification',
+  // With the parenthesis, so it is the *call* and not this product's own type names:
+  // `new NotificationFailedError(...)` is the hub's failure record, not a notification.
+  'new Notification(',
   'Notification.requestPermission',
   'requestPermission',
   'showNotification',
@@ -393,24 +395,16 @@ const WITHDRAWN_TOOL_NAMES = [
 ] as const
 
 /**
- * The modules under src/notify that still reach a withdrawn mechanism, and the ones
- * NT-8 removes or rewrites.
+ * The modules under src/notify that may still reach a withdrawn mechanism.
  *
- * NT-7 excludes that deletion, so this is the honest form of criterion 7 until it lands:
- * the surface path must be clean file by file, and *these* are the only modules allowed
- * to be unclean. NT-8 deletes five of them and rewrites the sixth, at which point this
- * list becomes empty and the literal claim - clean everywhere under src/notify - holds
- * with the same test. A seventh file reaching a withdrawn mechanism fails here, which is
- * what stops the exception becoming a habit (ADR-012).
+ * Empty, and kept as a named list rather than deleted, because NT-7 could only state
+ * NT-FR-11's literal form as "the surface path is clean file by file, and these six are
+ * the only ones allowed to be unclean". NT-8 deleted five of them and rewrote the
+ * sixth, so the honest form is now the literal one: nothing under src/notify reaches a
+ * platform notification mechanism. A seventh file reaching one fails this list, and so
+ * does a new module that reaches one without being added here (ADR-012).
  */
-const MODULES_PENDING_THE_PLATFORM_REMOVAL: readonly string[] = [
-  'src/notify/command.ts',
-  'src/notify/linux.ts',
-  'src/notify/macos.ts',
-  'src/notify/registry.ts',
-  'src/notify/types.ts',
-  'src/notify/windows.ts',
-]
+const MODULES_PENDING_THE_PLATFORM_REMOVAL: readonly string[] = []
 
 /** The modules under src/notify/surface: the surface path, and the card's own code. */
 function surfaceModules(): string[] {
@@ -420,8 +414,9 @@ function surfaceModules(): string[] {
 describe('the notification path reaches no platform notification mechanism', () => {
   it('reads every module under src/notify, and says which it read', () => {
     // The sweep is only as good as its coverage, so the file list is asserted rather than
-    // assumed: the six surface modules of NT-6 and NT-7, the two card modules, the
-    // lifetime table, and the class policy they all sit on.
+    // assumed: the six surface modules of NT-6 and NT-7, the class policy, the surface
+    // notifier NT-8 built, and the notifier's own vocabulary. Nine modules, and the
+    // count is stated so a tenth one fails here rather than being swept in silence.
     const modules = notifyModules()
     expect(modules).toEqual(
       expect.arrayContaining([
@@ -433,9 +428,10 @@ describe('the notification path reaches no platform notification mechanism', () 
         'src/notify/surface/card-view.ts',
         'src/notify/policy.ts',
         'src/notify/registry.ts',
+        'src/notify/types.ts',
       ]),
     )
-    expect(modules.length).toBeGreaterThanOrEqual(13)
+    expect(modules).toHaveLength(9)
   })
 
   it('has no notification API call, no audio and no spawned command on the surface path', () => {
@@ -471,11 +467,12 @@ describe('the notification path reaches no platform notification mechanism', () 
     }
   })
 
-  it('confines the modules that still reach a withdrawn mechanism to the ones NT-8 removes', () => {
-    // The honest form of criterion 7 while the platform notifiers are still in the tree.
-    // The computed set and the expected list are compared in both directions: a new
-    // offender fails, and so does an offender that has gone without this list being
-    // emptied - which is the signal NT-8 wants when it deletes the files.
+  it('reaches a withdrawn mechanism nowhere under src/notify, and the exemption list is empty', () => {
+    // The literal form of criterion 7, which NT-7 could only state as an exemption list:
+    // the computed set of offenders is compared with the list in both directions, so a
+    // new offender fails and so does a new entry added to excuse one. NT-8 deleted the
+    // platform notifiers and rewrote this module, which is what emptied the list
+    // (ADR-012, NT-FR-11).
     const offending = notifyModules().filter((file) => {
       const source = readModuleWithoutProse(file)
       return (
@@ -485,13 +482,10 @@ describe('the notification path reaches no platform notification mechanism', () 
       )
     })
     expect(offending).toEqual([...MODULES_PENDING_THE_PLATFORM_REMOVAL])
-    // None of them is a surface module, and no card code is among them.
-    for (const file of offending) {
-      expect(file.startsWith('src/notify/surface/')).toBe(false)
-    }
+    expect(MODULES_PENDING_THE_PLATFORM_REMOVAL).toEqual([])
   })
 
-  it('writes no inline style anywhere under src/notify, withdrawn modules included', () => {
+  it('writes no inline style anywhere under src/notify', () => {
     // Separate from the sweep above because inline style is a *this task* property: the
     // card has to render under `style-src 'self'`, and no module on the path may quietly
     // set up the habit that would break it.

@@ -43,20 +43,23 @@
 // Electron to be installed at all.
 //
 // WHAT IS HERE NOW, AND WHAT IS STILL TO COME
-// The platform notifier is wired (NT-1): the registry picks this machine's notifier, the
-// notifier applies the one class policy (a resident critical toast for a block, an
-// expiring one for a finished turn, and nothing at all for an fyi), and the delivery
-// policy calls it - it is the one thing in this process that may call a notifier, and
-// the notifier itself is constructed below and injected into the policy, so the restart
-// replay and the live path reach the same one. A platform with no notifier is not wired
-// and says so on health, which is the honest answer rather than a delivered lie
-// (APX-FR-02). All three v1 platforms have a notifier now (NT-2 added macOS and Windows,
-// which ship with scripted checks and a runbook and are not live-verified on the Linux
-// machine that built them).
+// The surface notifier is wired (NT-8): there is one delivery path in this product and
+// it is the card - a document this product draws in a window it owns - so the
+// composition root hands the delivery policy a notifier built over the mounted surface
+// host and the card renderer, and the notifier applies the one class policy (a card
+// that stays until it is resolved for a block, one that expires for a finished turn,
+// and nothing at all for an fyi). The platform registry and its three notifiers, which
+// started a process each and asked an operating system to speak, were deleted: nothing
+// in this product now reaches a notification service on any platform (ADR-012,
+// NT-FR-02, NT-FR-11). A run with no surface, a run whose desktop refused the window,
+// and a run with a window but no card renderer are all `not-wired` with a diagnostic
+// line, which is the honest answer rather than a delivered lie (APX-FR-02). A refused
+// class is a *suppression* in the policy's own ledger: it is recorded, and it is
+// counted neither as a delivery nor as a failure (NT-FR-09).
 // The tray is wired too (NT-3): the icon is mounted here, over the desktop bridge's five
 // platform calls and this file's own pending set, its badge is the pure function in
 // src/tray/badge.ts, its menu is two rows and has no suppression control in it, and its
-// click resolves the deep link the notifier builds. The icon goes down first in the
+// click resolves the same deep link the card carries. The icon goes down first in the
 // shutdown, because it reads the log this file closes.
 // The card surface is wired as well (NT-6): a frameless, transparent, always-on-top,
 // taskbar-skipping, unfocusable window, created here with `show: false` so it draws
@@ -145,9 +148,10 @@ import {
   type TrayBridge,
 } from '../hub/tray.js'
 import {
-  createPlatformNotifier,
+  resolveSurfaceNotifier,
   toNotifierPort,
-  type NotifierResolution,
+  type CardPresenter,
+  type SurfaceNotifierResolution,
 } from '../notify/registry.js'
 import {
   applyChromiumLaunchPolicy,
@@ -238,6 +242,26 @@ export interface DesktopBridge {
    * the first card rather than at mount.
    */
   readonly surface?: SurfaceHostBridge
+  /**
+   * How a card is rendered into the surface window, when this run has one.
+   *
+   * The second half of a card, and the reason a window on its own is not enough: the
+   * surface host owns a window and knows about placement and nothing about content
+   * (src/notify/surface/host.ts), while what a card *says* is a pure model
+   * (src/notify/surface/card.ts) that has to become a document somewhere. This member
+   * is that somewhere (NT-8, ADR-012).
+   *
+   * Absent means this run has a window and no way to put a card in it, which is
+   * reported as `not-wired` with a diagnostic rather than as a delivery - a
+   * transparent rectangle on a developer's screen is not a card, and reporting it as
+   * one would be the exact lie APX-FR-02 forbids. That is the honest state today: the
+   * card document is not in the built artefacts yet, and NT-9 records what that costs
+   * (NT-FR-01, APX-FR-02).
+   *
+   * Absent entirely on a headless run, exactly as `tray` and `surface` are: no desktop,
+   * no window, no card, and no stub pretending otherwise.
+   */
+  readonly renderCard?: CardPresenter
   /** The origin the hub published, once it is serving. */
   onHubReady?(hub: RunningHub): void
 }
@@ -269,7 +293,7 @@ export interface StartHubOptions {
    *
    * Production passes nothing, and the omission is meaningful: the defaults are the
    * documented bounds. The delivery port below is the policy, and the policy's `wired` is
-   * what the pipeline is told, so a hub on a platform with no notifier counts
+   * what the pipeline is told, so a hub that can show nobody anything counts
    * `not-wired` deliveries rather than passing silently (APX-FR-02). A test uses this
    * option to observe that the answer is returned before any delivery work begins.
    */
@@ -277,13 +301,15 @@ export interface StartHubOptions {
   /**
    * Overrides for the delivery policy (HC-FR-07).
    *
-   * Production passes nothing. The notifier is the platform's own, constructed by the
-   * registry below and injected into the policy, so the live path and the restart replay
-   * reach the same notifier without either of them naming a platform. The one override
-   * that matters is `notifier`, and it exists so a test can watch one classified event
-   * become one attempt without a desktop; passing one replaces the platform notifier, so
-   * a test that does it is testing the policy and not the toast, which is the right way
-   * round for both claims.
+   * Production passes nothing. The notifier is the surface's own, constructed by
+   * `resolveSurfaceNotifier` below and injected into the policy, so the live path and
+   * the restart replay reach the same notifier without either of them naming a
+   * platform or a window. The one override that matters is `notifier`, and it exists
+   * so a test can watch one classified event become one attempt without a desktop;
+   * passing one replaces the surface notifier, so a test that does it is testing the
+   * policy and not the card, which is the right way round for both claims. The suites
+   * that do exactly that are the ones that must not put a real card on a developer's
+   * screen during a full `npm test` run.
    *
    * `origin` is not a caller option: it is this file's own live origin, read per
    * request, because a deep link cannot be built from a port that was only a preference
@@ -397,16 +423,16 @@ export interface RunningHub {
    */
   readonly delivery: DeliveryPolicy
   /**
-   * The notifier resolution this hub was built with (NT-1): which platform answered,
-   * whether one did, and a probe for whether the tool it uses is installed.
+   * The notifier resolution this hub was built with (NT-8): whether this run can show a
+   * card, and if it cannot, which of the three reasons it is.
    *
    * Exposed so `doctor` reports notifier availability from the same resolution the
-   * deliveries went through rather than by constructing a second notifier, and so
-   * NT-3's tray can read the same answer (IO-2, NT-FR-09). Holding it grants nothing:
-   * calling `notifier` is a delivery attempt the policy owns, and `probe` only reports
-   * whether a tool is installed.
+   * deliveries went through rather than by constructing a second notifier (IO-2,
+   * NT-FR-09). Holding it grants nothing: calling `notifier` is a delivery attempt the
+   * policy owns, and `probe` only reports whether a window can be created - there is
+   * no tool to be installed, because nothing here starts a process (ADR-012, NT-FR-11).
    */
-  readonly notifier: NotifierResolution
+  readonly notifier: SurfaceNotifierResolution
   /**
    * The shutdown path (HC-FR-10): PRD 10's lifecycle state, and the one ordered
    * shutdown a signal, an Electron quit and a test all take.
@@ -610,54 +636,60 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
     //     constructed, which is what keeps a second delivery path from being a diff
     //     nobody reads.
     //
-    //     The notifier is the platform's (NT-1), resolved here rather than inside the
-    //     policy, for three reasons. The composition root is the one place in this
-    //     product that wires things, so "which notifier answered" is a line of this file
-    //     rather than a search. The policy and the notifier then have no dependency on
-    //     each other at all - the policy only knows a function it was handed - so a
-    //     platform notifier is a replacement rather than an edit. And a platform with no
-    //     notifier leaves the port unwired, which the policy reports as `not-wired` on
-    //     health and the ingest pipeline counts as `not-wired`, so "nobody was told" is
-    //     visible from both ends rather than being papered over with a no-op notifier
-    //     that always succeeds (APX-FR-02).
+    //     The notifier is the surface's (NT-8), resolved here rather than inside the
+    //     policy, for two reasons. The composition root is the one place in this
+    //     product that wires things, so "what can reach a developer" is a line of this
+    //     file rather than a search. And the policy and the notifier then have no
+    //     dependency on each other at all - the policy only knows a function it was
+    //     handed - so the surface is a replacement rather than an edit.
     //
-    //     A refused surface withholds it too, which is the same honest answer one step
-    //     further along: from ADR-012 the surface is this product's delivery substrate, a
-    //     desktop that refused it is a desktop this run cannot reach, and handing out a
-    //     delivery path that is about to be deleted would report a notification as shown
-    //     to a place that has already been decided against. NT-8 removes the platform
-    //     notifier entirely and the rule becomes the only rule; until then it is an
-    //     interim that can only make the answer more honest, never less. A *headless* run
-    //     is deliberately not in this branch: no desktop bridge means no refusal, and the
-    //     tests, the CLI and the verification scripts keep the wiring they already have.
-    const platformNotifier = createPlatformNotifier({ onDiagnostic: diagnostic })
-    if (!platformNotifier.supported) {
-      // A line, because a hub that cannot notify anybody is degraded in a way an
+    //     There is one notifier and it is this one. The platform registry NT-1 built
+    //     is gone, and so are the three notifiers behind it: a card is a document this
+    //     product draws in a window it owns, on every platform, and no operating
+    //     system's notification service is involved (ADR-012, NT-FR-02, NT-FR-11).
+    //
+    //     A run with no surface, a run whose window was refused, and a run with a
+    //     window but no card renderer all leave the port unwired, and the policy reports
+    //     `not-wired` on health while the ingest pipeline counts `not-wired` attempts,
+    //     so "nobody was shown anything" is visible from both ends rather than papered
+    //     over with a notifier that always succeeds (APX-FR-02). A *headless* run is the
+    //     first of those three, deliberately: the tests, the CLI and the verification
+    //     scripts keep the wiring they already have.
+    const surfaceNotifier = resolveSurfaceNotifier({
+      host: surface,
+      present: options.desktop?.renderCard ?? null,
+      refused: surfaceRefused,
+      onDiagnostic: diagnostic,
+    })
+    if (!surfaceNotifier.supported) {
+      // A line, because a hub that can show nobody anything is degraded in a way an
       // operator has to be told about, and the state it reports is `not-wired` rather
-      // than a failure (APX-CON-06, APX-FR-02). No notifier is constructed on this
-      // path, so nothing can be delivered by accident.
+      // than a failure. No notifier is constructed on this path, so no card can be
+      // claimed by accident.
       diagnostic(
-        `agent-ping has no notifier for this platform (${platformNotifier.platform}, ` +
-          `${platformNotifier.reason}), so every delivery is recorded as not-wired and no ` +
-          'notification leaves this machine',
+        `agent-ping has no way to show a card on this run (${surfaceNotifier.reason}), so every ` +
+          'delivery is recorded as not-wired and nothing is put on a developer\'s screen (NT-FR-04, ' +
+          'APX-FR-02)',
       )
     }
-    const notifierUnwired = !platformNotifier.supported || surfaceRefused
+    const notifierUnwired = !surfaceNotifier.supported
     delivery = createDeliveryPolicy({
       store: watching,
       // The live origin, read per request rather than captured: the bind below is what
       // chooses the port, and a deep link built from the preferred one would point at
-      // a port nobody is listening on (HC-FR-01, NT-FR-07).
+      // a port nobody is listening on (HC-FR-01, HC-FR-07).
       origin: (): string => server?.origin ?? '',
-      // The one conversion between the two notifier shapes: the platform notifier
-      // resolves with an outcome carrying a reason, and the policy's port has only
-      // "resolved" and "thrown" - so the adapter is where a `failed` outcome becomes a
-      // throw the policy records as a failure, with the reason beside it (APX-FR-02,
-      // ADR-010). An `fyi` is refused by the class policy before any platform notifier
-      // is reached and never becomes a command (NT-FR-02).
-      ...(notifierUnwired || platformNotifier.notifier === null
+      // The one conversion between the two notifier shapes: the surface notifier
+      // resolves with an outcome carrying a reason, and the policy's port has
+      // "resolved", "thrown" and one typed suppression - so the adapter is where a
+      // `failed` outcome becomes a throw the policy records as a failure with its
+      // reason beside it, and where a *refused* class becomes a suppression rather than
+      // a delivery (APX-FR-02, ADR-010, NT-FR-09). An `fyi` is refused by the class
+      // policy before a card is built at all and is never counted as a notification
+      // (NT-FR-02).
+      ...(notifierUnwired || surfaceNotifier.notifier === null
         ? {}
-        : { notifier: toNotifierPort(platformNotifier.notifier, { onDiagnostic: diagnostic }) }),
+        : { notifier: toNotifierPort(surfaceNotifier.notifier, { onDiagnostic: diagnostic }) }),
       onDiagnostic: diagnostic,
       // The one place a delivery outcome leaves the policy (HC-6). A `delivered`
       // outcome is the increment for `toast_deliveries`; the other four are handed
@@ -826,11 +858,11 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
        */
       delivery,
       /**
-       * The notifier resolution, so `doctor` and NT-3's tray can ask whether a
-       * notifier exists and whether its tool is installed without building a second
-       * one. The same object the policy above was given (NT-1).
+       * The notifier resolution, so `doctor` can ask whether this run can show a card
+       * at all - and why not if it cannot - without building a second notifier. The
+       * same object the policy above was given (NT-8).
        */
-      notifier: platformNotifier,
+      notifier: surfaceNotifier,
       lifecycle,
       /**
        * The tray, behind a getter because it is mounted after this object is built.
@@ -1156,19 +1188,28 @@ function unpublishedIdentity(claim: HubInstanceClaim, lifecycle: HubLifecycle): 
  * Three lines, and the only place the two layers meet. The policy resolves with an
  * outcome and never throws, which is what lets it keep its own record and its own
  * bound; the ingest pipeline is built to record a throwing port as a dropped delivery
- * with a reason (HC-FR-09). So the adapter turns any outcome that is not `delivered`
- * into a rejection carrying the policy's own record - a `DeliveryFailedError`, whose
- * message names the outcome and the reason and quotes nothing from the event.
+ * with a reason (HC-FR-09). So the adapter turns any outcome that means nobody was
+ * told into a rejection carrying the policy's own record - a `DeliveryFailedError`,
+ * whose message names the outcome and the reason and quotes nothing from the event.
  *
- * The consequence is that one failed notification is visible from all three places a
- * caller could look: the policy's ledger, the pipeline's drop ledger, and health
- * (APX-FR-02, ADR-010). And a hub with no notifier behind the port never gets here at
- * all, because the pipeline's `deliveryWired` is the policy's own `wired`.
+ * `suppressed` is the one outcome deliberately excluded, and it is the defect NT-8
+ * fixed rather than a new rule: a refused class - every `fyi`, which by design never
+ * leaves the app (NT-FR-02) - used to resolve as a delivery, so it counted as a
+ * notification nobody saw and inflated the figure PRD 11 measures notification
+ * restraint with. It is now a suppression, and a suppression is not a drop: nothing was
+ * lost, the event is stored, and the pipeline has a separate word for an event it
+ * declined to store (ADR-012, APX-FR-02, NT-FR-09).
+ *
+ * The consequence is that one failed card is visible from all three places a caller
+ * could look: the policy's ledger, the pipeline's drop ledger, and health. And a hub
+ * with no notifier behind the port never gets here at all, because the pipeline's
+ * `deliveryWired` is the policy's own `wired`.
  */
 function deliveryPort(delivery: DeliveryPolicy): DeliveryPort {
   return async (request: Parameters<DeliveryPort>[0]): Promise<void> => {
     const attempt = await delivery.deliver(request, 'event')
-    if (attempt.outcome !== 'delivered') throw new DeliveryFailedError(attempt)
+    if (attempt.outcome === 'delivered' || attempt.outcome === 'suppressed') return
+    throw new DeliveryFailedError(attempt)
   }
 }
 
@@ -1438,11 +1479,21 @@ function electronTrayBridge(electron: ElectronModuleLike): TrayBridge {
  * the boundary, so the loopback guarantee is a property of how the bridge is built and
  * not of every future caller.
  *
+ * WHAT THIS BRIDGE DELIBERATELY DOES NOT SUPPLY: a card renderer. It hands out a
+ * window and nothing else, so the composition root finds `DesktopBridge.renderCard`
+ * absent and reports the run as `not-wired` with a diagnostic rather than showing an
+ * empty rectangle on somebody's screen (NT-FR-01, APX-FR-02). The reason is recorded
+ * rather than worked around: the card document is not in the built artefacts yet
+ * (`dist/dashboard/card.html` does not exist), and the main-to-renderer channel that
+ * would hand a model to a document running under `contextIsolation` with no `require`
+ * in it is a decision NT-7 named and left here. NT-9's evidence is where that gap is
+ * recorded as a required product change.
+ *
  * VERIFICATION STATE: the window primitives this bridge uses were proved by the
  * pre-flight on the authoring machine, and the host itself is unit-tested against a
  * structural Electron stub. What has never been run is *this composition*: a real
- * Electron process mounting a real hub's surface. NT-9's script is where that happens
- * (NT-FR-03, APX-CON-06).
+ * Electron process mounting a real hub's surface with a real card in it. NT-9's script
+ * is where that happens (NT-FR-03, APX-CON-06).
  */
 function electronSurfaceBridge(electron: ElectronModuleLike): SurfaceHostBridge {
   return {
@@ -1485,9 +1536,9 @@ function electronSurfaceBridge(electron: ElectronModuleLike): SurfaceHostBridge 
  * mounted inside `startHub` (NT-3) over the bridge built here, so the mounted tray is
  * the same object a plain `startHub` produces and there is one implementation of the
  * badge, the menu and the click. The notifier the hub is started with is likewise the one
- * a plain `startHub` gets, because it is resolved inside `startHub` (NT-1) rather than
- * here: an Electron process and a plain Node process on the same machine must notify the
- * same way.
+ * a plain `startHub` gets, because it is resolved inside `startHub` (NT-8) rather than
+ * here: an Electron process and a plain Node process on the same machine must reach a
+ * developer the same way.
  */
 export async function startElectronMain(): Promise<RunningHub | null> {
   const electron = (await importModule('electron')) as ElectronModuleLike

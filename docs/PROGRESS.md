@@ -3,8 +3,8 @@
 ## Current State
 **Phase**: NOTIFICATION-AND-TRAY-PRESENCE-3
 **Status**: In Progress
-**Validation Gaps**: 72 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-27T08:35:40.800Z
+**Validation Gaps**: 77 unverified check(s) - see "Validation Gaps"
+**Last Updated**: 2026-09-27T09:04:17.321Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -50,6 +50,8 @@
   - Files: package.json, package-lock.json, src/notify/surface/host.ts, src/notify/surface/electron-host.ts, src/notify/surface/position.ts, src/main/index.ts, tests/notify/surface-host.test.ts, tests/notify/surface-position.test.ts
 - [x] Phase NOTIFICATION-AND-TRAY-PRESENCE-3, Task NT-7: Render the card and own its lifetime (@notification-engineer)
   - Files: src/notify/surface/lifetime.ts, src/notify/surface/card.ts, src/notify/surface/card-view.ts, tests/notify/surface-lifetime.test.ts, tests/notify/surface-card.test.ts, tests/notify/surface-card-view.test.ts, docs/EXECUTION-MANIFEST.json
+- [x] Phase NOTIFICATION-AND-TRAY-PRESENCE-3, Task NT-8: Deliver to the surface and retire the platform notifiers (@notification-engineer)
+  - Files: src/notify/types.ts, src/notify/policy.ts, src/notify/registry.ts, src/main/index.ts, tests/notify/policy.test.ts, tests/hub/tray.test.ts, docs/runbooks/notification-surface.md, docs/runbooks/notify-platforms.md, src/hub/delivery.ts, src/hub/routes/read.ts, src/notify/command.ts, src/notify/linux.ts, src/notify/macos.ts, src/notify/windows.ts, tests/hub/delivery.test.ts, tests/notify/linux.test.ts, tests/notify/macos.test.ts, tests/notify/registry-selection.test.ts, tests/notify/surface-card.test.ts, tests/notify/windows.test.ts
 - [x] Phase OPENCODE-PLUGIN-ADAPTER-1, Task OA-1: Translate opencode events into the normalized envelope (@connector-engineer)
   - Files: src/plugin/opencode/index.ts, src/plugin/opencode/translate.ts, src/plugin/opencode/work-signal.ts, tests/plugin/opencode-translate.test.ts, tests/plugin/opencode-work-signal.test.ts, docs/engine-config.json
 - [x] Phase OPENCODE-PLUGIN-ADAPTER-1, Task OA-2: Deliver events to the hub and leave a breadcrumb on failure (@connector-engineer)
@@ -139,6 +141,11 @@
 - Task NT-7: 'When the host is destroyed' is proven at the view: view.destroy() removes the card, cancels the timer and refuses to render again. That the host's destroy reaches the view is NT-8's wiring, because NT-6's host deliberately takes placement only and knows nothing about a card document's contents.
 - Task NT-7: The deep link is rendered as a data attribute with no control attached, so a click doing something is unbuilt by design (the feature's UI rule forbids buttons in the card) and the deep-link agreement with the tray is asserted structurally - the card takes the plan's own link - rather than by comparing two strings in a test.
 - Task NT-7: The source reader is a hand-written comment stripper. A backtick template is read as one string to its closing backtick, so a nested template inside a ${...} would end the scan early; no module on this path contains one, and the same tokens are checked in both the code and the values that code uses.
+- Task NT-8: No Electron process was started, no window was created and no card was seen on any desktop from this checkout. Every claim is about the model, the document, the decision tables and the source.
+- Task NT-8: No macOS or Windows observation of any kind is claimed and none was possible: the implementation is one file with no platform branch, and this ran on Linux only.
+- Task NT-8: The host seam is proven against this product's NotificationSurfaceHost interface with a recorder, not against a real BrowserWindow; whether any desktop composites a transparent frameless always-on-top window correctly is unobserved and is NT-9's evidence to produce.
+- Task NT-8: The card view is proven in jsdom, so nothing here says what a card looks like; the stylesheet that draws it and the window's own transparency compositing are both unobserved.
+- Task NT-8: The source sweep strips comments and keeps strings, and reads a backtick template as one string to its closing backtick, so a nested template inside a ${...} would end the scan early. No module on this path contains one, and a missed token would still be caught by the same token in the value the code then uses.
 - Task OA-1: No live opencode session was run. The payload shapes are the 1.18.32 type declarations, not a capture from a running harness; proving the harness delivers them is OA-5's script and OA-6's gate, not this task.
 - Task OA-1: The one-envelope and block-lifecycle tests use the real ingest pipeline and the real SQLite log but drive it from fixtures rather than from a harness's event stream.
 - Task OA-1: The plugin was not loaded by opencode itself. Its structural plugin and client types mirror the 1.18.32 declarations rather than importing @opencode-ai/plugin, which is deliberate (the adapter must load with no dependency), so a signature change upstream would not be caught by a compile error here - the OA-3 install and OA-5 live run are where that surfaces.
