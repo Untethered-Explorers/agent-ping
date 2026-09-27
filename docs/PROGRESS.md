@@ -1,10 +1,10 @@
 # Project Progress
 
 ## Current State
-**Phase**: OPENCODE-PLUGIN-ADAPTER-3
+**Phase**: LIVE-DASHBOARD-1
 **Status**: In Progress
-**Validation Gaps**: 119 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-27T19:42:38.537Z
+**Validation Gaps**: 125 unverified check(s) - see "Validation Gaps"
+**Last Updated**: 2026-09-27T20:58:05.637Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -76,6 +76,8 @@
   - Files: docs/reviews/opencode-adapter.json
 - [x] Phase LIVE-DASHBOARD-1, Task LD-1: Wire the dashboard to live hub state (@dashboard-engineer)
   - Files: src/dashboard/index.html, src/dashboard/main.ts, src/dashboard/live/stream-client.ts, src/dashboard/live/session-list.ts, tests/dashboard/session-list.test.ts, tests/dashboard/stream-client.test.ts, src/dashboard/a11y/dom-mirror.ts, src/dashboard/prototype/index.html, src/dashboard/prototype/main.ts, src/dashboard/prototype/scene.ts, vite.config.ts, src/dashboard/dashboard.css, src/dashboard/host.ts, tests/dashboard/live-harness.ts
+- [x] Phase LIVE-DASHBOARD-1, Task LD-2: Carry the accessibility pattern onto live data (@dashboard-engineer)
+  - Files: src/dashboard/main.ts, src/dashboard/a11y/dom-mirror.ts, src/dashboard/a11y/keyboard-nav.ts, tests/dashboard/live-dom-mirror.test.ts, src/dashboard/dashboard.css, tests/dashboard/live-harness.ts
 - [x] Phase COPILOT-CLI-ACP-SPIKE-1, Task CP-1: Probe the real Copilot ACP surface (@connector-engineer)
   - Files: scripts/probe-copilot-acp.mjs, tests/scripts/probe-copilot-acp.test.ts, docs/research/copilot-acp-capture.json, tests/scripts/fixtures/copilot-acp-capture.json
 - [x] Phase COPILOT-CLI-ACP-SPIKE-1, Task CP-2: Probe the Copilot hook surface and write the report (@connector-engineer)
@@ -89,7 +91,6 @@
 - None currently running
 
 ## Remaining
-- [ ] Phase LIVE-DASHBOARD-1: Phase 1: Live state on the approved layout
 - [ ] Phase LIVE-DASHBOARD-2: Phase 2: Interactions against the real API
 - [ ] Phase LIVE-DASHBOARD-3: Phase 3: End-to-end journey and review
 - [ ] Phase INSTALL-AUTOSTART-AND-OPERATIONS-1: Phase 1: Package and command line
@@ -217,6 +218,12 @@
 - Task LD-1: The browser probe lives in /tmp/ld1probe/probe.mjs and is not a deliverable: the browser journey, playwright.config.ts and any committed evidence file are qa-engineer's LD-4 outputs, and adding one here would duplicate that surface. Running it needs `cp src/storage/schema.sql dist/main/storage/schema.sql` first, which is the pre-existing build gap HC-1 and NT-9 recorded and is not fixed here.
 - Task LD-1: The reconnect observation is a reconnect onto a freshly started hub on the same port with the same state directory, so the hub's run-scoped cursor is gone and the page correctly answered refresh-required and re-read. That is the too-old-cursor path rather than a successful replay, so a successful replay across a restart is unobserved.
 - Task LD-1: Nothing here measures the hub's idle RSS or the ingest p95; those are HC-1's and HC-3's numbers and appear in the whole-suite output (ingest p95 12.90 ms against the 50 ms budget) but were not re-measured for this task.
+- Task LD-2: jsdom applies no layout, so what it proves about the mirror is the DOM, the order, the attributes, the keyboard controller and the motion policy - not a pixel, a computed style or a scroll. The linked stylesheet's rules, the clip-rect hiding keeping entries focusable, the real keyboard traversal, the real scroll, the real focus retention across a real live update and the emulated reduced-motion arrival were proven by the headless-Chrome run instead, and that run is in /tmp and is not committed evidence.
+- Task LD-2: The browser run is one headless Chrome on one Linux machine, with software WebGL and --disable-gpu. It asserts DOM, computed style, scroll position and painted pixels read back from the canvas; no human read a word off the page, and the design verdicts in LD-5 remain unperformed.
+- Task LD-2: The focus rail pixel check counts pixels within 6 per channel of the declared rail token, so it distinguishes a painted focus indicator from a blank surface but is not a claim about how the indicator looks.
+- Task LD-2: The reduced-motion browser observation mounts the page with the preference already in force. Setting the preference on an already-mounted page was not proven to re-read in a real browser - the controller's change handler is asserted in jsdom - because CDP's media emulation did not deliver a MediaQueryList change event in this run.
+- Task LD-2: The dense twenty-row fixture is the layout stress case in jsdom. The browser run used nine rows across two repositories in a 300px-tall emulated viewport, which is what made the scroll observable; twenty rows in a real browser is not observed here.
+- Task LD-2: APX-CON-11's first-paint budget was not re-measured. LD-1 reported 1095ms from a warm cache against the 1s budget in this environment, and nothing in this change addresses that; the authoritative browser measurement is LD-4's.
 - Task CP-1: The permission finding is from one run on one machine against one Copilot version. It is evidence, not a proof across versions, and the gate decision should cite the version alongside the claim.
 - Task CP-1: The hook surface is untouched: CP-2 owns the documented Copilot hook triggers and the consolidated report.
 - Task CP-1: The stub-binary deadline test executes a shebang script directly, so it assumes a POSIX-style platform, consistent with the existing tests/tooling/runner-convention.test.ts, which already spawns npm by bare name.

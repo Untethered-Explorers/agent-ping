@@ -17,6 +17,13 @@
 //   - Built from the row model the canvas renders, in that model's order. Neither
 //     renderer sorts anything itself, so a mirror ordered differently from the
 //     canvas is not expressible here.
+//   - The pending state is carried as the machine-readable half of what the row
+//     already says. A live row speaks its pending count in its status line
+//     ("waiting on you · 2 pending"), because that line is what the canvas paints;
+//     repeating it as a second field of the accessible name would make a screen
+//     reader say the same number twice. What is added here is the attribute, which
+//     is what a test asserts and what an acknowledgement can read without
+//     re-deriving it from prose.
 //   - Focus addressed by session identifier. A re-render replaces the focused
 //     element and the browser would move focus to `body`, so `render` puts it
 //     back by identity, or on the nearest surviving row, or on the container when
@@ -66,6 +73,14 @@ export interface MirrorRow {
   /** One line of state text. Never conversation content (APX-FR-01). */
   readonly status: string
   readonly age: string
+  /**
+   * How many unacknowledged items this session is waiting on, when the renderer
+   * has one. Optional, and deliberately so: the prototype's rows have no pending
+   * count and a mirror entry that invented one would be a row claiming to need
+   * something on a surface where nothing does. A live row's status line already
+   * speaks the count; this is the machine-readable half of the same fact.
+   */
+  readonly pendingCount?: number
 }
 
 export interface MirrorGroup {
@@ -99,6 +114,16 @@ export const MIRROR_STATE_LABEL_ATTRIBUTE = 'data-mirror-state-label'
 export const MIRROR_SESSION_LABEL_ATTRIBUTE = 'data-mirror-session-label'
 export const MIRROR_STATUS_ATTRIBUTE = 'data-mirror-status'
 export const MIRROR_AGE_ATTRIBUTE = 'data-mirror-age'
+/**
+ * The row's unacknowledged pending count, as a decimal string, and `0` for a row
+ * that is waiting on nothing.
+ *
+ * An attribute rather than another field of the accessible name, for the reason in
+ * this file's header: the status line already says the count out loud, and saying
+ * it twice is worse for the person listening than saying it once. This is the half
+ * a test reads and the half an acknowledgement reads.
+ */
+export const MIRROR_PENDING_ATTRIBUTE = 'data-mirror-pending'
 export const MIRROR_REPOSITORY_ATTRIBUTE = 'data-mirror-repository'
 export const MIRROR_PATH_ATTRIBUTE = 'data-mirror-path'
 export const MIRROR_FOCUSED_ATTRIBUTE = 'data-mirror-focused'
@@ -146,6 +171,18 @@ export function mirrorRowName(row: MirrorRow): string {
   return [row.repositoryShortName, ...mirrorRowFields(row).map((field) => field.text)].join(
     MIRROR_FIELD_SEPARATOR,
   )
+}
+
+/**
+ * The pending state an entry carries, or `null` when the renderer gave none.
+ *
+ * `null` rather than `0` for a row with no pending count, because those are two
+ * different facts: a session with nothing waiting on it and a renderer that has no
+ * pending count to report. Only the live page has the second, and conflating the
+ * two would put "nothing needs you" on a page that never said so.
+ */
+export function mirrorPending(row: MirrorRow): string | null {
+  return row.pendingCount === undefined ? null : String(row.pendingCount)
 }
 
 // ---------------------------------------------------------------------------
@@ -328,17 +365,17 @@ export function createDomMirror(options: DomMirrorOptions): DomMirror {
     model.groups
       .map(
         (group) =>
-          `${group.repositoryId} ${group.shortName} ${group.path} ${group.rowIds.join(',')}`,
+          `${group.repositoryId} ${group.shortName} ${group.path} ${group.rowIds.join(',')}`,
       )
-      .join('') +
-    '' +
+      .join('') +
+    '' +
     model.rows
       .map(
         (row) =>
-          `${row.sessionId} ${row.state} ${row.encoding.token} ${row.encoding.label}` +
-          ` ${row.label} ${row.status} ${row.age} ${row.repositoryId}`,
+          `${row.sessionId} ${row.state} ${row.encoding.token} ${row.encoding.label}` +
+          ` ${row.label} ${row.status} ${row.age} ${row.repositoryId} ${row.pendingCount ?? ''}`,
       )
-      .join('')
+      .join('')
 
   const buildRow = (row: MirrorRow): HTMLElement => {
     const entry = doc.createElement('li')
@@ -352,6 +389,10 @@ export function createDomMirror(options: DomMirrorOptions): DomMirror {
     // Detail, not label: never announced as the name and never drawn on the
     // canvas as the primary label.
     entry.setAttribute(MIRROR_PATH_ATTRIBUTE, row.repositoryPath)
+    // The pending state, or nothing at all when the renderer has none. See
+    // `mirrorPending`; the status line is where this is spoken.
+    const pending = mirrorPending(row)
+    if (pending !== null) entry.setAttribute(MIRROR_PENDING_ATTRIBUTE, pending)
     // Every entry is focusable. Roving tabindex decides which one Tab lands on;
     // the keyboard controller moves that as focus moves.
     entry.setAttribute('tabindex', '-1')

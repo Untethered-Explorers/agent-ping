@@ -36,6 +36,23 @@
 // restores DOM focus by identity while it rebuilds, so the two agree about which
 // row is focused even when the rows above it have moved.
 //
+// THE ONE THING A SCROLLING PAGE ADDS
+// The prototype's three rows always fit, so a focused row was always on screen. The
+// live page grows its canvas to the rows and the page scrolls them, and the
+// focusable twin of a row is a one-pixel clipped box - so when the keyboard focuses
+// a row, nothing scrolls. Focus therefore asks the page to bring that row into view
+// (`revealRow`), from the geometry the plan already knows, with the scroll's own
+// smoothness governed by the same motion policy as everything else that moves.
+//
+// THE MIRROR IS BUILT FROM THE PLAN, PLUS ONE FACT
+// `liveMirrorModel` derives the mirror's model from the plan - the canvas order,
+// one entry per row, the grouping - and joins the pending count from the state by
+// session identity. The count is not a fifth thing on the canvas: it is already in
+// the row's status line, and putting it in the mirror's accessible name as well
+// would make a screen reader say the same number twice. What the mirror adds is the
+// machine-readable half (`data-mirror-pending`), which is what an assertion reads
+// and what an acknowledgement reads.
+//
 // THE INSPECTION FLAG DP-4 ASKED FOR
 // `?mirror=visible` sets `data-mirror-inspect="on"` on the document element, which
 // the page's own stylesheet keys on to un-clip the DOM mirror and to draw the
@@ -51,7 +68,7 @@
 // the one thing here that would otherwise keep opening connections after the page
 // went away.
 
-import { createDomMirror, type DomMirror } from './a11y/dom-mirror'
+import { createDomMirror, type DomMirror, type MirrorModel } from './a11y/dom-mirror'
 import { createKeyboardNavigator, type KeyboardNavigator } from './a11y/keyboard-nav'
 import {
   createMotionController,
@@ -176,6 +193,35 @@ export function pendingText(state: LiveState): string {
 export const LIVE_AGE_TICK_MS = 60_000
 
 // ---------------------------------------------------------------------------
+// Bringing a focused row into view
+// ---------------------------------------------------------------------------
+
+/**
+ * One row's position on the surface, which is all a scroll needs to know.
+ *
+ * The row's own `y`, not a pixel offset from the document: the caller has the
+ * geometry and the browser has the scroll, and this is the seam between them.
+ */
+export interface RevealedRow {
+  readonly sessionId: string
+  /** The row's top edge, in the canvas's own coordinates. */
+  readonly y: number
+  readonly height: number
+}
+
+/** Asked to bring one row into view when the keyboard focuses it. */
+export type ScrollRowIntoView = (row: RevealedRow) => void
+
+/**
+ * How much of the page is kept above and below the revealed row.
+ *
+ * One row's worth, so the rows around the focused one stay on screen: a focus band
+ * alone at the very top edge of the viewport says which row has focus and nothing
+ * about where it is.
+ */
+export const REVEAL_MARGIN_PX = 44
+
+// ---------------------------------------------------------------------------
 // Mount
 // ---------------------------------------------------------------------------
 
@@ -221,6 +267,18 @@ export interface MountDashboardOptions {
   }) => KeyboardNavigator
   /** Defaults to the real stream client over the page's own origin. */
   readonly createClient?: (options: CreateStreamClientOptions) => StreamClient
+  /**
+   * Brings the focused row into view. Defaults to the real scroll.
+   *
+   * The prototype's three rows always fit, so it never needed this. The live page
+   * grows its canvas to the rows and the page scrolls them, and the focusable twin
+   * of a row is a one-pixel clipped element: a keyboard user arrowing down a long
+   * list would watch the painted focus band walk off the bottom of the window with
+   * no scroll to follow, because nothing they focused is anywhere near where they
+   * are looking. Injected so a headless test can assert what was asked for without
+   * a viewport to scroll.
+   */
+  readonly scrollRowIntoView?: ScrollRowIntoView
   /** Where the inspection flag is read from. Defaults to the page's location. */
   readonly search?: string
   /** Defaults to the page's own timers. */
@@ -251,6 +309,11 @@ export interface LiveDashboard {
   readonly isDestroyed: boolean
   /** Reveal one repository's full path, or `null` for none. Pointer and focus both call this. */
   setHoveredRepository(repositoryId: string | null): void
+  /**
+   * Bring a row into view, as focusing one does. Exposed because the deep link
+   * resolves to a row and the page must land on it, not merely paint it.
+   */
+  revealRow(sessionId: string): void
   /** Re-read the container size and re-lay out. */
   remeasure(): void
   destroy(): void
@@ -333,6 +396,44 @@ function hoverSignature(regions: readonly HoverRegion[]): string {
   return regions.map((region) => `${region.repositoryId}~${region.y}~${region.height}`).join('|')
 }
 
+/**
+ * The row model the mirror renders, in the canvas's own order.
+ *
+ * The plan's rows are the canvas order and carry everything the mirror shows except
+ * one thing: the pending count. The plan is a drawing, and a drawing has no use for
+ * a count it already spells inside the status line, so the count is joined here from
+ * the state the client holds - by session identity, so a row cannot pick up another
+ * row's count. Deriving the model in one function is what keeps the two renderers
+ * from being fed different data (APX-CON-07).
+ */
+function liveMirrorModel(plan: ScenePlan<LiveDisplayState>, state: LiveState): MirrorModel {
+  const pendingBySession = new Map(
+    state.sessions.map((session) => [session.sessionId, session.pendingCount] as const),
+  )
+  return {
+    groups: plan.groups.map((group) => ({
+      repositoryId: group.repositoryId,
+      shortName: group.shortName,
+      path: group.path,
+      rowIds: group.rowIds,
+    })),
+    rows: plan.rows.map((row) => ({
+      sessionId: row.sessionId,
+      repositoryId: row.repositoryId,
+      repositoryShortName: row.repositoryShortName,
+      repositoryPath: row.repositoryPath,
+      state: row.state,
+      encoding: row.encoding,
+      label: row.label,
+      status: row.status,
+      age: row.age,
+      // A row the plan draws is a row the state holds, so the lookup cannot miss;
+      // the fallback is a zero rather than a claim the page cannot support.
+      pendingCount: pendingBySession.get(row.sessionId) ?? 0,
+    })),
+  }
+}
+
 export async function mountDashboard(options: MountDashboardOptions): Promise<LiveDashboard> {
   const container = options.container
   const now = options.now ?? ((): string => new Date().toISOString())
@@ -375,6 +476,43 @@ export async function mountDashboard(options: MountDashboardOptions): Promise<Li
     motion.destroy()
   })
 
+  /**
+   * Scroll the page so a focused row is where the developer is looking.
+   *
+   * The mirror is clipped to a one-pixel box, so the browser has nothing to scroll
+   * to when a row is focused: it scrolls the focus into view *inside* that box, which
+   * moves nothing a person can see. The row's real position is the canvas's, so the
+   * offset is computed from the canvas's own rectangle and the row's `y` - the two
+   * things only a browser with layout has, which is why this is the one behaviour
+   * here a headless test asserts through a seam rather than by its result.
+   */
+  const scrollRowIntoView =
+    options.scrollRowIntoView ??
+    ((row: RevealedRow): void => {
+      const rect = canvas.getBoundingClientRect()
+      const top = rect.top + row.y
+      const bottom = top + row.height
+      const viewport = globalThis.innerHeight
+      if (top >= REVEAL_MARGIN_PX && bottom <= viewport - REVEAL_MARGIN_PX) return
+      const delta =
+        top < REVEAL_MARGIN_PX ? top - REVEAL_MARGIN_PX : bottom - (viewport - REVEAL_MARGIN_PX)
+      // The scroll is movement, so the same preference that suppresses an arriving
+      // row's transition decides whether it slides or jumps. Jumping still brings
+      // the row into view, so nothing is lost by suppressing it.
+      globalThis.scrollBy({
+        top: delta,
+        behavior: motion.isAnimated('focus-indicator') ? 'smooth' : 'auto',
+      })
+    })
+
+  /** Bring one row into view, if the plan still draws it. */
+  const revealRow = (sessionId: string): void => {
+    if (destroyed) return
+    const row = currentRows.find((candidate) => candidate.sessionId === sessionId)
+    if (row === undefined) return
+    scrollRowIntoView({ sessionId: row.sessionId, y: row.y, height: row.height })
+  }
+
   // The mirror's own sheet is an inline `<style>` element, which this page's
   // content-security-policy refuses: `style-src 'self'` with no `unsafe-inline`
   // (DASHBOARD_CSP in src/hub/security.ts) makes a browser drop the sheet and log
@@ -404,6 +542,9 @@ export async function mountDashboard(options: MountDashboardOptions): Promise<Li
       const repositoryId = repositoryIdFor(sessionId)
       if (repositoryId !== null) setHoveredRepository(repositoryId)
       replan()
+      // After the replan, so the geometry is the one the page is painting now and
+      // not the one the row had before this focus.
+      revealRow(sessionId)
     },
     onBlurRow: (_sessionId, relatedTarget) => {
       // Traversal inside the list is not a leave, and the mirror's own rebuild
@@ -455,7 +596,7 @@ export async function mountDashboard(options: MountDashboardOptions): Promise<Li
       lastHover = nextHover
       target.setHoverRegions(plan.hoverRegions)
     }
-    mirror.render(plan)
+    mirror.render(liveMirrorModel(plan, state))
   }
 
   /** Mark a row that has just arrived, and any row whose state just changed. */
@@ -497,6 +638,25 @@ export async function mountDashboard(options: MountDashboardOptions): Promise<Li
     })
 
   /**
+   * How tall the surface has to be to hold every row the plan drew.
+   *
+   * The plan's own `contentHeight` is the approved layout's measure of itself, and it
+   * is one page padding short of the last row it laid out: `contentHeight` stops
+   * where the group gap starts, while the final row's status line is drawn past it.
+   * The surface is sized from the rows rather than from that measure, because the
+   * surface is the scrolling page and a row at its very bottom that the page cannot
+   * scroll any further is a row the keyboard can focus and never see. The layout's
+   * arithmetic is untouched - nothing moves, and the extra is empty canvas below the
+   * last row - so this completes LD-1's own "grow to the rows" rule rather than
+   * restating the design. The under-measure is the prototype's and is recorded for
+   * the design review rather than changed here.
+   */
+  const requiredHeight = (plan: ScenePlan<LiveDisplayState>): number => {
+    const drawn = plan.rows.reduce((bottom, row) => Math.max(bottom, row.y + row.height), 0)
+    return Math.max(plan.contentHeight, drawn)
+  }
+
+  /**
    * Lay the page out again from the state this client holds.
    *
    * The one place the canvas and the mirror are updated together, and the reason
@@ -507,11 +667,11 @@ export async function mountDashboard(options: MountDashboardOptions): Promise<Li
   const replan = (): void => {
     if (destroyed) return
     let plan = buildPlan()
-    if (plan.contentHeight > surfaceHeight) {
+    if (requiredHeight(plan) > surfaceHeight) {
       // The canvas grows to the rows rather than hiding them below its own edge: a
       // page that silently drops the sessions past the fold is a page that is wrong
       // about what needs the developer. The page's own container scrolls.
-      surfaceHeight = Math.ceil(plan.contentHeight)
+      surfaceHeight = Math.ceil(requiredHeight(plan))
       host.setSize({ width: host.getSize().width, height: surfaceHeight })
       plan = buildPlan()
     }
@@ -656,6 +816,7 @@ export async function mountDashboard(options: MountDashboardOptions): Promise<Li
       return destroyed
     },
     setHoveredRepository,
+    revealRow,
     remeasure,
     destroy,
   }

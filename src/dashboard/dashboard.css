@@ -100,6 +100,47 @@ body {
 }
 
 /* --------------------------------------------------------------------------
+   The mirror's motion rules
+
+   The mirror injects these rules for itself, and this page asks it not to,
+   because an injected <style> element is what the hub's policy refuses. Taking
+   that option is an obligation rather than a convenience: the rules have to
+   arrive by a route the policy allows, and until they do, a preference for less
+   motion on this page has nothing to switch off.
+
+   Every transition here is the same declaration, applied only while an effect is
+   in play and permitted: the selector is the policy's own animated selector for
+   each of the three effects it declared non-essential (focus indicator, revealed
+   full path, arriving row), and `instant` - what reduced motion produces - is not
+   selected by any rule. A state change is information, so it is marked with an
+   attribute no rule transitions at all. The backstop covers anything that reaches
+   the DOM without asking the policy.
+
+   tests/dashboard/live-dom-mirror.test.ts asserts that every line below is a line
+   the module's own sheet also carries, so the two cannot drift.
+   -------------------------------------------------------------------------- */
+
+.dashboard-mirror [data-motion-focus-indicator='animated'],
+.dashboard-mirror [data-motion-full-path-reveal='animated'],
+.dashboard-mirror [data-motion-state-arrival='animated'] {
+  transition: opacity 120ms ease-out, transform 120ms ease-out;
+}
+
+/* A state change is information, not movement: it appears in place. */
+.dashboard-mirror [data-motion-state-change='visible'] {
+  /* no movement, deliberately */
+}
+
+/* Backstop for anything that reaches the DOM without asking the policy. */
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-mirror,
+  .dashboard-mirror * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
    The inspection flag: `?mirror=visible`
    -------------------------------------------------------------------------- */
 

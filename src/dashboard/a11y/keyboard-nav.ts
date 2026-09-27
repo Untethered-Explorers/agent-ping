@@ -13,7 +13,27 @@
 //   - Activation is reported, not implied: an entry is marked in the DOM, the
 //     activation is counted, and the surface is told through a callback. In this
 //     prototype the callback records the row; in the live page it is where
-//     acknowledgement and deep-link focus hang off.
+//     acknowledgement and deep-link focus hang off. The count is held here and the
+//     mark is re-applied by identity on every rebuild, so a row that has been
+//     activated still is after the feed has replaced the elements.
+//
+// ONE THING THE LIVE FEED CHANGED
+// A static list of rows is rendered once, so the entries read at construction are
+// the entries that exist forever. A live feed replaces them under this controller:
+// every state change that changes what a row says rebuilds the mirror, and the
+// element that was the third row a moment ago is no longer in the document.
+// `focusIndex` therefore refuses to work from a detached node - focusing one
+// silently does nothing, which a person experiences as the keyboard having stopped
+// working - and re-reads the list once instead. Traversal locates the focused row in
+// the list as it is now, for the same reason: an unannounced rebuild moves a row's
+// position, and a controller that remembered the old one would send a developer
+// arrowing down the list back to the top of it. This is what makes
+// `navigator.focusSession` usable straight after a hub frame, which is how
+// LD-FR-06's deep link lands on its row.
+//
+// The activation mark is the same problem in a different place. A count read back off
+// an element is a count the next rebuild forgets, so the counts are held here by
+// session identifier and re-applied to whichever element now holds that row.
 
 import type { MotionController } from '../theme/motion'
 import {
@@ -114,12 +134,30 @@ export function createKeyboardNavigator(options: KeyboardNavigatorOptions): Keyb
 
   let entries: readonly HTMLElement[] = [...container.querySelectorAll<HTMLElement>(selector)]
   let activatedSessionId: string | null = null
+  /**
+   * How many times each row has been activated, held here rather than read back off
+   * an element. A live rebuild replaces the elements, so an element attribute would
+   * forget the count and the row would go back to "never activated" the moment
+   * anything changed - which is what the earlier version of this did, and the
+   * activated row lost its mark on every frame the hub sent.
+   */
+  const activationCounts = new Map<string, number>()
   let lastActivation: (ActivationDetail & { readonly sessionId: string }) | null = null
   let markedEntry: HTMLElement | null = null
+  let markedActivated: HTMLElement | null = null
   let destroyed = false
 
   const sessionIdOf = (entry: HTMLElement | null): string | null =>
     entry?.getAttribute(MIRROR_ROW_ATTRIBUTE) ?? null
+
+  /** The entries the container holds right now, in visual order. */
+  const readEntries = (): readonly HTMLElement[] => [
+    ...container.querySelectorAll<HTMLElement>(selector),
+  ]
+
+  /** Whether a re-read found a different list, so a stale cache is never used twice. */
+  const entriesChanged = (next: readonly HTMLElement[]): boolean =>
+    next.length !== entries.length || next.some((entry, index) => entry !== entries[index])
 
   const focusedEntry = (): HTMLElement | null => {
     const active = doc.activeElement
@@ -149,30 +187,118 @@ export function createKeyboardNavigator(options: KeyboardNavigatorOptions): Keyb
     markedEntry = entry
   }
 
+  /**
+   * Put the activation mark on one entry, or take it off when passed null.
+   *
+   * The mark is addressed by session identity, so a rebuild re-applies it to the
+   * row that was activated rather than losing it. Only the previously marked entry
+   * is cleared, as with the focus mark, so a re-render costs two attribute writes
+   * rather than a pass over the list.
+   */
+  const markActivated = (entry: HTMLElement | null): void => {
+    if (markedActivated !== null && markedActivated !== entry) {
+      markedActivated.removeAttribute(MIRROR_ACTIVATIONS_ATTRIBUTE)
+      markedActivated.classList.remove(MIRROR_ACTIVATED_CLASS)
+    }
+    if (entry !== null) {
+      entry.classList.add(MIRROR_ACTIVATED_CLASS)
+      const id = sessionIdOf(entry)
+      if (id !== null) {
+        const seen = activationCounts.get(id)
+        if (seen !== undefined && seen > 0) {
+          entry.setAttribute(MIRROR_ACTIVATIONS_ATTRIBUTE, String(seen))
+        }
+      }
+    }
+    markedActivated = entry
+  }
+
   const focusIndex = (index: number): HTMLElement | null => {
     if (destroyed || entries.length === 0) return null
     const clamped = Math.min(Math.max(index, 0), entries.length - 1)
     const entry = entries[clamped]
     if (entry === undefined) return null
-    entry.focus()
-    return entry
+    if (container.contains(entry)) {
+      entry.focus()
+      return entry
+    }
+    // The row at this position is a node from before the last rebuild. Focus it
+    // and nothing happens at all, so re-read the list once and try the same
+    // position in it: a caller that chose the row by identity still gets that row
+    // as long as it survived, and a caller that chose a position gets the row now
+    // in that position rather than a silent no-op.
+    const next = readEntries()
+    if (!entriesChanged(next)) return null
+    entries = next
+    if (entries.length === 0) return null
+    const retried = entries[Math.min(clamped, entries.length - 1)]
+    if (retried === undefined) return null
+    // The single tab stop follows, so the list cannot be left unreachable by Tab
+    // because a rebuild moved the row the tab stop was on.
+    applyRovingTabIndex(entries, entries.indexOf(retried))
+    retried.focus()
+    return retried
+  }
+
+  /**
+   * The cached list, re-read once when it is not the list in the document.
+   *
+   * The mirror announces every rebuild it makes, so this is the defensive path: a
+   * caller that renders the mirror itself leaves the cache holding nodes that are
+   * no longer attached, and working from those means focusing a node that does
+   * nothing at all. One re-read costs a query and turns a silently dead keypress
+   * into a working one.
+   */
+  const liveEntries = (): readonly HTMLElement[] => {
+    if (entries.length === 0) {
+      const next = readEntries()
+      if (next.length > 0) entries = next
+    } else if (!entries.some((entry) => container.contains(entry))) {
+      const next = readEntries()
+      if (entriesChanged(next)) entries = next
+    }
+    return entries
   }
 
   const focusOffsetFrom = (current: HTMLElement | null, delta: number): HTMLElement | null => {
-    if (entries.length === 0) return null
-    const from = current === null ? -1 : entries.indexOf(current)
+    const list = liveEntries()
+    if (list.length === 0) return null
+    // The focused row is located by identity in the list as it is now, so an
+    // unannounced rebuild moves the position with the row rather than losing it -
+    // which is what would otherwise send a developer arrowing down a list of rows
+    // back to the top of it.
+    const from = current === null ? -1 : list.indexOf(current)
     // With nothing focused, forward traversal starts at the first row and backward
     // traversal at the last, which is where a list entry is entered from either
     // way round.
-    const next = from < 0 ? (delta > 0 ? 0 : entries.length - 1) : from + delta
+    const next = from < 0 ? (delta > 0 ? 0 : list.length - 1) : from + delta
     return focusIndex(next)
   }
 
   const focusSession = (sessionId: string): HTMLElement | null => {
-    const index = entries.findIndex((entry) => entry.getAttribute(MIRROR_ROW_ATTRIBUTE) === sessionId)
-    if (index < 0) return null
+    let index = entries.findIndex((entry) => entry.getAttribute(MIRROR_ROW_ATTRIBUTE) === sessionId)
+    if (index < 0) {
+      // The row is not in the cached list. Before answering "no such row", check
+      // the document: this controller is asked to focus a row most often right
+      // after the feed changed the list, and a rebuild that has not been announced
+      // to it yet must not look like a row that does not exist.
+      const next = readEntries()
+      if (!entriesChanged(next)) return null
+      entries = next
+      index = entries.findIndex((entry) => entry.getAttribute(MIRROR_ROW_ATTRIBUTE) === sessionId)
+      if (index < 0) return null
+    }
     return focusIndex(index)
   }
+
+  const focusFirst = (): HTMLElement | null => focusIndex(0)
+
+  const focusLast = (): HTMLElement | null =>
+    // The live list, not the cached length: a cached length from before a rebuild is
+    // a position in a list that no longer exists, and clamping it into the new one
+    // lands on a row nobody asked for - the second-to-last instead of the last,
+    // silently, with no keypress to explain it.
+    focusIndex(liveEntries().length - 1)
 
   const activate = (sessionId?: string, key = 'programmatic'): boolean => {
     if (destroyed) return false
@@ -183,9 +309,9 @@ export function createKeyboardNavigator(options: KeyboardNavigatorOptions): Keyb
     // Activation is observable in three places: on the element, in this
     // controller's own state, and in the surface's callback. A row that only
     // changed colour would be a dead end for anyone who cannot see it.
-    const count = Number(target.getAttribute(MIRROR_ACTIVATIONS_ATTRIBUTE) ?? '0') + 1
-    target.setAttribute(MIRROR_ACTIVATIONS_ATTRIBUTE, String(count))
-    target.classList.add(MIRROR_ACTIVATED_CLASS)
+    const count = (activationCounts.get(id) ?? 0) + 1
+    activationCounts.set(id, count)
+    markActivated(target)
     activatedSessionId = id
     lastActivation = { sessionId: id, key, count }
     options.onActivate?.(id, { key, count })
@@ -226,14 +352,17 @@ export function createKeyboardNavigator(options: KeyboardNavigatorOptions): Keyb
     const action = NAVIGATION_KEYS[event.key]
     if (action === undefined) return
     // Tab is deliberately not handled: it leaves the row list entirely.
+    // The four movements are the four methods, not a second copy of them - a key
+    // handler with its own positions is a second answer to where End goes, and the
+    // two drift apart the first time one of them is corrected.
     const target =
       action === 'next'
         ? focusOffsetFrom(focusedEntry(), 1)
         : action === 'previous'
           ? focusOffsetFrom(focusedEntry(), -1)
           : action === 'first'
-            ? focusIndex(0)
-            : focusIndex(entries.length - 1)
+            ? focusFirst()
+            : focusLast()
     if (target !== null) event.preventDefault()
   }
 
@@ -266,12 +395,8 @@ export function createKeyboardNavigator(options: KeyboardNavigatorOptions): Keyb
     focusPrevious(): HTMLElement | null {
       return focusOffsetFrom(focusedEntry(), -1)
     },
-    focusFirst(): HTMLElement | null {
-      return focusIndex(0)
-    },
-    focusLast(): HTMLElement | null {
-      return focusIndex(entries.length - 1)
-    },
+    focusFirst,
+    focusLast,
     focusSession,
     activate,
     /**
@@ -285,11 +410,21 @@ export function createKeyboardNavigator(options: KeyboardNavigatorOptions): Keyb
      */
     refresh(): void {
       if (destroyed) return
-      entries = [...container.querySelectorAll<HTMLElement>(selector)]
+      entries = readEntries()
       const focused = focusedEntry()
       const index = focused === null ? -1 : entries.indexOf(focused)
       applyRovingTabIndex(entries, index < 0 ? 0 : index)
       markFocused(focused)
+      // The activation mark is re-applied by identity for the same reason focus is:
+      // the row that was activated is the one that carries the mark, whichever
+      // element it is after a rebuild.
+      markActivated(
+        activatedSessionId === null
+          ? null
+          : (entries.find(
+              (entry) => entry.getAttribute(MIRROR_ROW_ATTRIBUTE) === activatedSessionId,
+            ) ?? null),
+      )
     },
     get isDestroyed(): boolean {
       return destroyed
@@ -301,6 +436,8 @@ export function createKeyboardNavigator(options: KeyboardNavigatorOptions): Keyb
       container.removeEventListener('focusout', onFocusOut)
       container.removeEventListener('keydown', onKeyDown)
       markFocused(null)
+      markActivated(null)
+      activationCounts.clear()
       entries = []
     },
   }

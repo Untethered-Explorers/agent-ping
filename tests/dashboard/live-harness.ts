@@ -15,9 +15,18 @@
 // off the transport rather than asserted about a function.
 
 import { createStreamClient, type HubSession, type HubSessionState, type StreamConnection, type StreamMessage } from '@/dashboard/live/stream-client'
-import { mountDashboard, type LiveDashboard } from '@/dashboard/main'
+import { mountDashboard, type LiveDashboard, type RevealedRow, type ScrollRowIntoView } from '@/dashboard/main'
+import { createMotionController, type MotionControllerOptions } from '@/dashboard/theme/motion'
 import type { DrawCommand, HoverRegion, SceneTarget, TextCommand } from '@/dashboard/prototype/scene'
-import { createRecordingHost, createRecordingTarget, setContainerSize, type RecordingHost, type RecordingTarget } from './prototype-harness'
+import {
+  createFakePreference,
+  createRecordingHost,
+  createRecordingTarget,
+  setContainerSize,
+  type FakePreference,
+  type RecordingHost,
+  type RecordingTarget,
+} from './prototype-harness'
 
 export { setContainerSize }
 
@@ -349,6 +358,18 @@ export interface LiveMount {
   readonly container: HTMLElement
   /** The header the page prints into. */
   readonly header: HTMLElement
+  /** The injected reduced-motion preference, or null when none was requested. */
+  readonly preference: FakePreference | null
+  /**
+   * Every row the page asked to be brought into view, in order.
+   *
+   * A recorder rather than a scroll: the real one needs a viewport and a layout,
+   * which jsdom has neither, so the default here is a seam that records. A test
+   * that wants the real arithmetic asks for `'default'` and reads the window's
+   * `scrollBy` instead. Mutable, so a test can clear it and read only the requests
+   * its own keypresses caused.
+   */
+  readonly revealed: RevealedRow[]
   /**
    * The pointer path itself: the callback the painter is handed. Calling this is
    * what a pointer hovering a repository group does, so a test drives the real
@@ -366,8 +387,19 @@ export interface MountLiveOptions {
   readonly height?: number
   /** The query string the page was opened with. */
   readonly search?: string
-  /** A reduced-motion preference the test controls. */
+  /**
+   * Whether the page believes the developer asked for less motion. `undefined`
+   * leaves the real policy in place, which jsdom answers as "not reduced" because
+   * it has no `matchMedia`. Declared since LD-1 and ignored until LD-2, which is
+   * the suite that had to prove a newly arrived row does not move.
+   */
   readonly reducedMotion?: boolean
+  /**
+   * How the page should bring a focused row into view. Omitted, the page is given
+   * a recorder and the requests land in `revealed`; `'default'` uses the shipped
+   * implementation, which a test then observes through the window's `scrollBy`.
+   */
+  readonly scrollRowIntoView?: ScrollRowIntoView | 'default'
 }
 
 const mounted: LiveDashboard[] = []
@@ -378,6 +410,9 @@ export async function mountLiveDashboard(options: MountLiveOptions = {}): Promis
   document.body.append(container)
   setContainerSize(container, options.width ?? 1024, options.height ?? 540)
   const target = createRecordingTarget()
+  const fakePreference =
+    options.reducedMotion === undefined ? null : createFakePreference(options.reducedMotion)
+  const revealed: RevealedRow[] = []
   let host: RecordingHost | null = null
   let hover: (repositoryId: string | null) => void = () => undefined
 
@@ -387,6 +422,18 @@ export async function mountLiveDashboard(options: MountLiveOptions = {}): Promis
     now: () => LIVE_NOW,
     search: options.search ?? '',
     timers: hub.timers,
+    ...(fakePreference === null
+      ? {}
+      : {
+          createMotionController: (controllerOptions: MotionControllerOptions) =>
+            createMotionController({ ...controllerOptions, preference: fakePreference.preference }),
+        }),
+    ...(options.scrollRowIntoView === 'default'
+      ? {}
+      : {
+          scrollRowIntoView:
+            options.scrollRowIntoView ?? ((row: RevealedRow): void => void revealed.push(row)),
+        }),
     createHost: async ({ size }) => {
       host = createRecordingHost(container, size)
       return host
@@ -413,6 +460,8 @@ export async function mountLiveDashboard(options: MountLiveOptions = {}): Promis
     target,
     container,
     header: dashboard.header,
+    preference: fakePreference,
+    revealed,
     hoverRepository(repositoryId: string | null): void {
       hover(repositoryId)
     },
