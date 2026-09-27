@@ -1,5 +1,17 @@
 # Runbook: reviewing OA-6, a real opencode session caught end to end
 
+> **Status: this review is owed, not done.** The gate was closed on **2026-09-27** with a
+> deferral: the human journey was not performed, and the three claims only a person can
+> settle are named in [`docs/reviews/OA-6-console-review.md`](../reviews/OA-6-console-review.md).
+> Read that record first — it says what is already proven and what is not, so you do not
+> redo it. This file is the standing procedure for when the review is taken up.
+>
+> The irreducible part of it is much smaller than the whole document suggests: **one
+> permission decision, one card, and a look at the tray.** Everything else here exists so the
+> reviewer does not have to rebuild what `OA-5` and `NS-4` already established. Estimated
+> residual human time is about five minutes. Tracked in
+> [`docs/reviews/deferred-gates.md`](../reviews/deferred-gates.md).
+>
 > This is the procedure for the one gate in this project that **cannot** be automated.
 > Every other gate in the run has either a test or a script behind it. This one needs a
 > person, a real model, a real desktop and their own eyes, and that is not a gap in the

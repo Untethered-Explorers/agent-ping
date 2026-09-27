@@ -29,29 +29,50 @@ agents said, and it never drives them.
 ## Status
 
 **Under active build.** The hub, the log, the notification path and the opencode
-adapter are implemented and covered by 877 tests. The packaged install, the command
-line and the live dashboard are not.
+adapter are implemented. The packaged install, the command line and the live dashboard
+are not. 36 of 46 build tasks are complete and no task has failed.
+
+The notification card has been **live-verified on Linux/X11 against the product's own
+shipped build** with no test-supplied seam: a real window inside the work area, painted
+with the product's own fill, taken down 55 ms after acknowledgement, and silence for a
+session that does nothing. The evidence is
+[`notification-surface-evidence.json`](docs/reviews/notification-surface-evidence.json)
+and the claims are tabulated in
+[`docs/runbooks/notification-surface.md`](docs/runbooks/notification-surface.md).
 
 | Area | State |
 |------|-------|
 | Content-free SQLite log, retention, local counters | Built, tested |
 | Loopback hub: reads, live stream, ingest, ack + security, delivery, restart replay, metrics, clean shutdown | Built, tested |
 | Tray icon with pending badge | Built, tested |
-| Self-rendered notification card, replacing the platform notifiers (NT-6 → NT-9) | Not started — the three platform notifiers still exist and NT-8 removes them |
-| opencode adapter: event translation, transport with visible failure, global plugin install | Built, tested |
-| PixiJS 8 dashboard prototype, DOM mirror, keyboard model | Built, reviewed |
-| Live dashboard wired to the hub (LD-1 → LD-4) | Not started |
-| CLI, npm package, autostart, `doctor` (IO-1 → IO-4) | Not started |
-| Polling fallback, live run against a real session (OA-4 → OA-6) | Not started |
-| GitHub Copilot CLI ACP spike (CP-1 → CP-2) | Not started |
+| Self-rendered notification card, replacing the platform notifiers (NT-6 → NT-9) | **Built.** The three platform notifiers and their 56 tests were deleted by NT-8; this is the only delivery path |
+| opencode adapter: event translation, transport with visible failure, global plugin install | Built, tested, and **driven against the real `opencode` binary** by OA-5 |
+| PixiJS 8 dashboard prototype, DOM mirror, keyboard model | Built, reviewed (`DP-4`) |
+| Live dashboard wired to the hub (LD-1 → LD-4) | `LD-1` done — renders live state, grouped, with staleness. `LD-2`–`LD-4` (mirror, interactions, browser journey) not started |
+| CLI, npm package, autostart, `doctor` (IO-1 → IO-4) | Not started. There is no `agent-ping` command to run |
+| Polling fallback, live run against a real session (OA-4 → OA-6) | `OA-4` and `OA-5` done — real binary, real permission decision, real hub, breadcrumb when the hub is absent. **`OA-6` deferred**: the human journey was not performed |
+| GitHub Copilot CLI ACP spike (CP-1 → CP-2) | Done. `CP-3` **deferred** the adapter, and `CP-4` turned that into a runbook and a test. v1 ships opencode only |
 
 > [!IMPORTANT]
 > There is no `agent-ping` command to run yet, and no release. `package.json` carries
 > no `bin` entry, `src/cli` does not exist, and nothing has been installed globally.
 > [docs/PROGRESS.md](docs/PROGRESS.md) is the running build log, including every check
-> that is *not* yet verified against real software — the macOS and Windows notifiers
-> have never run on macOS or Windows, and the hub has never been driven by a live
-> opencode session.
+> that is *not* yet verified against real software.
+
+Three things in this repository are **known not to be verified**, and each is recorded
+rather than glossed:
+
+1. **Nothing has ever run on macOS or Windows.** Every observation comes from one Linux
+   desktop. The notification surface is one code path across all three platforms and only
+   the window manager differs, but that is a statement about the code, not an observation.
+2. **No human has watched the product work end to end.** Three review gates — `OA-6`,
+   `LD-5` and `IO-5` — were closed without the review being performed, and two of them
+   (`LD-5`, `IO-5`) were closed before the software they review had been written. Read
+   [`docs/reviews/deferred-gates.md`](docs/reviews/deferred-gates.md) before trusting a
+   `complete` in the workflow state; it lists exactly what is owed, and the runbooks that
+   discharge it.
+3. **Half the end-to-end evidence was not retained.** `OA-5` declared only its script and
+   test as outputs, so the machine summary of the real-harness run was never committed.
 
 ## How it works
 
