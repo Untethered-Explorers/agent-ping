@@ -1,10 +1,10 @@
 # Project Progress
 
 ## Current State
-**Phase**: COPILOT-CLI-ACP-SPIKE-1
+**Phase**: NOTIFICATION-AND-TRAY-PRESENCE-3
 **Status**: In Progress
-**Validation Gaps**: 80 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-27T09:30:27.790Z
+**Validation Gaps**: 82 unverified check(s) - see "Validation Gaps"
+**Last Updated**: 2026-09-27T11:14:02.058Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -52,6 +52,8 @@
   - Files: src/notify/surface/lifetime.ts, src/notify/surface/card.ts, src/notify/surface/card-view.ts, tests/notify/surface-lifetime.test.ts, tests/notify/surface-card.test.ts, tests/notify/surface-card-view.test.ts, docs/EXECUTION-MANIFEST.json
 - [x] Phase NOTIFICATION-AND-TRAY-PRESENCE-3, Task NT-8: Deliver to the surface and retire the platform notifiers (@notification-engineer)
   - Files: src/notify/types.ts, src/notify/policy.ts, src/notify/registry.ts, src/main/index.ts, tests/notify/policy.test.ts, tests/hub/tray.test.ts, docs/runbooks/notification-surface.md, docs/runbooks/notify-platforms.md, src/hub/delivery.ts, src/hub/routes/read.ts, src/notify/command.ts, src/notify/linux.ts, src/notify/macos.ts, src/notify/windows.ts, tests/hub/delivery.test.ts, tests/notify/linux.test.ts, tests/notify/macos.test.ts, tests/notify/registry-selection.test.ts, tests/notify/surface-card.test.ts, tests/notify/windows.test.ts
+- [x] Phase NOTIFICATION-AND-TRAY-PRESENCE-3, Task NT-9: Prove the card on a real desktop with a script (@qa-engineer)
+  - Files: scripts/verify-notification-surface.mjs, docs/reviews/notification-surface-evidence.json, docs/runbooks/notification-surface.md, tests/scripts/verify-notification-surface.test.ts
 - [x] Phase OPENCODE-PLUGIN-ADAPTER-1, Task OA-1: Translate opencode events into the normalized envelope (@connector-engineer)
   - Files: src/plugin/opencode/index.ts, src/plugin/opencode/translate.ts, src/plugin/opencode/work-signal.ts, tests/plugin/opencode-translate.test.ts, tests/plugin/opencode-work-signal.test.ts, docs/engine-config.json
 - [x] Phase OPENCODE-PLUGIN-ADAPTER-1, Task OA-2: Deliver events to the hub and leave a breadcrumb on failure (@connector-engineer)
@@ -67,7 +69,6 @@
 - None currently running
 
 ## Remaining
-- [ ] Phase NOTIFICATION-AND-TRAY-PRESENCE-3: Phase 3: The self-rendered surface
 - [ ] Phase OPENCODE-PLUGIN-ADAPTER-2: Phase 2: Polling fallback and live verification
 - [ ] Phase OPENCODE-PLUGIN-ADAPTER-3: Phase 3: Live adapter gate
 - [ ] Phase LIVE-DASHBOARD-1: Phase 1: Live state on the approved layout
@@ -148,6 +149,8 @@
 - Task NT-8: The host seam is proven against this product's NotificationSurfaceHost interface with a recorder, not against a real BrowserWindow; whether any desktop composites a transparent frameless always-on-top window correctly is unobserved and is NT-9's evidence to produce.
 - Task NT-8: The card view is proven in jsdom, so nothing here says what a card looks like; the stylesheet that draws it and the window's own transparency compositing are both unobserved.
 - Task NT-8: The source sweep strips comments and keeps strings, and reads a backtick template as one string to its closing backtick, so a nested template inside a ${...} would end the scan early. No module on this path contains one, and a missed token would still be caught by the same token in the value the code then uses.
+- Task NT-9: No human read a word off a card. The pixel capture counts distinct values in the window's own drawable, which separates a painted card from a blank rectangle and reads no text, and the stylesheet that drew the card in this run is the run's own because the product has none.
+- Task NT-9: No card was produced by the shipped build. Every card observed in this run went through the run-time harness's three seams; the shipped build's own answer (not-wired, 404, no viewable card window) is a separate record.
 - Task OA-1: No live opencode session was run. The payload shapes are the 1.18.32 type declarations, not a capture from a running harness; proving the harness delivers them is OA-5's script and OA-6's gate, not this task.
 - Task OA-1: The one-envelope and block-lifecycle tests use the real ingest pipeline and the real SQLite log but drive it from fixtures rather than from a harness's event stream.
 - Task OA-1: The plugin was not loaded by opencode itself. Its structural plugin and client types mirror the 1.18.32 declarations rather than importing @opencode-ai/plugin, which is deliberate (the adapter must load with no dependency), so a signature change upstream would not be caught by a compile error here - the OA-3 install and OA-5 live run are where that surfaces.
