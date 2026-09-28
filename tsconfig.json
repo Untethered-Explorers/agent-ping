@@ -1,14 +1,16 @@
 {
   // Base configuration for every TypeScript surface in the repository:
-  // src/ (all seven concerns from PRD 6.2), tests/ and the Vite/Vitest config.
+  // src/ (all seven concerns from PRD 6.2), tests/, and the three build/test
+  // runner configs (playwright.config.ts, vite.config.ts, vitest.config.ts).
   //
   // This file type-checks only (noEmit). tsconfig.build.json extends it for the
   // one build entry point that uses tsc (Electron main and the CLI).
   //
   // Module strategy: Bundler resolution, which is what the Vite-built dashboard
-  // and the directly-loaded plugin need. The Node-hosted tsc build overrides
-  // this to NodeNext in tsconfig.build.json, where relative imports must carry
-  // an explicit .js extension.
+  // and the directly-loaded plugin need. Node-hosted code under src/ uses
+  // relative imports instead. NodeNext resolution means every relative import in
+  // those directories must carry an explicit .js extension.
+
   //
   // `.cts` is here for one file: src/notify/surface/preload.cts, the card
   // surface's preload. A preload in a renderer with `sandbox: true` is parsed by
@@ -58,6 +60,7 @@
     "src/**/*.cts",
     "tests/**/*.ts",
     "tests/**/*.tsx",
+    "playwright.config.ts",
     "vite.config.ts",
     "vitest.config.ts"
   ],

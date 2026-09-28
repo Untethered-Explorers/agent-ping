@@ -1,10 +1,10 @@
 # Project Progress
 
 ## Current State
-**Phase**: INSTALL-AUTOSTART-AND-OPERATIONS-1
+**Phase**: LIVE-DASHBOARD-3
 **Status**: In Progress
-**Validation Gaps**: 133 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-27T22:58:18.670Z
+**Validation Gaps**: 138 unverified check(s) - see "Validation Gaps"
+**Last Updated**: 2026-09-28T00:03:19.683Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -80,6 +80,8 @@
   - Files: src/dashboard/main.ts, src/dashboard/a11y/dom-mirror.ts, src/dashboard/a11y/keyboard-nav.ts, tests/dashboard/live-dom-mirror.test.ts, src/dashboard/dashboard.css, tests/dashboard/live-harness.ts
 - [x] Phase LIVE-DASHBOARD-2, Task LD-3: Add acknowledgement, deep-link focus, handoff and history (@dashboard-engineer)
   - Files: src/dashboard/live/ack.ts, src/dashboard/live/deeplink.ts, src/dashboard/live/handoff.ts, src/dashboard/live/history.ts, src/dashboard/main.ts, tests/dashboard/live-interactions.test.ts, src/dashboard/dashboard.css, src/dashboard/index.html, src/dashboard/live/session-list.ts, tests/dashboard/live-harness.ts
+- [x] Phase LIVE-DASHBOARD-3, Task LD-4: Prove the dashboard journey in a real browser (@qa-engineer)
+  - Files: playwright.config.ts, tests/e2e/dashboard.spec.ts, scripts/verify-dashboard-e2e.mjs, package-lock.json, package.json, tsconfig.json, scripts/verify-dashboard-e2e.d.mts, tests/e2e/fixtures/dashboard-hub.mjs, tests/e2e/global-teardown.ts, tests/e2e/hub-fixture.ts, tests/scripts/verify-dashboard-e2e.test.ts
 - [x] Phase INSTALL-AUTOSTART-AND-OPERATIONS-1, Task IO-1: Publish the package and guard its build artefacts (@packaging-engineer)
   - Files: package.json, scripts/prepack-check.mjs, tests/packaging/package.test.ts, README.md, docs/runbooks/io-5-operations-review.md, scripts/build.mjs, tests/dashboard/card-document.test.ts
 - [x] Phase COPILOT-CLI-ACP-SPIKE-1, Task CP-1: Probe the real Copilot ACP surface (@connector-engineer)
@@ -232,6 +234,11 @@
 - Task LD-3: The refusal the browser observed is a 401 driven by a deliberately wrong token, because that is the one refusal a page holding a token can provoke. A 404 and a 409 are covered by the committed jsdom suite and by the hub's own ack tests, but were not each driven through the browser.
 - Task LD-3: The deep-link browser observation used ?session=<id> on a live page; it does not cover the notification card's own click path, which is notification-engineer's surface and is asserted against the hub's published DEEP_LINK_QUERY_KEY literal rather than end to end.
 - Task LD-3: The ack control's availability was observed with the mirror clipped (the shipped view) and the mirror-height arithmetic was observed in the ?mirror=visible inspection view; a page both un-clipped and scrolled was not exercised.
+- Task LD-4: One headless Chromium on one Linux machine with software WebGL (swiftshader). The run asserts the DOM, attributes, computed page state, the hub's own responses and page-side clocks; it samples no painted pixel and no human read a word off the page, so the design verdicts in docs/reviews/live-dashboard.json (LD-5) remain unperformed human work.
+- Task LD-4: The live-update budget is measured to the row being present in the page and to the frame two animation frames later, not by reading the canvas back. The canvas paints from the same row model the mirror is derived from, and the observation says so rather than implying a pixel reading.
+- Task LD-4: The latency figure is one reading on one run, not a p95; APX-CON-11's 50 ms ingest p95 is measured by the hub's own suite over 60 posts, not here.
+- Task LD-4: The browser falls back to a system Chrome when the Playwright download is blocked, recorded as a distinct browser kind in the evidence rather than as a quieter version of the same claim; on this machine the Playwright-managed Chromium was used, so the fallback path was exercised only by the judgement's unit tests.
+- Task LD-4: The replay-with-cursor path of LD-FR-03 is asserted for the stream reconnect the stale journey drives and for the deep-link journey's live update, but a dropped socket at an arbitrary point in a long stream was not induced; the hub's own suite covers the feed's replay window.
 - Task IO-1: The npm pack comparison runs against the scratch tree, not the developer's dist/, and npm is invoked with --ignore-scripts so the observation does not depend on the answer it is compared against. The real-tree `npm pack --dry-run` was run by hand during development and agrees: 87 files, 0 source maps, 0 declarations, 0 tests, 0 docs, all three documents and the schema present.
 - Task IO-1: The dashboard asset sweep reads href and src attributes out of the built documents. It resolves relative references and skips absolute and protocol-relative ones; a build that emitted an asset under a different name than the document names is caught, and one that emitted an asset nothing references is not.
 - Task IO-1: The comment stripper used for the closure walk and the launch-policy read is this repository's hand-written kind: a backtick template is read as one string to its closing backtick, so a nested template inside a ${...} would end the scan early. No module or artefact these are pointed at contains one, and the test that compares the guard's derived closure against the product's own renderer would fail if a module were missed.
