@@ -1,10 +1,10 @@
 # Project Progress
 
 ## Current State
-**Phase**: INSTALL-AUTOSTART-AND-OPERATIONS-1
+**Phase**: LIVE-DASHBOARD-3
 **Status**: In Progress
 **Validation Gaps**: 143 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-28T01:09:01.131Z
+**Last Updated**: 2026-09-28T01:09:01.228Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -82,6 +82,8 @@
   - Files: src/dashboard/live/ack.ts, src/dashboard/live/deeplink.ts, src/dashboard/live/handoff.ts, src/dashboard/live/history.ts, src/dashboard/main.ts, tests/dashboard/live-interactions.test.ts, src/dashboard/dashboard.css, src/dashboard/index.html, src/dashboard/live/session-list.ts, tests/dashboard/live-harness.ts
 - [x] Phase LIVE-DASHBOARD-3, Task LD-4: Prove the dashboard journey in a real browser (@qa-engineer)
   - Files: playwright.config.ts, tests/e2e/dashboard.spec.ts, scripts/verify-dashboard-e2e.mjs, package-lock.json, package.json, tsconfig.json, scripts/verify-dashboard-e2e.d.mts, tests/e2e/fixtures/dashboard-hub.mjs, tests/e2e/global-teardown.ts, tests/e2e/hub-fixture.ts, tests/scripts/verify-dashboard-e2e.test.ts
+- [x] Phase LIVE-DASHBOARD-3, Task LD-5: Review the primary dashboard journey
+  - Files: docs/reviews/live-dashboard.json
 - [x] Phase INSTALL-AUTOSTART-AND-OPERATIONS-1, Task IO-1: Publish the package and guard its build artefacts (@packaging-engineer)
   - Files: package.json, scripts/prepack-check.mjs, tests/packaging/package.test.ts, README.md, docs/runbooks/io-5-operations-review.md, scripts/build.mjs, tests/dashboard/card-document.test.ts
 - [x] Phase INSTALL-AUTOSTART-AND-OPERATIONS-1, Task IO-2: Implement the install, uninstall, status and doctor commands (@packaging-engineer)
@@ -99,7 +101,6 @@
 - None currently running
 
 ## Remaining
-- [ ] Phase LIVE-DASHBOARD-3: Phase 3: End-to-end journey and review
 - [ ] Phase INSTALL-AUTOSTART-AND-OPERATIONS-2: Phase 2: Autostart
 - [ ] Phase INSTALL-AUTOSTART-AND-OPERATIONS-3: Phase 3: Live operations verification and gate
 
