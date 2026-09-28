@@ -1,6 +1,6 @@
 ---
 name: live-verification-script
-description: "Write a repository script that drives a real binary, browser or service manager and proves a claim about live behaviour. Covers printing a machine-readable summary, exiting non-zero on any failed assertion, having no path that reports success when nothing ran, treating a missing harness or browser as a failure rather than a skip, and keeping decision logic unit-testable against injected results. Use when adding a verification or probe script under scripts/, or when reviewing one that could report a green result without having exercised anything."
+description: "Write a repository script that drives a real binary, browser or service manager and proves a claim about live behaviour. Covers printing a machine-readable summary, exiting non-zero on any failed assertion, having no path that reports success when nothing ran, treating a missing harness or browser as a failure rather than a skip, keeping decision logic unit-testable against injected results, and closing the seams a task depends on instead of substituting for them. Use when adding a verification or probe script under scripts/, when a live run needs an artefact another task was meant to produce, or when reviewing one that could report a green result without having exercised anything."
 ---
 
 # Skill: Live Verification Script
@@ -9,6 +9,9 @@ Four separate tasks in this project need a script with the same shape - a live o
 a live autostart and restart run, a browser-driven dashboard journey, and the Copilot probes.
 The discipline is stricter than usual: **a green result that exercised nothing is worse than a
 failure**, so a missing browser, harness or service manager is a non-zero exit, never a skip.
+
+Step 8 is the same rule seen from the other end. A run that supplied the artefact it was meant
+to verify is measuring itself, so seams are named, owned and closed rather than substituted.
 
 ---
 
@@ -146,6 +149,37 @@ without re-running the script.
 
 **Output:** the script wired to its exit code, with the decision function unit-tested.
 
+### Step 8: Close the seam, do not substitute for it
+
+A green result that exercised **the test's own substitute** is the same lie as one that
+exercised nothing, one level deeper. The script supplied the capability and then reported it as
+working.
+
+- Before writing the script, read the task's declared outputs and write the seam table: what the
+  run depends on, which task owns each piece, and which test asserts its existence.
+- Assert each seam at the artefact - the built file, the document fetched over a real socket, the
+  option that carries the channel, the port the route calls - not through a mock standing in for
+  it. Prefer a check that fails when the artefact is deleted over one that fails on a null field.
+- If a seam has no owning task, that is the finding. Raise the missing task; do not build the
+  seam inside the verification task.
+- If a run cannot proceed without a substitute, stop driving the journey and emit a bug report
+  naming each missing product seam, its owner (or the absence of one), the blocked assertions,
+  and what was substituted. Exit non-zero; a supplied seam must never appear as a pass.
+- Once the seams exist, re-run against the shipped build with every substitute **deleted**, and
+  assert at source level that the substitutes are gone rather than merely unreferenced. Keep
+  every earlier journey, including the negative case.
+- The evidence summary is an output of the task, not a by-product of running it. Declare it,
+  commit it, and treat a run whose summary is uncommitted as unrun.
+- A deferral record is a seam too: assert no adapter module exists for the deferred harness,
+  that the recorded decision's evidence digests still hold, and that each claim the record makes
+  is present in its own text.
+
+Load `references/seam-closure.md` for the seam table format, the artefact-level existence
+assertions, the missing-seam bug-report shape, and the shipped-build re-proof procedure.
+
+**Output:** a seam table with an owner and an existence assertion per row, no supplied seam in
+any passing summary, and a re-proof run whose substitutes are asserted absent.
+
 ---
 
 ## Gotchas
@@ -186,6 +220,32 @@ without re-running the script.
   configuration than the one shipped.** A verification run must not change product code or
   config; when a fix is needed, record it as required rather than applying it.
 
+- **A seam the test supplied is a green result measuring the test.** Three tasks in this project
+  each passed every gate and collectively could not put a card on a screen: one loaded a document
+  nobody was told to create, one ran with no preload under full isolation so nothing could hand
+  the view a model, and one named an acknowledged end nobody wired back. None of the three
+  assertions was capable of noticing, because each was individually correct. Name the seam, name
+  its owner, and assert it exists.
+
+- **"Unused" is not "absent".** Deleting a substitute from the code path and observing that the
+  run still passes does not prove the product supplied the capability; the substitute may simply
+  be unreachable. Assert at source level that the harness's own document, stylesheet, entry
+  module and bridge are gone, or a re-proof can silently measure the harness again.
+
+- **A live run whose summary was never committed is not evidence.** One task declared only its
+  script and its test as outputs, so the journeys ran against a real binary and no observation
+  survived. The evidence summary is an output of the task; declare it and commit it, or the run
+  is treated as unrun.
+
+- **A deferral record that drifts from its own claims still reads as a decision.** Assert that
+  no adapter module exists for the deferred harness, that the recorded decision's evidence
+  digests still hold, and that every claim the record makes is present in its text. Otherwise a
+  later change can cross the line the gate drew without anything failing.
+
+- **A missing seam reported as a skipped journey is a lie with a paper trail.** If the run
+  substituted anything to get through, the output is a bug report naming the missing product
+  seams and their owners, and a non-zero exit. It is never a pass with a footnote.
+
 ---
 
 ## Validation
@@ -219,6 +279,16 @@ Confirm each item:
 - [ ] Stdout carries only the machine-readable JSON summary; progress goes to stderr
 - [ ] The summary includes every relevant version and a timestamp
 - [ ] The script changes no product code or configuration
+- [ ] Every seam the run depends on is named with its owning task, and each is asserted to exist
+      at the artefact rather than through a substitute
+- [ ] No seam the script supplied appears as a pass anywhere in the summary; a supplied seam
+      produces a non-zero exit and a report naming the missing product seams
+- [ ] Any re-proof run deletes the harness's own substitutes and asserts at source level that
+      they are gone, and keeps every journey from the earlier run
+- [ ] The evidence summary is declared in the task's outputs and committed, not left as a
+      by-product of the run
+- [ ] For a deferral record: no adapter module for the deferred path exists, the recorded
+      decision's evidence digests still hold, and every claim in the record is present in its text
 
 If the script passes locally, that is necessary and not sufficient. Confirm the summary lists
 the assertions you expected by name, and confirm `assertionsRun` is non-zero. A passing run with

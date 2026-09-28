@@ -1,13 +1,13 @@
 ---
 name: create-project-documentation
-description: "Create or refresh a complete software-project documentation suite: ADRs, user guide, administrator guide, changelog, versioned release notes, platform runbooks that state what is not live-verified, human-gate review files, and research probe reports. Then install AGENTS.md instructions that keep those documents current. Use when a project needs launch documentation, a documentation audit, release preparation, evidence artefacts, consistent operational and user-facing docs, or documentation upkeep as the project changes."
+description: "Create or refresh a complete software-project documentation suite: ADRs, user guide, administrator guide, changelog, versioned release notes, platform runbooks that state what is not live-verified, human-gate review files, registers of gates closed without being performed, and research probe reports. Then install AGENTS.md instructions that keep those documents current. Use when a project needs launch documentation, a documentation audit, release preparation, evidence artefacts, consistent operational and user-facing docs, or documentation upkeep as the project changes."
 ---
 
 # Create Project Documentation
 
 Use this skill to turn an implemented project into a coherent, fact-checked documentation set. It works for applications, libraries, services, CLIs, platforms, and monorepos. Document implemented behavior separately from roadmap or aspirational behavior.
 
-Three artefact shapes recur in projects that ship on more than one platform, or that gate work on human judgement: **platform runbooks** that must say plainly what is not live-verified, **human-gate review files** written against a fixed acceptance shape, and **research probe reports** that distinguish a signal that is absent from one that was never triggered. Load the matching reference before writing any of the three.
+Four artefact shapes recur in projects that ship on more than one platform, or that gate work on human judgement: **platform runbooks** that must say plainly what is not live-verified, **human-gate review files** written against a fixed acceptance shape, **registers of gates that closed without being performed**, and **research probe reports** that distinguish a signal that is absent from one that was never triggered. Load the matching reference before writing any of the four.
 
 ## Process
 
@@ -17,7 +17,7 @@ Three artefact shapes recur in projects that ship on more than one platform, or 
 4. **Write ADRs from evidence.** Record durable architectural decisions, not every implementation detail. Each ADR must include status, date, context, decision, alternatives, consequences, and implementation references. Link the ADR index from the README.
 5. **Write task-oriented guides.** The user guide should describe goals, workflows, visible states, recovery, accessibility, and privacy. The administrator guide should describe prerequisites, installation, configuration, secrets, operations, backups, upgrades, troubleshooting, and security hardening. Use exact commands and configuration names found in the project.
 6. **Prepare release communication.** Add a Keep a Changelog-compatible changelog and release notes for the resolved version. Include highlights, compatibility, installation/upgrade notes, known limitations, validation status, and links to detailed docs. Do not claim tests, integrations, or production support that were not verified.
-7. **Write the evidence artefacts.** If the project ships on multiple platforms, has human review gates, or has unresolved external integrations, write the runbook, review file, and probe report shapes. Mark each unverified path explicitly rather than letting absence read as success.
+7. **Write the evidence artefacts.** If the project ships on multiple platforms, has human review gates, closes gates without prompting again, or has unresolved external integrations, write the runbook, review file, register and probe report shapes. Mark each unverified path explicitly rather than letting absence read as success.
 8. **Refresh navigation and stale docs.** Correct stale status statements in component docs and add links to canonical guides and release notes. Preserve historical requirements and design documents; label their status rather than rewriting history.
 9. **Install documentation upkeep instructions.** Find the nearest applicable `AGENTS.md`. If one exists, then reconcile a delimited documentation-maintenance section in place instead of appending a duplicate; if none exists, then propose a root `AGENTS.md` containing that section. Name the document paths actually written in this run rather than generic placeholders, and drop entries for documents that were not created. Show the exact diff and obtain confirmation before writing. If the user declines, then leave `AGENTS.md` unchanged and report that upkeep instructions were not installed. Load `references/agents-instructions.md` when drafting or editing this section.
 10. **Validate.** Run the checks below, then the project's own gates.
@@ -55,10 +55,27 @@ gates. It records the reviewer, the platform, the journey performed, one verdict
 criterion, timings, and what remains outstanding.
 
 The critical rule: an agent may **prepare** the shape and check that a verdict is complete, but
-must never author, infer, or close a verdict. A generated verdict is fabricated evidence.
+must never author, infer, or close a verdict. A generated verdict is fabricated evidence. The
+same rule holds for the register below: it states what is owed, never what was concluded.
 
 Load `references/human-review-file.md` when a project has human review gates, or when a review
 file needs to be created, validated for completeness, or reconciled.
+
+### Closed-gate registers
+
+Required when the project's task engine can mark a human gate complete without anyone having
+performed the review, which is the usual case: the engine closes a gate the moment a valid
+attestation exists and never prompts again. A register is the page that stops a closed-but-
+unperformed gate from reading as a pass, and it distinguishes two debts that look identical in
+a status file — a reviewable thing nobody reviewed, and a review of software that did not exist
+when the gate closed. It also states the discharge procedure, because an engine that cannot
+re-open a completed gate leaves that procedure to whoever reads it.
+
+It records what is owed and who owes it. It never records a verdict.
+
+Load `references/gate-register.md` when a project's status file reports human gates as complete,
+when a platform path is withdrawn rather than deferred, or when settled and outstanding gates
+need to be distinguishable at a glance.
 
 ### Research probe reports
 
@@ -85,6 +102,8 @@ Load these references when writing the corresponding artifact:
 - Load `references/release-notes-template.md` when preparing a versioned release.
 - Load `references/platform-runbook.md` when documenting a platform path that was not executed on the authoring machine.
 - Load `references/human-review-file.md` when a project has human review gates.
+- Load `references/gate-register.md` when the engine can close a human gate without prompting, or
+  when a platform path is abandoned rather than outstanding.
 - Load `references/probe-report.md` when an external capability is unresolved under an assumption.
 - Load `references/agents-instructions.md` when creating or reconciling the `AGENTS.md` documentation-maintenance section.
 
@@ -100,6 +119,8 @@ Load these references when writing the corresponding artifact:
 - [ ] Release notes link to upgrade, user, and administrator guidance.
 - [ ] Every runbook states per platform which parts were executed and which were not.
 - [ ] Every human review file has one verdict per acceptance criterion and names its reviewer and platform.
+- [ ] Every gate the engine records complete without a human journey appears in a register, with
+      its "did the subject exist yet" answer and a link to a runbook that discharges it.
 - [ ] Every probe report holds verbatim captures with tool versions and timestamps.
 - [ ] `AGENTS.md` contains a single documentation-maintenance section naming the documents created in this run, reconciled rather than duplicated.
 - [ ] Local Markdown links resolve, including links from nested docs.
@@ -119,6 +140,16 @@ git status --porcelain
 - **A runbook that omits the unverified statement.** The commands and tests are all present, so it reads as complete, and every downstream document inherits the claim. Put the not-live-verified statement in the runbook body, per platform.
 
 - **An agent-authored review verdict.** Generating the JSON shape is helpful; filling in the verdict is fabricated human evidence. Prepare and validate the shape, and leave the verdict for a person.
+
+- **A gate closed by an attestation nobody earned.** Engines mark a human-review task complete the moment a valid attestation exists and then never prompt again, so the status file reads `complete` for a review that was never performed. A register is the only thing that makes the debt visible; without one the project's honest state is permanently misreported.
+
+- **"Pending review" for a gate whose subject did not exist.** A review owed on work not yet written is not a few minutes of someone's attention; the work has to be raised, compiled and run first. Keep the two debts in separate columns, or the expensive one gets scheduled as if it were cheap.
+
+- **A withdrawn path deleted instead of recorded.** When a platform path is abandoned rather than deferred, its evidence file is the only trace of the decision and of the mechanism that was dropped. Leave it on disk and say in the register that the gate is withdrawn and what replaced it.
+
+- **A discharge procedure invented from memory.** Engines differ in whether a completed gate can be re-opened and which command affects which tasks. Check the engine's own commands before writing the procedure, because a reader who follows a wrong procedure concludes the debt is unpayable.
+
+- **An automated run cited as closing a human gate.** A script that covers the same surface is not the judgement the gate exists for. Say so in the register, in the row that would otherwise be tempting to strike.
 
 - **Collapsing "absent" and "untriggered" in a probe report.** A signal that does not exist and a signal that fired with nothing in it need different conclusions, and merging them turns a capability gap into a quiet observation.
 
