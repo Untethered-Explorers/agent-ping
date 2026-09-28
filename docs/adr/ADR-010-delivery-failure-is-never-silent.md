@@ -23,7 +23,9 @@
   failures**, not mocks. **Not yet verified live:** the breadcrumb path has been
   exercised through a stub logging client and through a live opencode run that
   never reached a hub; no real harness session has yet failed to deliver to a
-  real hub, and no desktop has been shown a real card. Under ADR-012 the delivery
+  real hub. A real desktop *has* been shown a real card from the shipped build
+  (NS-4), and a surface that refuses to mount is reported as `not-wired` from
+  both ends; macOS and Windows are unobserved. Under ADR-012 the delivery
   mechanism is this product's own rendering, so a surface that refuses to mount is a
   first-class failure of this decision rather than an edge case of someone else's API.
 

@@ -175,10 +175,12 @@ exists", and it resolves that ambiguity by reporting nothing at all.
 
 Two honest qualifications:
 
-- **`doctor` does not exist yet.** `src/cli/` is not in the tree (IO-1 through IO-3 have not run),
-  so the `doctor` half of the gate's obligation is **inherited, not satisfied**. This runbook is
-  the only place the gap is stated in the product's own documentation today. Nothing here claims
-  `doctor` reports Copilot.
+- **`doctor` exists and still does not report this gap.** `src/cli/` is in the tree
+  (IO-1 through IO-3 have run; `agent-ping doctor` prints seven checks), so the
+  `doctor` half of the gate's obligation is **inherited, not satisfied** — the check
+  that would notice an unsupported harness is not one of the seven. This runbook is
+  the only place the gap is stated in the product's own documentation today. Nothing
+  here claims `doctor` reports Copilot.
 - **The gap is not discoverable from the dashboard.** It is discoverable by reading this file. A
   future authorised adapter inherits the obligation to make it visible in the product's own
   interface, not only in documentation.
@@ -227,7 +229,7 @@ recorded as unresolved upstream at 1.0.83 and is `observed` at 1.0.88.
 - It does not claim anything about Copilot CLI versions other than 1.0.88.
 - It does not claim anything about the **payloads** of the six documented events that never fired. Their payloads are unobserved, not empty.
 - It does not claim a repository-level Copilot hook is never loaded in ACP mode. The capture shows 0 invocations in one run, and the report declines to choose between "ACP mode ignores that location" and "something specific to this run prevented it".
-- It does not claim `doctor`, the tray or the dashboard report this gap today. `doctor` does not exist yet, and the tray and dashboard show only what the store holds.
+- It does not claim `doctor`, the tray or the dashboard report this gap today. `doctor` exists and does not report it — the seven checks know nothing about Copilot — and the tray and dashboard show only what the store holds.
 - It does not claim the `notification` hook cannot carry an idle signal. Its state is `unclear`, which is not the same as absent.
 - It contains no claim about a live Copilot session's content, because no conversation content reaches this product or this file (APX-FR-01).
 

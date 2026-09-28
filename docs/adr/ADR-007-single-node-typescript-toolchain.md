@@ -7,18 +7,23 @@
   notification path becomes this product's own rendering rather than a platform service.
 - **Decision owners:** Project author (decided with the user; versions recorded
   in the PRD)
-- **Implementation state:** **Partial, with one recorded divergence.** The
+- **Implementation state:** **Implemented, with one recorded divergence and one
+  platform gap.** The
   toolchain itself exists and is verified: `package.json` and `package-lock.json`
   are the single package, `tsconfig.json` is `strict` with
   `noUncheckedIndexedAccess`, and all three build entry points work —
-  `npm run build` compiles 30 Node-hosted sources with `tsc` to `dist/main` and
+  `npm run build` compiles the Node-hosted sources with `tsc` to `dist/main` and
   builds the dashboard with Vite, and `npm test` runs the whole Vitest suite
-  through `scripts/run-tests.mjs`. **Electron is not yet a dependency.** The
-  composition root in `src/main/index.ts` reaches it only through a dynamic
-  `import('electron')` behind an injectable bridge, which is what lets the real
-  entry point be started by a test on a machine with no display — but the
-  Electron main process, the tray, and `src/cli/` have never actually run inside
-  Electron, because the package is not installed. See the divergence table below.
+  through `scripts/run-tests.mjs`. **Electron is a runtime dependency**
+  (`electron` 44.4.5 in `dependencies`, not `devDependencies`), reached by the
+  composition root in `src/main/index.ts` through a dynamic `import('electron')`
+  behind an injectable bridge — the bridge is what lets the real entry point be
+  started by a test on a machine with no display, and it is also what
+  `doctor` and the live scripts interrogate. `src/cli/` is built and its four
+  subcommands run from the built entry point. The Electron main process, the
+  tray, the card window and the CLI have all run inside Electron on a real
+  Linux desktop, and **only on Linux**: macOS and Windows have never run this
+  product. See the divergence table below.
 
 ## Context
 

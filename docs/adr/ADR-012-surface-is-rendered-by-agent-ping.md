@@ -4,7 +4,21 @@
 - **Date:** 2026-09-27
 - **Decision owners:** Project author (settled with the user)
 - **Supersedes:** the clause in [ADR-009](ADR-009-on-demand-surface-no-always-on-window.md) that the notification is an OS toast, and the per-platform implementation strategy in [ADR-004](ADR-004-three-loudness-classes.md)
-- **Implementation state:** **Not started.** The three platform notifiers, their registry and their 56 tests still exist in the tree and are removed by NT-8. The pre-flight that this decision rests on is [docs/research/electron-surface-preflight.json](../research/electron-surface-preflight.json); it proves the window primitives work on the authoring machine and records the one blocking finding NT-6 must decide.
+- **Implementation state:** **Implemented, and live-verified on Linux.** NT-8 removed
+  the three platform notifiers, their registry and their 56 tests, and the card this
+  product renders is now the only delivery path; `tests/notify/policy.test.ts` sweeps
+  `src/notify` so none of them can come back. NS-1 through NS-3 built the card
+  document, the renderer channel that leaves `contextIsolation` on and the renderer
+  sandbox in force, and the dismissal when a block ends. NS-4 then re-proved the
+  **shipped build** on a real Linux desktop with no seam supplied by the run: a real
+  window inside the work area, painted with the product's own fill, taken down 55 ms
+  after acknowledgement, and silence for a session that does nothing. Evidence:
+  [docs/reviews/notification-surface-evidence.json](../reviews/notification-surface-evidence.json);
+  claims tabulated in
+  [docs/runbooks/notification-surface.md](../runbooks/notification-surface.md).
+  **What has not been observed:** a card on macOS or Windows. The implementation is
+  one code path with no platform branch, but only Linux was ever run, and the
+  compositing that differs between the three desktops is unobserved elsewhere.
 
 ## Context
 

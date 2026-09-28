@@ -102,17 +102,17 @@ things only a person can see.
 
 ## 3. Install the adapter globally
 
-There is **no `agent-ping` command on this machine yet.** `package.json` has no `bin`
-entry; that arrives with the packaging tasks (`IO-1`–`IO-3`), which have not run. The
-`agent-ping` invocation in `docs/runbooks/notification-surface.md` is therefore *not*
-available to you, and its manual section is written for a future per-user install.
+There **is** an `agent-ping` command now, and this section has been corrected: the
+packaging tasks (`IO-1`–`IO-3`) have run, `package.json` names the `bin`, and
+`npm run build` followed by `npm install -g .` puts a working command on `PATH`.
 
-Nor is the installer built. `tsconfig.build.json` compiles `src/main`, `src/hub`,
-`src/storage`, `src/domain`, `src/notify` and a `src/cli` that does not exist yet — but
-**not** `src/plugin`, because the generated plugin is loaded by opencode as directly
-loadable TypeScript. So there is nothing in `dist/` that can install it. Call the module
-from source instead; Node ≥ 22.12 loads `.ts` directly, which is the same mechanism the
-product's own verifier relies on:
+What is still true of the build is that `tsconfig.build.json` compiles `src/main`,
+`src/hub`, `src/storage`, `src/domain`, `src/notify` and `src/cli` — but **not**
+`src/plugin`, because the generated plugin is loaded by opencode as directly loadable
+TypeScript. So `agent-ping install` generates the plugin from the package's own
+sources rather than from a built artefact. If you would rather not install the command
+to run this review, call the module from source instead; Node ≥ 22.12 loads `.ts`
+directly, which is the same mechanism the product's own verifier relies on:
 
 ```bash
 node --input-type=module -e "
@@ -470,9 +470,10 @@ through.
   compile `src/plugin`, because the generated plugin is loaded by opencode as TypeScript.
   If you import from `dist/main/plugin/...` the path will not exist. Use the source
   command in step 3.
-- **`agent-ping` is not on your `PATH`.** There is no `bin` entry yet (`IO-1` has not run),
-  so the `agent-ping` invocation in `docs/runbooks/notification-surface.md` is not available
-  to you. Use `node_modules/electron/dist/electron dist/main/main/index.js`.
+- **`agent-ping` may not be on your `PATH` yet.** The `bin` entry has landed (`IO-1` has
+  run), so `npm run build && npm install -g .` gives you the command; if you have not
+  installed it, run the built entry point directly:
+  `node_modules/electron/dist/electron dist/main/main/index.js`.
 - **Running the surface script without `--out`.** Its default overwrites
   `docs/reviews/notification-surface-evidence.json`, which is NS-4's record and which the
   runbook and a test both cite. Pass `--out docs/reviews/oa6-surface-evidence.json`.

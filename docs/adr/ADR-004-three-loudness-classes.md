@@ -15,11 +15,14 @@
   where `fyi` is a **named refusal** rather than a no-op and no cell carries a
   sound field. Both tables are enumerated by tests rather than restated:
   `tests/domain/classify.test.ts` and `tests/notify/policy.test.ts`. Both tables
-  survive the ADR-012 change of track intact. **What is not yet true of the new
-  mechanism:** the lifecycle cell this ADR cares about is now a lifetime this
-  product owns rather than a request to an installed notification server, and it
-  has never been exercised against a real window. NT-7 builds it; NT-9's script
-  is where it gets observed. NT-4, the old Linux toast gate, is withdrawn.
+  survive the ADR-012 change of track intact. The lifecycle cell this ADR cares
+  about is now a lifetime this product owns rather than a request to an installed
+  notification server, and it has been exercised against a real window: a
+  needs-you card appeared inside the work area and stayed, a finished card left
+  the screen on its own interval with nothing dismissing it, and a
+  greeting-and-close session produced no window at all (NT-9, then re-proved
+  against the shipped build by NS-4). NT-4, the old Linux toast gate, is
+  withdrawn. **macOS and Windows remain unobserved.**
 
 ## Context
 

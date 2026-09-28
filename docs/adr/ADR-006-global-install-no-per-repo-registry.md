@@ -11,11 +11,18 @@
   process before publishing it**, and records the product version and a `sha256`
   of the emitted bytes so a second install is a no-op and a *different* installed
   version is reportable rather than overwritable. It was exercised against a live
-  `opencode run` with the file in the real plugin directory. What does not exist
-  yet is anything a user can invoke: `src/cli/` is absent, so there is no
-  `agent-ping install` or `agent-ping uninstall`, and the per-platform autostart
-  units in the Decision below are unimplemented. The polling fallback is also
-  unbuilt — push is currently the only path.
+  `opencode run` with the file in the real plugin directory. The rest of the
+  decision is built too: `src/cli/` implements the four commands the package's
+  `bin` names — `install`, `uninstall`, `status`, `doctor` — each driven by its
+  tests through the dispatcher rather than around it, and `src/cli/autostart/`
+  implements the per-platform user-level units in the Decision below
+  (systemd user unit, launchd user agent, per-user Startup folder entry), each
+  idempotent, reversible, owner-only and root-free. The polling fallback is built
+  and shares its dedupe keys with the pushing path, so the two can run at once.
+  **What has not been observed:** no login has ever started agent-ping on any
+  platform, and macOS and Windows have had no live service manager — their units
+  are unit-tested bytes and paths only. See
+  [docs/reviews/deferred-gates.md](../reviews/deferred-gates.md).
 
 ## Context
 

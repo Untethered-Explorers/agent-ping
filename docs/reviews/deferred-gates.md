@@ -4,6 +4,13 @@
 and `IO-5` as `complete`. They are complete as *attested decisions*. None of the three
 reviews was performed.
 
+> For the product itself, read the [user guide](../user-guide.md) and the
+> [administrator guide](../admin-guide.md) first. This page is the register of what this
+> repository still owes, not an install or usage guide. The prepared release notes for
+> the untagged `0.1.0` are in
+> [`docs/releases/UNRELEASED.md`](../releases/UNRELEASED.md), and each release's known
+> limitations restate this page's rows.
+
 This page exists because closing a gate is silent. The engine marks a human-review task
 complete the moment a valid attestation exists, and from that moment nothing in the engine
 will ever prompt for the review again. Without this register, the only trace would be

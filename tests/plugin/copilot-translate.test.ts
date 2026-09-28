@@ -580,7 +580,7 @@ describe('the runbook is the deferral record rather than a note about one', () =
     },
     { label: 'requires a new recorded gate decision, not a code change', needle: 'recorded gate decision' },
     { label: 'states the missing-signal path is reported rather than silent', needle: 'the degradation is this file' },
-    { label: 'does not claim doctor reports the gap, because doctor does not exist yet', needle: '`doctor` does not exist yet' },
+    { label: 'does not claim doctor reports the gap, because doctor does not report it', needle: '`doctor` exists and still does not report this gap' },
     { label: 'binds every finding to the probed version', needle: '1.0.88' },
     { label: 'binds itself to its evidence by digest', needle: 'binds its decision to two files by SHA-256' },
     { label: 'names the gate decision it comes from', needle: 'docs/reviews/CP-3-console-review.md' },

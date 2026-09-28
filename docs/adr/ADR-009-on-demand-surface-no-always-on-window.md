@@ -18,13 +18,19 @@
   `src/dashboard/prototype/scene.ts` draws with icon-plus-text state encoding
   rather than colour alone, and `src/dashboard/a11y/dom-mirror.ts` pairs every
   visible row with a visually hidden focusable entry keyed by row identity.
-  **What does not exist yet:** the live dashboard, and the surface itself. The
-  prototype renders mock data with no hub behind it, so the page-header pending
-  count beside the connection state, the acknowledgement control on a blocked
-  row, the copyable handoff command, and the history panel are all unbuilt —
-  they belong to the live-dashboard feature. **The host window does not exist
-  yet either** (NT-6), and no desktop has ever displayed the tray icon or a
-  card.
+  The live half is built too: the hub serves the dashboard at `/`, the page is fed
+  by the change stream, and the page-header pending count beside the connection
+  state, the acknowledgement control on a blocked row, the copyable handoff
+  command and the history panel all exist (LD-1 through LD-3, with the journey
+  driven in a real browser by LD-4). The host window exists (NT-6), the card is
+  rendered by this product and taken down when its block ends (NS-1 through
+  NS-3), and the shipped build's card was **live-verified on Linux/X11 with no
+  seam supplied by the run** (NS-4; evidence in
+  [docs/reviews/notification-surface-evidence.json](../reviews/notification-surface-evidence.json),
+  claims tabulated in [docs/runbooks/notification-surface.md](../runbooks/notification-surface.md)).
+  **What has not been observed:** a card has never been seen on macOS or Windows,
+  and the tray icon has never been seen on *any* desktop by a human — a
+  `StatusNotifierItem` is not an X window, so the live run could not observe it.
 
 ## Context
 
