@@ -807,6 +807,7 @@ describe('the read routes (HC-FR-02)', () => {
       'dashboard',
       'database',
       'delivery',
+      'desktop',
       'host',
       'instanceId',
       'origin',
@@ -857,6 +858,15 @@ describe('the read routes (HC-FR-02)', () => {
       lastFailure: null,
     })
     expect(health['dashboard']).toMatchObject({ available: true })
+    // The fourth section, added for `doctor` (IO-2). This hub is a headless one - no
+    // desktop bridge was supplied - so every answer is the "never asked for" one, which
+    // is what makes it different from a desktop that refused. `tests/cli/doctor.test.ts`
+    // drives the other three states through real hubs over real sockets.
+    expect(health['desktop']).toEqual({
+      bridge: 'absent',
+      tray: 'absent',
+      surface: 'not-mounted',
+    })
   })
 
   it('carries exactly the content-free read shapes in every payload', async () => {

@@ -534,7 +534,7 @@ function checkBinary(root, manifest) {
       'binary',
       false,
       `${target} is not in this tree, so the installed command cannot run`,
-      'run `npm run build`; src/cli/index.ts is IO-2 and does not exist yet, so a publish is blocked until it does',
+      'run `npm run build`; the bin names the tsc output of src/cli/index.ts, so a tree without it has no command to install (IO-FR-01)',
     )
   }
   return finding('binary', true, `"${BIN_NAME}" -> ${target}`)

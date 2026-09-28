@@ -25,7 +25,7 @@ Already covered, so you do not rebuild it:
 | Covered by | What it proves |
 | --- | --- |
 | `IO-1`, complete | The package publishes, the files allowlist is right, and a prepack check fails when a build artefact is missing |
-| `IO-2` (pending) | The four subcommands, unit-tested including the failure exits |
+| `IO-2`, complete | The four subcommands, driven through the command entry point, unit-tested including the failure exits |
 | `IO-3` (pending) | Autostart units per platform, idempotent and reversible, against a temporary home |
 | `IO-4` (pending) | `scripts/verify-autostart-linux.mjs` — login, restart and pending survival on Linux |
 | `OA-5`, complete | The real `opencode` binary reaching a real permission decision against a real hub |
@@ -176,15 +176,28 @@ was not observable rather than reporting a pass for it.*
 
 ## 7. What this runbook cannot tell you yet
 
-Written before `IO-1`–`IO-4` exist. Confirm from `agent-ping --help` before relying on any
-line above, and update this section rather than trusting it:
+`IO-1` and `IO-2` exist; `IO-3` and `IO-4` do not. Confirm from `agent-ping --help`
+before relying on any line above, and update this section rather than trusting it.
 
-- **The exact flag spellings** — the purge flag, the verbose flag (`IO-FR-09`), and
-  whatever the version-mismatch report uses.
-- **`doctor`'s actual check names**, so you can map its output onto the seven required
-  checks rather than guessing.
+**Already answered by `IO-2`, and re-checkable from `--help`:**
+
+- **The exact flag spellings** — `--purge` (with `uninstall`), `--force` (with `install`,
+  which is the version-mismatch override), `--verbose` (the `IO-FR-09` mirror). A flag
+  given to the wrong command is refused with exit 2 rather than ignored.
+- **`doctor`'s actual check names**, in the order it prints them: `runtime`, `database`,
+  `port`, `plugin`, `autostart`, `notification surface`, `tray`. Two of them are
+  `unknown` rather than `ok` or `fail` when no hub is running — a check that could not be
+  evaluated has not found a fault, and it does not change the exit code.
+- **What `uninstall` removes and what it keeps**: the plugin file, the autostart unit and
+  the bounded local log go; the database stays; the runtime file and the write token are
+  kept while a hub is running, and the output says so.
+
+**Still unknown, because `IO-3` has not run:**
+
 - **The autostart unit names** per platform, and where the platform state directory resolves
-  to on yours.
+  to on yours. Until then `install` reports that it cannot enable a unit, and `doctor`
+  fails the `autostart` check naming `src/cli/autostart/index.js` as what is missing —
+  which means breakage-free install cannot be reviewed yet.
 - **What `IO-4`'s script already covers on Linux**, so you do not repeat it — and so you
   know which of your observations are the only evidence for macOS or Windows.
 

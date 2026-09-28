@@ -79,6 +79,14 @@ import {
 import { readRuntimeFile, runtimeFilePath, writeRuntimeFile } from '@/hub/runtime-file'
 import { readHealth, type HubServices } from '@/hub/routes/read'
 import { createCardDismissal } from '@/notify/surface/dismissal'
+import type { HubDesktopState } from '@/hub/routes/read'
+
+/** What the composition root reports for a run with no desktop bridge (IO-2). */
+const HEADLESS_DESKTOP: HubDesktopState = {
+  bridge: 'absent',
+  tray: 'absent',
+  surface: 'not-mounted',
+}
 import type { Notifier } from '@/hub/delivery'
 import { SHUTDOWN_PORT_BASE, startRealHub, stopStrayHubs, type RealHub } from './fixtures/hub-process'
 
@@ -886,6 +894,11 @@ describe('health reports the state the shutdown is in', () => {
         servedRequests: () => 0,
         listening: () => hub.server.nodeServer.listening,
         state: () => hub.lifecycle.state().state,
+        // The desktop section IO-2 added for `doctor`, spelled out rather than read:
+        // this fixture is about the lifecycle states, and its hub is a headless one -
+        // no bridge, so no tray and no card window. The shape is the composition root's
+        // own for a run with no `DesktopBridge`.
+        desktop: () => HEADLESS_DESKTOP,
       },
     } satisfies HubServices
 

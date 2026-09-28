@@ -55,6 +55,12 @@
 // and wired the delivery policy into `HubServices`. It stays a read-only GET, it
 // still carries nothing that could be content, and the whole route is still in this
 // file - the one list a reviewer reads to see what a client can ask for.
+//
+// SINCE IO-2: the desktop section. NT-3 left a note that a health payload was where a
+// `doctor` tray check belonged and that adding one was a change to this file, so IO-2
+// added it: three closed tokens, read at request time through `HubIdentity.desktop()`.
+// Nothing else moved, and no writer came with it - the section reports two facts the
+// composition root already had, so a health request still changes nothing (IO-FR-04).
 
 import type { ServerResponse } from 'node:http'
 import {
@@ -205,6 +211,50 @@ export interface HubIdentity {
   listening(): boolean
   /** PRD 10's lifecycle state, read from the shutdown path (HC-FR-10). */
   state(): HubState
+  /**
+   * What this run's desktop holds, read at request time (IO-2).
+   *
+   * A function for the reason `servedRequests` and `state` are: a snapshot taken when
+   * the identity was built would be permanently stale, and a stale "the tray is on the
+   * desktop" in a health payload is worse than no field. The tray is mounted after the
+   * identity exists and taken down before the log closes, so only a read at request time
+   * can tell the two apart.
+   *
+   * It exists because `doctor` has to answer two of IO-FR-04's checks - whether a card
+   * window can be created here and whether the badge is on this desktop - from outside
+   * the process that owns both. There is no second window manager in this product and no
+   * other place from which a second process could learn either fact (NT-3 handed this
+   * over with the note that a health payload was where it belonged).
+   */
+  desktop(): HubDesktopState
+}
+
+/**
+ * The three closed tokens the tray can be in.
+ *
+ * `absent` and `unavailable` are different faults and the difference is the whole point:
+ * `absent` is a run that asked for no tray (a headless Node run, which is a supported
+ * run), and `unavailable` is a desktop that was asked and refused. The remedy for the
+ * second is about a session without a status area, not about a missing tray (NT-FR-05).
+ */
+export type HubTrayState = 'mounted' | 'closed' | 'unavailable' | 'absent'
+
+/**
+ * The three closed tokens the card window can be in.
+ *
+ * `not-mounted` and `window-refused` are the distinction IO-2's own description and the
+ * operations review are both built on: a run that never asked for a window is not a
+ * runtime that could not provide one, and a remedy that says "reinstall Electron" for
+ * either of them is the wrong remedy for both (NT-FR-04, NT-FR-11, ADR-012).
+ */
+export type HubSurfaceState = 'available' | 'window-refused' | 'not-mounted'
+
+/** What this run's desktop holds. Three facts, no detail, and nothing that could be content. */
+export interface HubDesktopState {
+  /** Whether a desktop bridge was supplied at all: the application against a headless run. */
+  readonly bridge: 'present' | 'absent'
+  readonly tray: HubTrayState
+  readonly surface: HubSurfaceState
 }
 
 /**
@@ -258,6 +308,17 @@ export interface HealthPayload {
     readonly available: boolean
     readonly root: string | null
   }
+  /**
+   * What this run's desktop holds (IO-2, NT-3, NT-FR-04).
+   *
+   * The fourth section, added for `doctor` and read at request time for the reason
+   * `listening` and `state` are. It is the only way a second process can learn whether
+   * this hub has a tray on the desktop and whether it could create its card window -
+   * both of which live in the process that owns them and neither of which any route,
+   * file or counter exposes. A payload field that could carry a message would be a
+   * problem; these are three closed tokens (APX-FR-01, APX-CON-12).
+   */
+  readonly desktop: HubDesktopState
   /**
    * The delivery policy's own status, verbatim (HC-FR-07, NT-FR-09).
    *
@@ -437,6 +498,7 @@ export function readHealth(services: HubServices, now: Date = new Date()): Healt
       available: hub.dashboardRoot !== null,
       root: hub.dashboardRoot,
     },
+    desktop: hub.desktop(),
     delivery: services.delivery.status(),
   }
 }

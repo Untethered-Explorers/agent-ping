@@ -28,9 +28,9 @@ agents said, and it never drives them.
 
 ## Status
 
-**Under active build.** The hub, the log, the notification path and the opencode
-adapter are implemented. The packaged install, the command line and the live dashboard
-are not. 36 of 46 build tasks are complete and no task has failed.
+**Under active build.** The hub, the log, the notification path, the opencode adapter
+and the command line are implemented. The autostart units and the live dashboard are
+not. 36 of 46 build tasks are complete and no task has failed.
 
 The notification card has been **live-verified on Linux/X11 against the product's own
 shipped build** with no test-supplied seam: a real window inside the work area, painted
@@ -49,15 +49,19 @@ and the claims are tabulated in
 | opencode adapter: event translation, transport with visible failure, global plugin install | Built, tested, and **driven against the real `opencode` binary** by OA-5 |
 | PixiJS 8 dashboard prototype, DOM mirror, keyboard model | Built, reviewed (`DP-4`) |
 | Live dashboard wired to the hub (LD-1 → LD-4) | `LD-1` done — renders live state, grouped, with staleness. `LD-2`–`LD-4` (mirror, interactions, browser journey) not started |
-| CLI, npm package, autostart, `doctor` (IO-1 → IO-4) | The package, its `files` allowlist and its prepack guard are done (`IO-1`). The CLI, autostart and `doctor` are not: there is still no `agent-ping` command to run |
+| CLI, npm package, autostart, `doctor` (IO-1 → IO-4) | The package, its `files` allowlist and its prepack guard are done (`IO-1`). `install`, `uninstall`, `status` and `doctor` are built and tested through the command entry point (`IO-2`), including the failure exits. The per-platform autostart units are `IO-3` and are not here yet, so `install` reports that it cannot enable a unit rather than pretending to |
 | Polling fallback, live run against a real session (OA-4 → OA-6) | `OA-4` and `OA-5` done — real binary, real permission decision, real hub, breadcrumb when the hub is absent. **`OA-6` deferred**: the human journey was not performed |
 | GitHub Copilot CLI ACP spike (CP-1 → CP-2) | Done. `CP-3` **deferred** the adapter, and `CP-4` turned that into a runbook and a test. v1 ships opencode only |
 
 > [!IMPORTANT]
-> There is no `agent-ping` command to run yet, and no release. `package.json` now
-> declares the `agent-ping` binary, a `files` allowlist and a `prepack` guard
-> ([`scripts/prepack-check.mjs`](scripts/prepack-check.mjs)), but `src/cli` does not
-> exist, so the guard refuses to publish and nothing has been installed globally.
+> There is no release, and nothing has been installed globally. `package.json` declares
+> the `agent-ping` binary, a `files` allowlist and a `prepack` guard
+> ([`scripts/prepack-check.mjs`](scripts/prepack-check.mjs)) that refuses to pack a
+> build missing any required artefact — and the build now passes it, so
+> `npm install -g .` from a built checkout gives you a working command. What it does
+> *not* give you yet is autostart: the per-platform units are `IO-3`, so
+> `agent-ping install` writes the plugin, starts the hub, and then reports plainly that
+> it cannot enable a login unit in a build that has none.
 > [docs/PROGRESS.md](docs/PROGRESS.md) is the running build log, including every check
 > that is *not* yet verified against real software.
 
@@ -156,16 +160,45 @@ These are enforced in code and asserted by tests, not conventions.
 
 ## Getting started
 
-Requires **Node.js 22.12 or newer**. This is a development checkout: there is nothing
-to install globally yet.
+Requires **Node.js 22.12 or newer**.
 
 ```bash
-npm install          # one package; better-sqlite3 is the only runtime dependency
-npm test             # 877 tests across 29 files, on real loopback sockets
+npm install          # one package; better-sqlite3 and electron are the runtime dependencies
+npm test             # on real loopback sockets
 npm run typecheck    # tsc --strict, noUncheckedIndexedAccess
 npm run lint
-npm run build        # tsc -> dist/main, Vite -> dist/dashboard
+npm run build        # tsc -> dist/main (hub + CLI), Vite -> dist/dashboard
 ```
+
+## The command line
+
+Four subcommands, and one command to run when something is wrong. `doctor` never
+repairs anything: it reports, names one remedy per fault, and exits non-zero if any
+check failed — a tool that fixes things behind your back is harder to trust than one
+that says what is broken.
+
+```bash
+agent-ping install      # write the opencode plugin, enable autostart, start the hub,
+                        # and print exactly what changed (nothing, on a second run)
+agent-ping status       # pending count, last event, hub uptime, active sessions
+agent-ping doctor       # the seven checks, one remedy each, non-zero on any failure
+agent-ping uninstall    # remove the plugin and autostart and the local log;
+                        # the database stays unless you pass --purge
+```
+
+| Flag | Meaning |
+|------|---------|
+| `--purge` | with `uninstall`: also delete the database. It is kept without this flag, so a mistaken uninstall is recoverable |
+| `--force` | with `install`: replace a different installed plugin version. Without it a version mismatch is reported and nothing is overwritten |
+| `--verbose` | mirror every local-log line to standard output |
+
+Exit codes are part of the interface: `0` the command did what it was asked, `1` a
+check failed or a step could not be completed, `2` the command line named a command or
+flag that does not exist.
+
+Point `AGENT_PING_STATE_DIR` at a temporary directory and every path the product writes
+resolves there instead, which is how the test suite and the live verification scripts run
+without touching your own state.
 
 ### The dashboard prototype
 
@@ -180,8 +213,9 @@ npm run build:dashboard                     # -> dist/dashboard/index.html
 
 ### The hub, by hand
 
-There is no CLI yet, so the hub is started programmatically. `tsc` emits JavaScript
-only, so the build copies the durable schema beside the emitted store itself:
+`agent-ping install` starts the hub; this is what a development checkout does instead.
+`tsc` emits JavaScript only, so the build copies the durable schema beside the emitted
+store itself:
 
 ```bash
 npm run build
@@ -256,6 +290,7 @@ $XDG_STATE_HOME/agent-ping/            # Linux
   agent-ping.db        durable log: sessions, events, counters
   hub-runtime.json     the single-instance lock and the live port
   hub-write-token      the per-install write token
+  agent-ping.log       bounded structured local log; two files, no content
 ```
 
 ## Project layout
@@ -270,6 +305,7 @@ src/
   plugin/      the opencode adapter, its transport, and the global installer
   dashboard/   the PixiJS 8 prototype and its accessibility modules
   main/        the composition root: the one place collaborators are wired
+  cli/         install, uninstall, status, doctor; the state directory and the log
 tests/         one suite per area, run by scripts/run-tests.mjs
 scripts/       the build and test entry points
 docs/          the requirements, decisions, evidence and build log

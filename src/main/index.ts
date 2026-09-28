@@ -116,14 +116,14 @@
 // (APX-CON-03, ADR-001), so nothing in this file starts, stops or signals anything
 // outside this process.
 
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { openCounters, type Counters } from '../storage/counters.js'
 import { openEventStore, type EventStore, type PendingItem } from '../storage/eventStore.js'
 import { databaseFilePath, ensureStateDir, resolveStateDir } from '../storage/paths.js'
 import { createPendingLifecycle, type PendingLifecycle } from '../domain/pending.js'
-import { READ_ROUTES, type HubIdentity, type HubServices } from '../hub/routes/read.js'
+import { READ_ROUTES, type HubDesktopState, type HubIdentity, type HubServices } from '../hub/routes/read.js'
 import { STREAM_ROUTES } from '../hub/routes/stream.js'
 import { INGEST_ROUTES } from '../hub/routes/ingest.js'
 import { ACK_ROUTES } from '../hub/routes/ack.js'
@@ -684,6 +684,43 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
     // and is not a refusal - see the note on the notifier below.
     const surfaceRefused = options.desktop?.surface !== undefined && surface === null
 
+    // 4a-ter. What this run's desktop holds, for the health payload (IO-2, IO-FR-04).
+    //
+    //     A function over the two `let`s above rather than a value, for two reasons that
+    //     are the same reason. It is read at request time because the tray is mounted
+    //     later in this function and taken down before the log closes, so a snapshot
+    //     would be stale in both directions. And it is one function handed to both
+    //     `HubServices` literals for the reason `dismissal` is named in both: a field
+    //     that exists before the bind and not after it is a field a reader cannot rely
+    //     on (NS-3).
+    //
+    //     "Asked for and refused" and "never asked for" stay apart here, because that
+    //     distinction is what `doctor`'s remedies are built on: a headless Node run is a
+    //     supported run, and a desktop that refused the window or the icon is a fault
+    //     with a fault's remedy (NT-FR-04, NT-FR-05, NT-FR-11).
+    const desktopState = (): HubDesktopState => {
+      const bridge = options.desktop === undefined ? 'absent' : 'present'
+      const trayRequested = options.desktop?.tray !== undefined
+      const liveTray = mountedTray()
+      return {
+        bridge,
+        tray: !trayRequested
+          ? 'absent'
+          : liveTray === null
+            ? 'unavailable'
+            : liveTray.mounted
+              ? 'mounted'
+              : 'closed',
+        surface: options.desktop?.surface === undefined
+          ? 'not-mounted'
+          : mountedSurface() !== null
+            ? 'available'
+            : surfaceRefused
+              ? 'window-refused'
+              : 'not-mounted',
+      }
+    }
+
     // 4a-bis. The card dismissal (NS-3, NT-FR-12), between the host and the notifier
     //     because it needs both: the channel's removal, to take the card out of the
     //     document, and the hub's own live state feed, to hear about a resolution.
@@ -890,7 +927,10 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
       // port present in one of them and absent from the other is a field that exists
       // until the socket is bound and then stops existing (NS-3).
       dismissal,
-      hub: unpublishedIdentity(claim, lifecycle),
+      // The pre-bind identity, which reports a desktop of its own because nothing is
+      // mounted yet - the same closure the post-bind literal below carries, so the two
+      // cannot disagree about what a desktop is.
+      hub: { ...unpublishedIdentity(claim, lifecycle), desktop: desktopState },
     }
 
     // 6. The listener. The port is chosen here and nowhere else.
@@ -940,6 +980,9 @@ export async function startHub(options: StartHubOptions = {}): Promise<RunningHu
         // field (HC-FR-07, HC-FR-10).
         listening: (): boolean => server?.nodeServer.listening ?? false,
         state: (): HubState => lifecycle.state().state,
+        // The same closure the pre-bind literal above carries, read at request time for
+        // the same reason `listening` is (IO-2, IO-FR-04).
+        desktop: desktopState,
       },
     }
 
@@ -1301,6 +1344,11 @@ function unpublishedIdentity(claim: HubInstanceClaim, lifecycle: HubLifecycle): 
     servedRequests: () => 0,
     listening: () => false,
     state: (): HubState => lifecycle.state().state,
+    desktop: (): HubDesktopState => ({
+      bridge: 'absent',
+      tray: 'absent',
+      surface: 'not-mounted',
+    }),
   }
 }
 
@@ -1906,11 +1954,38 @@ function isElectronEntryPoint(): boolean {
     // nothing is not evidence either way.
     if (argument.startsWith('-')) return false
     try {
-      return path.resolve(argument) === self
+      if (path.resolve(argument) === self) return true
     } catch {
       return false
     }
+    // `electron .` is the documented way to run a package, and it is what an autostart
+    // unit and this repository's own install command both use: Electron reads
+    // `package.json`'s `main` and loads this module, but the argument in argv is the
+    // package *directory*, which resolves to nothing this module could be. Without this
+    // arm the process starts, loads nothing and exits - a silent no-op that looks like a
+    // successful start to anything watching for a port. Found on this machine by
+    // launching the built package that way and watching no hub appear.
+    return namesThisModuleAsMain(path.resolve(argument))
   })
+}
+
+/**
+ * Is this directory the package whose `main` is this module?
+ *
+ * Read out of the manifest rather than assumed from a `dist/` path, so the answer is the
+ * manifest's own and a rename of the build output does not silently stop the application
+ * from starting.
+ */
+function namesThisModuleAsMain(directory: string): boolean {
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(path.join(directory, 'package.json'), 'utf8'))
+    if (typeof parsed !== 'object' || parsed === null) return false
+    const main = (parsed as { main?: unknown }).main
+    if (typeof main !== 'string' || main === '') return false
+    return path.resolve(directory, main) === fileURLToPath(import.meta.url)
+  } catch {
+    return false
+  }
 }
 
 if (isElectronEntryPoint()) {

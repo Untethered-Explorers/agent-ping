@@ -210,8 +210,65 @@ const ENTRY_MODULE = 'plugin/opencode/index.ts'
 /** The delivery port OA-2 owns, which the installed entry point has to build. */
 const TRANSPORT_MODULE = 'plugin/transport/http.ts'
 
-/** The repository root, from this file's own location: `src/plugin/install/`. */
-const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
+/**
+ * The package root, found by walking up to the manifest that names this product.
+ *
+ * It used to be three `..` segments from this file, which is right in a checkout
+ * (`src/plugin/install/`) and wrong in a build (`dist/main/plugin/install/`, where three
+ * segments up is `dist/`). The generator would then look for the adapter under
+ * `dist/src`, find nothing, and report "the adapter source could not be read" - so
+ * `agent-ping install`, run from a build, could not install the plugin it exists to
+ * install. Found on this machine by running the built command, and fixed here rather
+ * than by having the caller pass a path, because one resolution point is what stops a
+ * checkout and an installed package from disagreeing about where the sources are.
+ */
+const REPO_ROOT = findPackageRoot()
+
+/**
+ * The package root, from this file's own location, by looking for `package.json`.
+ *
+ * Bounded to eight levels, which is four more than any layout this package has: the
+ * source at `src/plugin/install/`, and the emitted module at `dist/main/plugin/install/`.
+ * A manifest that names this product is the answer; a fixed number of segments is a
+ * layout, and the layout is not this module's to decide.
+ */
+function findPackageRoot(): string {
+  let directory = path.dirname(fileURLToPath(import.meta.url))
+  for (let depth = 0; depth < 8; depth += 1) {
+    const candidate = path.join(directory, 'package.json')
+    try {
+      const parsed: unknown = JSON.parse(readFileSync(candidate, 'utf8'))
+      if (
+        typeof parsed === 'object' &&
+        parsed !== null &&
+        (parsed as { name?: unknown }).name === PRODUCT_NAME
+      ) {
+        return directory
+      }
+    } catch {
+      // Not here, or not a manifest: keep walking.
+    }
+    const parent = path.dirname(directory)
+    if (parent === directory) break
+    directory = parent
+  }
+  // A checkout always has one of the two layouts above, so this is unreachable rather
+  // than expected; the three-segment answer is the historical one, kept as the fallback
+  // so a source tree with an unreadable manifest still resolves the way it used to.
+  return path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
+}
+
+/**
+ * The directory the generator reads the adapter's modules from.
+ *
+ * Named and exported because "the generator cannot find its own sources" is a failure
+ * `install` reports to a developer, and a test has to be able to assert the directory
+ * rather than infer it: `src/plugin/opencode/index.ts` has to be readable underneath
+ * this path, in a checkout and in a build alike (IO-1's allowlist ships `src/plugin/`).
+ */
+export function pluginSourceDir(): string {
+  return path.join(REPO_ROOT, 'src')
+}
 
 /**
  * The one hand-written part of the emitted file.
@@ -330,7 +387,7 @@ export interface RenderOptions {
  * installed" from "installed something different" without trusting a timestamp.
  */
 export function renderPluginSource(options: RenderOptions): RenderedPlugin {
-  const sourceDir = options.sourceDir ?? path.join(REPO_ROOT, 'src')
+  const sourceDir = options.sourceDir ?? pluginSourceDir()
   const read =
     options.read ??
     ((modulePath: string): string => readFileSync(path.join(sourceDir, modulePath), 'utf8'))

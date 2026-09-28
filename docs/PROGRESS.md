@@ -1,10 +1,10 @@
 # Project Progress
 
 ## Current State
-**Phase**: LIVE-DASHBOARD-3
+**Phase**: INSTALL-AUTOSTART-AND-OPERATIONS-1
 **Status**: In Progress
-**Validation Gaps**: 138 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-28T00:03:19.683Z
+**Validation Gaps**: 143 unverified check(s) - see "Validation Gaps"
+**Last Updated**: 2026-09-28T01:09:01.131Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -84,6 +84,8 @@
   - Files: playwright.config.ts, tests/e2e/dashboard.spec.ts, scripts/verify-dashboard-e2e.mjs, package-lock.json, package.json, tsconfig.json, scripts/verify-dashboard-e2e.d.mts, tests/e2e/fixtures/dashboard-hub.mjs, tests/e2e/global-teardown.ts, tests/e2e/hub-fixture.ts, tests/scripts/verify-dashboard-e2e.test.ts
 - [x] Phase INSTALL-AUTOSTART-AND-OPERATIONS-1, Task IO-1: Publish the package and guard its build artefacts (@packaging-engineer)
   - Files: package.json, scripts/prepack-check.mjs, tests/packaging/package.test.ts, README.md, docs/runbooks/io-5-operations-review.md, scripts/build.mjs, tests/dashboard/card-document.test.ts
+- [x] Phase INSTALL-AUTOSTART-AND-OPERATIONS-1, Task IO-2: Implement the install, uninstall, status and doctor commands (@packaging-engineer)
+  - Files: src/cli/index.ts, src/cli/install.ts, src/cli/doctor.ts, src/cli/status.ts, tests/cli/install.test.ts, tests/cli/doctor.test.ts, README.md, docs/runbooks/io-5-operations-review.md, scripts/prepack-check.mjs, src/hub/routes/read.ts, src/main/index.ts, src/plugin/install/global-plugin.ts, tests/hub/delivery.test.ts, tests/hub/lifecycle.test.ts, tests/hub/security.test.ts, tests/hub/server.test.ts, tests/packaging/package.test.ts, src/cli/autostart-control.ts, src/cli/hub-client.ts, src/cli/log.ts, src/cli/output.ts, tests/cli/fixtures/command-line.ts
 - [x] Phase COPILOT-CLI-ACP-SPIKE-1, Task CP-1: Probe the real Copilot ACP surface (@connector-engineer)
   - Files: scripts/probe-copilot-acp.mjs, tests/scripts/probe-copilot-acp.test.ts, docs/research/copilot-acp-capture.json, tests/scripts/fixtures/copilot-acp-capture.json
 - [x] Phase COPILOT-CLI-ACP-SPIKE-1, Task CP-2: Probe the Copilot hook surface and write the report (@connector-engineer)
@@ -98,7 +100,6 @@
 
 ## Remaining
 - [ ] Phase LIVE-DASHBOARD-3: Phase 3: End-to-end journey and review
-- [ ] Phase INSTALL-AUTOSTART-AND-OPERATIONS-1: Phase 1: Package and command line
 - [ ] Phase INSTALL-AUTOSTART-AND-OPERATIONS-2: Phase 2: Autostart
 - [ ] Phase INSTALL-AUTOSTART-AND-OPERATIONS-3: Phase 3: Live operations verification and gate
 
@@ -242,6 +243,11 @@
 - Task IO-1: The npm pack comparison runs against the scratch tree, not the developer's dist/, and npm is invoked with --ignore-scripts so the observation does not depend on the answer it is compared against. The real-tree `npm pack --dry-run` was run by hand during development and agrees: 87 files, 0 source maps, 0 declarations, 0 tests, 0 docs, all three documents and the schema present.
 - Task IO-1: The dashboard asset sweep reads href and src attributes out of the built documents. It resolves relative references and skips absolute and protocol-relative ones; a build that emitted an asset under a different name than the document names is caught, and one that emitted an asset nothing references is not.
 - Task IO-1: The comment stripper used for the closure walk and the launch-policy read is this repository's hand-written kind: a backtick template is read as one string to its closing backtick, so a nested template inside a ${...} would end the scan early. No module or artefact these are pointed at contains one, and the test that compares the guard's derived closure against the product's own renderer would fail if a module were missed.
+- Task IO-2: Linux only. Every live observation here is Ubuntu 24.04 / X11, one machine, one run per journey. No macOS or Windows observation of any kind is claimed and none was possible; APX-CON-06 keeps the per-platform difference a documented manual step and IO-5 owns the per-platform gate.
+- Task IO-2: No global install and no publish. The live journey used an isolated temporary HOME, XDG_CONFIG_HOME and AGENT_PING_STATE_DIR, so nothing on this developer's real opencode configuration or state directory was touched. The claim 'npm install -g gives you a working command' is a build-and-run observation from this checkout, not a global install.
+- Task IO-2: The live hub was started and stopped by hand and its pid killed afterwards; no process, autostart unit or service manager was left behind. Restart survival, login autostart and pending-state durability are IO-4's script, not mine.
+- Task IO-2: The macOS and Windows autostart implementations do not exist yet (IO-3), so nothing about them is claimed. The `portHolderCommand` table has a per-platform branch for all three, exercised only on linux.
+- Task IO-2: The whole-suite run is not fully hermetic: it builds a scratch tree in tests/packaging/package.test.ts and starts real loopback hubs in several suites, so a run on a machine with 43117 already held behaves as my live run did - on a fallback port - rather than the preferred one.
 - Task CP-1: The permission finding is from one run on one machine against one Copilot version. It is evidence, not a proof across versions, and the gate decision should cite the version alongside the claim.
 - Task CP-1: The hook surface is untouched: CP-2 owns the documented Copilot hook triggers and the consolidated report.
 - Task CP-1: The stub-binary deadline test executes a shebang script directly, so it assumes a POSIX-style platform, consistent with the existing tests/tooling/runner-convention.test.ts, which already spawns npm by bare name.

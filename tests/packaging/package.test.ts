@@ -546,18 +546,24 @@ describe('the allowlist and the declared bin cover everything that must ship', (
     for (const file of required) {
       expect(guard.matchesFilesAllowlist(file, realManifest.files), file).toBe(true)
     }
-    // And the guard says so about a real build of this repository, for every check but
-    // the one whose subject is IO-2's `src/cli/index.ts`.
+    // And the guard says so about a real build of this repository, for every check.
+    // It used to stop at `binary`, because `src/cli/index.ts` was IO-2's and did not
+    // exist; a package whose declared command could not run had to be unpublishable, and
+    // now that the command is here the whole guard is green.
     const checks = checkNames(buildTree)
-    for (const check of checks.filter((found) => found.name !== 'binary')) {
+    for (const check of checks) {
       expect(check.ok, `${check.name}: ${check.detail}`).toBe(true)
     }
-    // Which is stated rather than assumed: the one failure is the missing command, and
-    // its remedy names the task that has to write it.
-    const failed = checks.filter((check) => !check.ok)
-    expect(failed.map((check) => check.name)).toEqual(['binary'])
-    expect(failed[0]?.detail).toContain(guard.BIN_TARGET)
-    expect(failed[0]?.remedy).toContain('IO-2')
+    expect(checks.filter((check) => !check.ok).map((check) => check.name)).toEqual([])
+    // The binary check is still proven, on a tree the command is missing from rather than
+    // on this repository - so the assertion outlives the fix that made it pass.
+    const withoutCommand = completeTree()
+    rmSync(path.join(withoutCommand, guard.BIN_TARGET), { force: true })
+    const missing = checkOf(withoutCommand, 'binary')
+    expect(missing.ok).toBe(false)
+    expect(missing.detail).toContain(guard.BIN_TARGET)
+    expect(missing.remedy).toContain('npm run build')
+    expect(missing.remedy).toContain('src/cli/index.ts')
   })
 
   it('reports a plugin module the allowlist would leave behind', () => {

@@ -343,6 +343,10 @@ describe('the loopback predicate (APX-CON-01)', () => {
         dashboardRoot: null,
         servedRequests: () => 0,
         listening: () => false,
+        // The desktop section IO-2 added for `doctor`. This fixture is a headless run -
+        // no bridge, so no tray and no card window - and it is about the address
+        // boundary, so nothing here may put anything on a desktop either.
+        desktop: () => ({ bridge: 'absent', tray: 'absent', surface: 'not-mounted' }),
         state: () => 'starting',
       },
     }

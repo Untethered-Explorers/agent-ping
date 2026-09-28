@@ -727,11 +727,16 @@ describe('health reports the delivery status a doctor run needs', () => {
     const health = await healthOf(hub)
 
     // HC-FR-07 names three sections, and the payload has exactly those three plus the
-    // identity and the dashboard it already had.
+    // identity and the dashboard it already had. The fourth, `desktop`, was added by
+    // IO-2: `doctor`'s notification-surface and tray checks (IO-FR-04) can only be
+    // answered from outside the process that owns the tray and the card window, and this
+    // payload is the only place either fact is published. It is still a closed set - the
+    // enumeration below is the assertion, and a fifth section would fail it.
     expect(Object.keys(health).sort()).toEqual([
       'dashboard',
       'database',
       'delivery',
+      'desktop',
       'host',
       'instanceId',
       'origin',
