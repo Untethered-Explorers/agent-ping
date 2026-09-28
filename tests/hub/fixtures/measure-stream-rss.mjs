@@ -39,13 +39,12 @@ import { request } from 'node:http'
 import { register } from 'node:module'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { pathToFileURL } from 'node:url'
 
 register('./ts-resolver.mjs', import.meta.url)
 
 const stateDir = mkdtempSync(path.join(tmpdir(), 'agent-ping-stream-rss-'))
 const { startHub } = await import(
-  pathToFileURL(new URL('../../../src/main/index.ts', import.meta.url).pathname).href
+  new URL('../../../src/main/index.ts', import.meta.url).href
 )
 
 /** How many streams to hold open: a few dashboards plus a script or two. */

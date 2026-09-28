@@ -44,7 +44,6 @@
 
 import { appendFileSync } from 'node:fs'
 import { register } from 'node:module'
-import { pathToFileURL } from 'node:url'
 
 register('./ts-resolver.mjs', import.meta.url)
 
@@ -65,8 +64,25 @@ if (port !== undefined && !Number.isInteger(port)) {
   process.exit(2)
 }
 
+// The source entry, as a URL. `new URL(relative, import.meta.url).href` and nothing
+// else: this used to be
+//
+//   pathToFileURL(new URL('../../../src/main/index.ts', import.meta.url).pathname).href
+//
+// which converts twice. The URL constructor already resolved the specifier against
+// this file, and taking `.pathname` throws that resolution away in favour of an opaque
+// encoded string - which `pathToFileURL` then has to guess at again. On Linux the
+// round trip happens to be idempotent, so it worked. On Windows it is not: `.pathname`
+// yields `/D:/a/...`, and re-resolving that against the current drive produces
+// `D:\D:\a\...`, so the fixture died with ERR_MODULE_NOT_FOUND on the one platform
+// where its import target lives behind a drive letter. Five fixtures carried the
+// pattern, which is what the Windows CI cell reported as 50 failing tests.
+//
+// The four sibling fixtures - second-instance, measure-idle-rss, measure-stream-rss and
+// tests/e2e/fixtures/dashboard-hub.mjs - import the same entry the same way and must
+// keep doing so in this one shape.
 const { startHub } = await import(
-  pathToFileURL(new URL('../../../src/main/index.ts', import.meta.url).pathname).href
+  new URL('../../../src/main/index.ts', import.meta.url).href
 )
 
 /**

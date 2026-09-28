@@ -19,7 +19,6 @@
 // installation.
 
 import { register } from 'node:module'
-import { pathToFileURL } from 'node:url'
 
 register('./ts-resolver.mjs', import.meta.url)
 
@@ -30,7 +29,7 @@ if (stateDir === undefined || stateDir === '') {
 }
 
 const { startHub } = await import(
-  pathToFileURL(new URL('../../../src/main/index.ts', import.meta.url).pathname).href
+  new URL('../../../src/main/index.ts', import.meta.url).href
 )
 
 let hub

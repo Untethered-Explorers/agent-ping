@@ -38,7 +38,6 @@
 // can never be pointed at a developer's own installation.
 
 import { register } from 'node:module'
-import { pathToFileURL } from 'node:url'
 
 register('../../hub/fixtures/ts-resolver.mjs', import.meta.url)
 
@@ -55,7 +54,7 @@ if (port !== undefined && !Number.isInteger(port)) {
 }
 
 const { startHub } = await import(
-  pathToFileURL(new URL('../../../src/main/index.ts', import.meta.url).pathname).href
+  new URL('../../../src/main/index.ts', import.meta.url).href
 )
 
 let hub
