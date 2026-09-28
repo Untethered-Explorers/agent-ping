@@ -132,6 +132,15 @@ export const PLUGIN_DIR_NAME = 'plugins'
  */
 export const XDG_CONFIG_HOME_ENV_VAR = 'XDG_CONFIG_HOME'
 
+/**
+ * The path flavour for an XDG directory, which is POSIX on every platform.
+ *
+ * `xdg-basedir` - what opencode itself resolves with - uses forward slashes on Windows
+ * too, so an XDG path is not a platform path and must not be joined with the ambient
+ * `path`. See the note on `resolveOpencodeConfigDir`, which is where that matters.
+ */
+const POSIX = path.posix
+
 /** The single plugin file. One file, one export, every session (OA-FR-01). */
 export const PLUGIN_FILE_NAME = 'agent-ping.ts'
 
@@ -191,13 +200,20 @@ export function resolveOpencodeConfigDir(options: OpencodePathOptions = {}): str
   const env = options.env ?? process.env
   const home = options.home ?? homedir()
   const xdg = env[XDG_CONFIG_HOME_ENV_VAR]
-  const base = xdg !== undefined && xdg.trim() !== '' ? xdg.trim() : path.join(home, '.config')
-  return path.join(base, OPENCODE_DIR_NAME)
+  // `path.posix`, not the ambient `path`, and not because this product prefers POSIX.
+  // opencode resolves its base directories with `xdg-basedir`, which is POSIX on every
+  // platform including Windows - that is why there is no `%APPDATA%` branch above, and
+  // it is the same reason the separators here must be POSIX. The ambient flavour is
+  // `path.win32` on a Windows host, so the directory this returned was
+  // `\Users\dev\.config\opencode` there: a real path on that machine, and not the one
+  // opencode reads, which is how an installed plugin silently does nothing.
+  const base = xdg !== undefined && xdg.trim() !== '' ? xdg.trim() : POSIX.join(home, '.config')
+  return POSIX.join(base, OPENCODE_DIR_NAME)
 }
 
 /** The global plugin directory: `<config>/plugins`. */
 export function resolveGlobalPluginDir(options: OpencodePathOptions = {}): string {
-  return path.join(resolveOpencodeConfigDir(options), PLUGIN_DIR_NAME)
+  return POSIX.join(resolveOpencodeConfigDir(options), PLUGIN_DIR_NAME)
 }
 
 // ---------------------------------------------------------------------------

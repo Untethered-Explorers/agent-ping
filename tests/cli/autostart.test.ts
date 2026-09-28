@@ -158,6 +158,22 @@ const PLATFORMS: readonly Platform[] = ['linux', 'darwin', 'win32']
 const HAS_POSIX_MODES = process.platform !== 'win32'
 
 /**
+ * The joiner for a *platform's* path, used by the assertions below.
+ *
+ * This suite drives all three platforms from whichever one it runs on, so an assertion
+ * about a systemd unit or a launchd agent has to build that platform's path in that
+ * platform's separators - the ambient `path` is `path.win32` on a Windows host, so
+ * `path.join('/home/tester', '.config', 'systemd', 'user')` asserts
+ * `\home\tester\.config\systemd\user` there and the product's correct POSIX answer
+ * fails it. The mirror image of the product bug these assertions were written to catch,
+ * and the Windows CI cell caught both in the same run.
+ *
+ * `buildMachine` already selects per platform for the *harness*; this is the same
+ * selection for the *expectations*.
+ */
+const POSIX = path.posix
+
+/**
  * Tokens that would mean a unit asks for privilege this product never asks for.
  *
  * Checked against the *content* of each unit, not against this file, so a comment
@@ -671,15 +687,15 @@ describe("every generated unit names this install's packaged binary and asks for
     // directory would be a different product with a different lifecycle.
     await withMachine('linux', async (m) => {
       const unit = unitFor(m)
-      expect(unit.unitPath).toContain(path.join('systemd', 'user'))
+      expect(unit.unitPath).toContain(POSIX.join('systemd', 'user'))
       expect(unit.links.map((link) => link.path)).toEqual([
-        path.join(m.unitDirectory, `${LINUX_WANTS_TARGET}.wants`, LINUX_UNIT_NAME),
+        POSIX.join(m.unitDirectory, `${LINUX_WANTS_TARGET}.wants`, LINUX_UNIT_NAME),
       ])
 
       await m.control.enable()
       // The login link is what makes the unit enabled, and it is written relative
       // the way `systemctl enable` writes it, so a restored home directory works.
-      expect(readlinkSync(unit.links[0]?.path ?? '')).toBe(`..${path.sep}${LINUX_UNIT_NAME}`)
+      expect(readlinkSync(unit.links[0]?.path ?? '')).toBe(`..${POSIX.sep}${LINUX_UNIT_NAME}`)
       // And it is a symlink, not a second copy of the unit: two files with the
       // same content is exactly the duplicate IO-FR-06 forbids.
       expect(isSymlink(unit.links[0]?.path ?? ''), 'the login link is a symlink, not a second copy').toBe(true)
@@ -690,7 +706,7 @@ describe("every generated unit names this install's packaged binary and asks for
     await withMachine('darwin', async (m) => {
       const unit = unitFor(m)
       expect(unit.unitPath).toBe(
-        path.join(resolveLaunchAgentsDirectory(m.home), `${MACOS_AGENT_LABEL}.plist`),
+        POSIX.join(resolveLaunchAgentsDirectory(m.home), `${MACOS_AGENT_LABEL}.plist`),
       )
       expect(unit.links, 'launchd loads the directory, so there is no second artefact').toEqual([])
       // A plist that could not parse is a job launchd silently never loads, so the
@@ -813,26 +829,26 @@ describe('a pre-existing unrelated unit in the same location is left untouched',
 describe('the unit location is the platform convention, and everything written is owner-only', () => {
   it("linux follows systemd's documented user search path, XDG_CONFIG_HOME included", () => {
     const home = '/home/tester'
-    expect(resolveLinuxUnitDirectory({}, home)).toBe(path.join(home, '.config', 'systemd', 'user'))
+    expect(resolveLinuxUnitDirectory({}, home)).toBe(POSIX.join(home, '.config', 'systemd', 'user'))
 
     // A machine with a non-default XDG_CONFIG_HOME gets its unit where systemd
     // looks, which is the whole reason the path is resolved rather than written.
     expect(resolveLinuxUnitDirectory({ XDG_CONFIG_HOME: '/var/tmp/somewhere-else' }, home)).toBe(
-      path.join('/var/tmp/somewhere-else', 'systemd', 'user'),
+      POSIX.join('/var/tmp/somewhere-else', 'systemd', 'user'),
     )
 
     // And a shell-quoted `~/...` is expanded against this home, not left literal.
     expect(resolveLinuxUnitDirectory({ XDG_CONFIG_HOME: '~/cfg' }, home)).toBe(
-      path.join('/home/tester', 'cfg', 'systemd', 'user'),
+      POSIX.join('/home/tester', 'cfg', 'systemd', 'user'),
     )
   })
 
   it('macOS has no environment override and always uses ~/Library/LaunchAgents', () => {
     expect(resolveLaunchAgentsDirectory('/Users/tester')).toBe(
-      path.join('/Users/tester', 'Library', 'LaunchAgents'),
+      POSIX.join('/Users/tester', 'Library', 'LaunchAgents'),
     )
     expect(resolveMacosUnitPath('/Users/tester')).toBe(
-      path.join('/Users/tester', 'Library', 'LaunchAgents', `${MACOS_AGENT_LABEL}.plist`),
+      POSIX.join('/Users/tester', 'Library', 'LaunchAgents', `${MACOS_AGENT_LABEL}.plist`),
     )
   })
 
@@ -1090,7 +1106,7 @@ describe("the resolver `install` and `doctor` load now finds the real units", ()
     const stateDir = path.join(root, 'state')
 
     const control = await resolveAutostartControl({
-      env: { XDG_CONFIG_HOME: path.join(home, '.config') },
+      env: { XDG_CONFIG_HOME: POSIX.join(home, '.config') },
       platform: 'linux',
       home,
       stateDir,
@@ -1102,7 +1118,7 @@ describe("the resolver `install` and `doctor` load now finds the real units", ()
     expect(AUTOSTART_MODULE_SPECIFIER).toBe('./autostart/index.js')
     const state = await control.state()
     expect(state.availability).toBe('disabled')
-    expect(state.unitPath).toBe(path.join(home, '.config', 'systemd', 'user', LINUX_UNIT_NAME))
+    expect(state.unitPath).toBe(POSIX.join(home, '.config', 'systemd', 'user', LINUX_UNIT_NAME))
   })
 })
 
@@ -1110,7 +1126,7 @@ describe('install and uninstall, through the command entry point, with the real 
   it('writes the unit, reports no changes the second time, passes the doctor check and removes the unit', async () => {
     const cli = await cliHarness()
     harnesses.push(cli)
-    const unitPath = path.join(cli.home, '.config', 'systemd', 'user', LINUX_UNIT_NAME)
+    const unitPath = POSIX.join(cli.home, '.config', 'systemd', 'user', LINUX_UNIT_NAME)
     // No `autostart` override, so the dispatcher resolves the real control itself -
     // which is the seam, exercised rather than assumed.
     const realAutostart = { autostart: undefined }
