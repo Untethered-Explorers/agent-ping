@@ -372,3 +372,5 @@
 {"timestamp":"2026-09-28T02:48:21.593Z","action":"task.complete","runId":"7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8","taskId":"IO-4","phaseId":"INSTALL-AUTOSTART-AND-OPERATIONS-3","outputFiles":["scripts/verify-autostart-linux.mjs","tests/scripts/verify-autostart-linux.test.ts","README.md","docs/runbooks/io-5-operations-review.md","docs/reviews/autostart-linux-evidence.json"],"durationMs":2166675}
 {"timestamp":"2026-09-28T02:48:21.650Z","action":"task.committed","runId":"7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8","taskId":"IO-4","commitSha":"4a08086dae69467094e8c522d97db8cb1de55827"}
 {"timestamp":"2026-09-28T02:48:21.656Z","action":"task.complete","runId":"7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8","taskId":"IO-5","note":"Human attestation: docs/reviews/operations.json"}
+{"timestamp":"2026-09-28T02:48:21.709Z","action":"task.committed","runId":"7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8","taskId":"IO-5","commitSha":"9273fd66a3382234561a347e073d3896709a9a4e"}
+{"timestamp":"2026-09-28T02:48:21.709Z","action":"run.complete","runId":"7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8"}

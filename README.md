@@ -88,6 +88,34 @@ rather than glossed:
 4. **Half the end-to-end evidence was not retained.** `OA-5` declared only its script and
    test as outputs, so the machine summary of the real-harness run was never committed.
 
+## What this project still owes
+
+**The build is finished and the reviews are not.** All 46 tasks in
+[`docs/EXECUTION-MANIFEST.json`](docs/EXECUTION-MANIFEST.json) are complete, none failed,
+and `docs/PROGRESS.md` reports `Status: Complete`. Three human-review gates were closed by
+attestation rather than by review, so the one thing a status file cannot show you is the
+work that is still outstanding. This table is that.
+
+| Owed | Why it is not done | What closes it |
+| --- | --- | --- |
+| **Nobody has watched the product work end to end** | `OA-6` was closed with a deferral. The subject existed and two instruments measured most of it; three claims did not survive being measured | `docs/runbooks/oa-6-opencode-adapter-review.md` — one permission decision, one card, a look at the tray. **About five minutes** |
+| **No keyboard or screen-reader user has used the dashboard** | `LD-5` was closed *before* `LD-2`–`LD-4` built it. Acknowledge, deep-link focus, handoff and history are all `LD-3`; the focusable mirror is `LD-2` | `docs/runbooks/ld-5-dashboard-review.md`, after `LD-4` completes |
+| **Nobody has installed this, or broken it on purpose** | `IO-5` was closed *before* `IO-1`–`IO-4` built it. `src/cli` did not exist when the gate closed | `docs/runbooks/io-5-operations-review.md`, after `IO-4` completes |
+| **No login has ever started the hub** | `IO-4` drives a real `systemd --user` manager, which is not a log out and back in. True on all three platforms | The same operations review; `systemctl --user start` is not the observation |
+| **macOS and Windows have never run** | Every observation in this repository comes from one Linux desktop. The surface is one code path and only the window manager differs — a statement about the code, not an observation | The same scripts and reviews, run on those machines |
+| **No human judge has seen the approved dashboard design meet real data** | `DP-4` approved it as a design artefact, against a static prototype with three mock rows. "Does the density hold with eight live sessions" is not a property of the prototype | `docs/runbooks/ld-5-dashboard-review.md` §5 |
+
+The full register, with per-gate detail and an issue log for anything found before the
+above happen, is [`docs/reviews/deferred-gates.md`](docs/reviews/deferred-gates.md).
+
+**Five of these are gaps in what is known. One is a defect.** A missing macOS run is a
+platform this project has not been taken to yet. The other four are missing observations —
+about a real login, about a real human, about a real install — and the runbooks above were
+written so each can be closed in an afternoon rather than reconstructed later. The sixth row
+is different in kind: a gate that reads `complete` in a status file while its review was
+never performed is a defect in this repository's own accounting, and
+[`docs/reviews/deferred-gates.md`](docs/reviews/deferred-gates.md) is the fix.
+
 ## How it works
 
 ```text
