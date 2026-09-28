@@ -437,6 +437,29 @@ describe('status says plainly that the hub is not running', () => {
 // IO-FR-07: the state directory is the overridable one, and owner-only
 // ---------------------------------------------------------------------------
 
+/**
+ * Variables that name a *state* directory, banned in every module under `src/cli/`.
+ *
+ * Split out from the layout tokens below because these two are the second resolution
+ * point whatever directory a module is in: a CLI module that read `XDG_STATE_HOME` or
+ * `LOCALAPPDATA` would be resolving a state path without the one resolver, and the
+ * override the rest of the product honours would silently not apply to it.
+ */
+const STATE_DIRECTORY_TOKENS: readonly string[] = ['XDG_STATE_HOME', 'LOCALAPPDATA']
+
+/**
+ * Tokens that appear in a platform's *product state* layout, banned under
+ * `src/cli/` except in the per-platform autostart modules.
+ *
+ * `Library` and `AppData` are where macOS and Windows put a roaming profile, which
+ * is where a second implementation of the state directory would put it. The autostart
+ * modules are exempt because there they are the platform's per-user *unit*
+ * convention instead - `~/Library/LaunchAgents` and `%APPDATA%\...\Startup` - which
+ * is where the login unit has to be for that platform to read it, and which is a
+ * different path from this product's state by design (IO-3).
+ */
+const PRODUCT_STATE_LAYOUT_TOKENS: readonly string[] = ['Library', 'AppData']
+
 describe('every path the product writes resolves through the overridable state directory', () => {
   it('creates it at 0700 from AGENT_PING_STATE_DIR, and writes nothing outside it', async () => {
     const cli = await harness()
@@ -467,15 +490,42 @@ describe('every path the product writes resolves through the overridable state d
     expect(files.length).toBeGreaterThan(3)
     for (const file of files) {
       // The import specifier is a string, so the reader that keeps strings is the one
-      // that can see where a module imported the resolver from.
+      // that can see where a module imported the resolver from. The specifier is
+      // computed from the file's own depth rather than spelled for one directory:
+      // `src/cli/log.ts` reaches it as `../storage/paths.js` and the per-platform
+      // autostart modules under `src/cli/autostart/` as `../../storage/paths.js`. The
+      // property is that every one of them lands on the *same* module, so a
+      // second resolution point cannot appear one directory deeper without this
+      // failing - which a hard-coded `../` string would not have caught.
+      const depth = file.slice('src/'.length).split('/').length - 1
+      const oneResolver = `from '${'../'.repeat(depth)}storage/paths.js'`
       const source = readModuleImports(file)
       if (source.includes('resolveStateDir')) {
-        expect(source.includes("from '../storage/paths.js'"), `${file} must import the one resolver`).toBe(true)
+        expect(source.includes(oneResolver), `${file} must import the one resolver`).toBe(true)
       }
       // No platform state variable and no hard-coded layout: both are the second
-      // resolution point wearing a different name.
-      for (const forbidden of ['XDG_STATE_HOME', 'LOCALAPPDATA', 'Library', 'AppData']) {
+      // resolution point wearing a different name. Banned in every CLI module,
+      // because these two name a *state* directory and this is the test that says
+      // there is exactly one of those.
+      for (const forbidden of STATE_DIRECTORY_TOKENS) {
         expect(source.includes(forbidden), `${file} must not name ${forbidden} itself`).toBe(false)
+      }
+      // The same two tokens as a *product state* layout, which is a different claim
+      // from the one above. The per-platform autostart modules are the one place
+      // under `src/cli/` where `Library` and `AppData` are not a second state
+      // resolution point: they are the platform's own per-user unit convention -
+      // `~/Library/LaunchAgents` and `%APPDATA%\...\Startup` - and IO-3 requires the
+      // unit to be written where that platform will read it rather than beside this
+      // product's state. The autostart unit is deliberately NOT in the state
+      // directory, so banning the token there would ban the requirement; the
+      // `AGENT_PING_STATE_DIR` override that *does* belong to the product still has
+      // to come from the one resolver, which is the assertion above. Everything else
+      // under `src/cli/` is still banned outright, and the state tokens above are
+      // banned in these modules too.
+      if (!file.startsWith('src/cli/autostart/')) {
+        for (const forbidden of PRODUCT_STATE_LAYOUT_TOKENS) {
+          expect(source.includes(forbidden), `${file} must not name ${forbidden} itself`).toBe(false)
+        }
       }
       // The database and the log are named in exactly one place each - the module that
       // owns the name - and every other CLI module imports them. `log.ts` is the
@@ -485,6 +535,20 @@ describe('every path the product writes resolves through the overridable state d
           expect(source.includes(forbidden), `${file} must import ${forbidden} rather than name it`).toBe(false)
         }
       }
+    }
+  })
+
+  it('the autostart units take the state directory the command resolved, and resolve none of their own', () => {
+    // The other half of the exemption above, stated as its own assertion so that the
+    // exemption cannot be widened silently. The autostart modules read
+    // `AGENT_PING_STATE_DIR` to decide whether the unit has to carry it, and they take
+    // the state directory the command already resolved rather than deriving it again:
+    // a unit that re-resolved it could disagree with the command that wrote it, and
+    // the symptom would be a hub whose runtime file the installed plugin never finds.
+    const autostartModules = sourceFilesUnderSrc().filter((file) => file.startsWith('src/cli/autostart/'))
+    expect(autostartModules.length).toBeGreaterThan(3)
+    for (const file of autostartModules) {
+      expect(readModuleImports(file).includes('resolveStateDir'), `${file} must not resolve the state dir itself`).toBe(false)
     }
   })
 })

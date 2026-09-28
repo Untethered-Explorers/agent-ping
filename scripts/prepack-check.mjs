@@ -65,6 +65,20 @@ export const BIN_NAME = 'agent-ping'
 /** Where that command's implementation is emitted to. `src/cli/index.ts` under tsc. */
 export const BIN_TARGET = 'dist/main/cli/index.js'
 
+/**
+ * The per-platform autostart units, as a directory of emitted modules.
+ *
+ * `install` and `doctor` load this through a `string`-typed dynamic import rather
+ * than a static one - the module's presence is a runtime fact, and a build without
+ * it is a build whose install reports that it cannot enable a login unit
+ * (src/cli/autostart-control.ts, IO-FR-06). A dynamic import is exactly the kind of
+ * edge no type checker follows and no `files` review reads, so the guard names the
+ * entry here and the allowlist check proves it would be published: a package that
+ * ships without its units installs, starts a hub and then fails its own autostart
+ * check, which is the failure mode this guard exists to stop (IO-1, IO-3).
+ */
+export const AUTOSTART_ENTRY = 'dist/main/cli/autostart/index.js'
+
 /** The Electron main entry the installed Electron loads. `src/main/index.ts` under tsc. */
 export const MAIN_ENTRY = 'dist/main/main/index.js'
 
@@ -729,6 +743,7 @@ export function requiredShippedPaths(root) {
   return [
     MAIN_ENTRY,
     BIN_TARGET,
+    AUTOSTART_ENTRY,
     DURABLE_SCHEMA,
     ...REQUIRED_DASHBOARD_DOCUMENTS.map((document) => `${DASHBOARD_ROOT}/${document}`),
     PLUGIN_GENERATOR,

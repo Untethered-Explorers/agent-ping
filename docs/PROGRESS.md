@@ -1,10 +1,10 @@
 # Project Progress
 
 ## Current State
-**Phase**: LIVE-DASHBOARD-3
+**Phase**: INSTALL-AUTOSTART-AND-OPERATIONS-2
 **Status**: In Progress
-**Validation Gaps**: 143 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-28T01:09:01.228Z
+**Validation Gaps**: 149 unverified check(s) - see "Validation Gaps"
+**Last Updated**: 2026-09-28T02:12:07.631Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -88,6 +88,8 @@
   - Files: package.json, scripts/prepack-check.mjs, tests/packaging/package.test.ts, README.md, docs/runbooks/io-5-operations-review.md, scripts/build.mjs, tests/dashboard/card-document.test.ts
 - [x] Phase INSTALL-AUTOSTART-AND-OPERATIONS-1, Task IO-2: Implement the install, uninstall, status and doctor commands (@packaging-engineer)
   - Files: src/cli/index.ts, src/cli/install.ts, src/cli/doctor.ts, src/cli/status.ts, tests/cli/install.test.ts, tests/cli/doctor.test.ts, README.md, docs/runbooks/io-5-operations-review.md, scripts/prepack-check.mjs, src/hub/routes/read.ts, src/main/index.ts, src/plugin/install/global-plugin.ts, tests/hub/delivery.test.ts, tests/hub/lifecycle.test.ts, tests/hub/security.test.ts, tests/hub/server.test.ts, tests/packaging/package.test.ts, src/cli/autostart-control.ts, src/cli/hub-client.ts, src/cli/log.ts, src/cli/output.ts, tests/cli/fixtures/command-line.ts
+- [x] Phase INSTALL-AUTOSTART-AND-OPERATIONS-2, Task IO-3: Install and remove per-platform autostart units (@packaging-engineer)
+  - Files: src/cli/autostart/index.ts, src/cli/autostart/linux.ts, src/cli/autostart/macos.ts, src/cli/autostart/windows.ts, tests/cli/autostart.test.ts, README.md, docs/runbooks/io-5-operations-review.md, scripts/prepack-check.mjs, tests/cli/install.test.ts
 - [x] Phase COPILOT-CLI-ACP-SPIKE-1, Task CP-1: Probe the real Copilot ACP surface (@connector-engineer)
   - Files: scripts/probe-copilot-acp.mjs, tests/scripts/probe-copilot-acp.test.ts, docs/research/copilot-acp-capture.json, tests/scripts/fixtures/copilot-acp-capture.json
 - [x] Phase COPILOT-CLI-ACP-SPIKE-1, Task CP-2: Probe the Copilot hook surface and write the report (@connector-engineer)
@@ -101,7 +103,6 @@
 - None currently running
 
 ## Remaining
-- [ ] Phase INSTALL-AUTOSTART-AND-OPERATIONS-2: Phase 2: Autostart
 - [ ] Phase INSTALL-AUTOSTART-AND-OPERATIONS-3: Phase 3: Live operations verification and gate
 
 ## Blockers
@@ -249,6 +250,12 @@
 - Task IO-2: The live hub was started and stopped by hand and its pid killed afterwards; no process, autostart unit or service manager was left behind. Restart survival, login autostart and pending-state durability are IO-4's script, not mine.
 - Task IO-2: The macOS and Windows autostart implementations do not exist yet (IO-3), so nothing about them is claimed. The `portHolderCommand` table has a per-platform branch for all three, exercised only on linux.
 - Task IO-2: The whole-suite run is not fully hermetic: it builds a scratch tree in tests/packaging/package.test.ts and starts real loopback hubs in several suites, so a run on a machine with 43117 already held behaves as my live run did - on a fallback port - rather than the preferred one.
+- Task IO-3: Linux only, on this one machine. No macOS and no Windows observation of any kind is claimed and none was possible: the macOS and Windows units are proven as bytes, paths and filesystem lifecycle only, assembled with each platform's own path rules. APX-CON-06 keeps their human review gate on those platforms.
+- Task IO-3: No live service manager was touched, as the task requires. A real systemd user manager has not loaded these units; that is IO-4's script on Linux and a human gate elsewhere. The verification state is stated in the same words in the three unit files' comments, the runbook and README.
+- Task IO-3: No global install and no publish. The live journey used an isolated temporary HOME, XDG_CONFIG_HOME and AGENT_PING_STATE_DIR, so nothing on the developer's real opencode configuration was touched. The claim 'a built checkout gives a working install' is a build-and-run observation from this tree.
+- Task IO-3: The residue observation covers the Linux two-directory case. macOS and Windows hold the unit in the convention directory itself, so each declares one owned directory; that their prune behaves the same is argued from the shared engine and rmdir, not observed on those platforms.
+- Task IO-3: The Windows unit path is drive-rooted, so on a POSIX machine the kernel resolves it against the working directory and each test case runs inside a temporary cwd. That makes 'for each platform implementation' an observation on the shared lifecycle, not a claim about a Windows filesystem.
+- Task IO-3: Whole-suite runs are not hermetic: tests/packaging/package.test.ts builds a scratch tree and several suites start real loopback hubs, and stale ld1probe hubs from an earlier task on this machine hold 127.0.0.1:43117, so a hub may bind a fallback port as it did in my live run.
 - Task CP-1: The permission finding is from one run on one machine against one Copilot version. It is evidence, not a proof across versions, and the gate decision should cite the version alongside the claim.
 - Task CP-1: The hook surface is untouched: CP-2 owns the documented Copilot hook triggers and the consolidated report.
 - Task CP-1: The stub-binary deadline test executes a shebang script directly, so it assumes a POSIX-style platform, consistent with the existing tests/tooling/runner-convention.test.ts, which already spawns npm by bare name.

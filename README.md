@@ -28,9 +28,9 @@ agents said, and it never drives them.
 
 ## Status
 
-**Under active build.** The hub, the log, the notification path, the opencode adapter
-and the command line are implemented. The autostart units and the live dashboard are
-not. 36 of 46 build tasks are complete and no task has failed.
+**Under active build.** The hub, the log, the notification path, the opencode adapter,
+the command line and the per-platform autostart units are implemented. The live
+dashboard is not. 44 of 46 build tasks are complete and no task has failed.
 
 The notification card has been **live-verified on Linux/X11 against the product's own
 shipped build** with no test-supplied seam: a real window inside the work area, painted
@@ -49,7 +49,7 @@ and the claims are tabulated in
 | opencode adapter: event translation, transport with visible failure, global plugin install | Built, tested, and **driven against the real `opencode` binary** by OA-5 |
 | PixiJS 8 dashboard prototype, DOM mirror, keyboard model | Built, reviewed (`DP-4`) |
 | Live dashboard wired to the hub (LD-1 → LD-4) | `LD-1` done — renders live state, grouped, with staleness. `LD-2`–`LD-4` (mirror, interactions, browser journey) not started |
-| CLI, npm package, autostart, `doctor` (IO-1 → IO-4) | The package, its `files` allowlist and its prepack guard are done (`IO-1`). `install`, `uninstall`, `status` and `doctor` are built and tested through the command entry point (`IO-2`), including the failure exits. The per-platform autostart units are `IO-3` and are not here yet, so `install` reports that it cannot enable a unit rather than pretending to |
+| CLI, npm package, autostart, `doctor` (IO-1 → IO-4) | The package, its `files` allowlist and its prepack guard are done (`IO-1`). `install`, `uninstall`, `status` and `doctor` are built and tested through the command entry point (`IO-2`), including the failure exits. The per-platform autostart units are done (`IO-3`) — a systemd user unit, a launchd user agent and a per-user Startup-folder entry, each idempotent, reversible, owner-only and root-free, **unit-tested against a temporary home and *not* live-verified**; `IO-4`'s live service-manager script is what closes that |
 | Polling fallback, live run against a real session (OA-4 → OA-6) | `OA-4` and `OA-5` done — real binary, real permission decision, real hub, breadcrumb when the hub is absent. **`OA-6` deferred**: the human journey was not performed |
 | GitHub Copilot CLI ACP spike (CP-1 → CP-2) | Done. `CP-3` **deferred** the adapter, and `CP-4` turned that into a runbook and a test. v1 ships opencode only |
 
@@ -58,10 +58,12 @@ and the claims are tabulated in
 > the `agent-ping` binary, a `files` allowlist and a `prepack` guard
 > ([`scripts/prepack-check.mjs`](scripts/prepack-check.mjs)) that refuses to pack a
 > build missing any required artefact — and the build now passes it, so
-> `npm install -g .` from a built checkout gives you a working command. What it does
-> *not* give you yet is autostart: the per-platform units are `IO-3`, so
-> `agent-ping install` writes the plugin, starts the hub, and then reports plainly that
-> it cannot enable a login unit in a build that has none.
+> `npm install -g .` from a built checkout gives you a working command. It now also
+> gives you a login unit: `agent-ping install` writes the plugin, enables autostart
+> and starts the hub. What is **not** yet observed against real software is a login
+> that starts it — the units are implemented and unit-tested against a temporary
+> home, and `IO-4`'s script against a real service manager is the evidence that is
+> still owed.
 > [docs/PROGRESS.md](docs/PROGRESS.md) is the running build log, including every check
 > that is *not* yet verified against real software.
 
@@ -199,6 +201,44 @@ flag that does not exist.
 Point `AGENT_PING_STATE_DIR` at a temporary directory and every path the product writes
 resolves there instead, which is how the test suite and the live verification scripts run
 without touching your own state.
+
+### Autostart
+
+`agent-ping install` enables a **user-level** login unit: one that belongs to your
+account, needs no `sudo`, and is removed completely by `agent-ping uninstall`. Each
+platform gets the unit its own convention expects.
+
+| Platform | What `install` writes | How it is enabled |
+| --- | --- | --- |
+| Linux | `$XDG_CONFIG_HOME/systemd/user/agent-ping.service` (or `~/.config/...`) | a `default.target.wants/agent-ping.service` symlink beside it — exactly what `systemctl --user enable` writes, so `systemctl --user is-enabled agent-ping` agrees afterwards |
+| macOS | `~/Library/LaunchAgents/local.agent-ping.hub.plist` | writing the agent is the enablement; launchd loads that directory at login |
+| Windows | `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\agent-ping.cmd` | Explorer's per-user Startup folder runs it at logon; no registry key, no scheduled task, nothing that needs elevation |
+
+Every unit names **this install's own** Electron runtime and package root as absolute
+paths, so a login cannot start a different build off your `PATH`, and carries
+`--no-sandbox` plus `ELECTRON_DISABLE_SANDBOX=1` — the packaged application aborts at
+startup without them. If you set `AGENT_PING_STATE_DIR`, the unit carries it too, so a
+login-started hub writes its runtime file where your commands look for it. Each unit
+file is `0600` and each directory agent-ping creates is `0700`.
+
+Enabling twice writes nothing the second time; disabling twice removes nothing and
+reports no change. If something that agent-ping did not write already occupies the unit
+path, `install` refuses with a remedy instead of replacing it, and `uninstall` leaves it
+alone. A unit from an older agent-ping is recognised as ours and rewritten.
+
+To bring it up in the *current* session on Linux rather than waiting for the next login:
+
+```bash
+systemctl --user daemon-reload
+systemctl --user start agent-ping.service
+```
+
+**Verification state:** implemented and unit-tested against a temporary home on all
+three platforms (`tests/cli/autostart.test.ts`), and the enable/disable/uninstall
+journey was also driven through the built `agent-ping` command on Linux. **No live
+service manager has run these units, and no login has been observed** — that is
+`IO-4`'s live script on Linux, and a human gate is the only possible evidence on macOS
+and Windows.
 
 ### The dashboard prototype
 

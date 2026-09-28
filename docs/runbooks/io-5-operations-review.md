@@ -26,7 +26,7 @@ Already covered, so you do not rebuild it:
 | --- | --- |
 | `IO-1`, complete | The package publishes, the files allowlist is right, and a prepack check fails when a build artefact is missing |
 | `IO-2`, complete | The four subcommands, driven through the command entry point, unit-tested including the failure exits |
-| `IO-3` (pending) | Autostart units per platform, idempotent and reversible, against a temporary home |
+| `IO-3`, complete | Autostart units per platform, idempotent and reversible, against a temporary home |
 | `IO-4` (pending) | `scripts/verify-autostart-linux.mjs` — login, restart and pending survival on Linux |
 | `OA-5`, complete | The real `opencode` binary reaching a real permission decision against a real hub |
 | `NS-4`, complete | The notification surface, and the manual commands in `docs/runbooks/notification-surface.md` §2 |
@@ -176,7 +176,7 @@ was not observable rather than reporting a pass for it.*
 
 ## 7. What this runbook cannot tell you yet
 
-`IO-1` and `IO-2` exist; `IO-3` and `IO-4` do not. Confirm from `agent-ping --help`
+`IO-1`, `IO-2` and `IO-3` exist; `IO-4` does not. Confirm from `agent-ping --help`
 before relying on any line above, and update this section rather than trusting it.
 
 **Already answered by `IO-2`, and re-checkable from `--help`:**
@@ -192,12 +192,20 @@ before relying on any line above, and update this section rather than trusting i
   the bounded local log go; the database stays; the runtime file and the write token are
   kept while a hub is running, and the output says so.
 
-**Still unknown, because `IO-3` has not run:**
+**Answered by `IO-3`, and checkable yourself on the machine you are reviewing:**
 
 - **The autostart unit names** per platform, and where the platform state directory resolves
-  to on yours. Until then `install` reports that it cannot enable a unit, and `doctor`
-  fails the `autostart` check naming `src/cli/autostart/index.js` as what is missing —
-  which means breakage-free install cannot be reviewed yet.
+  to on yours:
+  `$XDG_CONFIG_HOME/systemd/user/agent-ping.service` (or `~/.config/...`) on Linux,
+  `~/Library/LaunchAgents/local.agent-ping.hub.plist` on macOS, and
+  `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\agent-ping.cmd` on Windows.
+  On Linux the unit is only *enabled* when the `default.target.wants` symlink beside it
+  is present, which is what `doctor`'s `autostart` check reads.
+- **Whether a real login actually starts the hub.** The units are implemented and
+  unit-tested against a temporary home, but no live service manager has run them here:
+  `IO-4`'s script is the evidence for Linux and a human gate is the only possible
+  evidence for macOS and Windows. Do not record a login as working on the strength of
+  the unit file alone.
 - **What `IO-4`'s script already covers on Linux**, so you do not repeat it — and so you
   know which of your observations are the only evidence for macOS or Windows.
 
