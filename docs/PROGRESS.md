@@ -4,7 +4,7 @@
 **Phase**: INSTALL-AUTOSTART-AND-OPERATIONS-3
 **Status**: In Progress
 **Validation Gaps**: 153 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-28T02:48:21.599Z
+**Last Updated**: 2026-09-28T02:48:21.663Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -92,6 +92,8 @@
   - Files: src/cli/autostart/index.ts, src/cli/autostart/linux.ts, src/cli/autostart/macos.ts, src/cli/autostart/windows.ts, tests/cli/autostart.test.ts, README.md, docs/runbooks/io-5-operations-review.md, scripts/prepack-check.mjs, tests/cli/install.test.ts
 - [x] Phase INSTALL-AUTOSTART-AND-OPERATIONS-3, Task IO-4: Write the live autostart and restart verification script (@qa-engineer)
   - Files: scripts/verify-autostart-linux.mjs, tests/scripts/verify-autostart-linux.test.ts, README.md, docs/runbooks/io-5-operations-review.md, docs/reviews/autostart-linux-evidence.json
+- [x] Phase INSTALL-AUTOSTART-AND-OPERATIONS-3, Task IO-5: Review the install and diagnostic experience
+  - Files: docs/reviews/operations.json
 - [x] Phase COPILOT-CLI-ACP-SPIKE-1, Task CP-1: Probe the real Copilot ACP surface (@connector-engineer)
   - Files: scripts/probe-copilot-acp.mjs, tests/scripts/probe-copilot-acp.test.ts, docs/research/copilot-acp-capture.json, tests/scripts/fixtures/copilot-acp-capture.json
 - [x] Phase COPILOT-CLI-ACP-SPIKE-1, Task CP-2: Probe the Copilot hook surface and write the report (@connector-engineer)
@@ -105,7 +107,7 @@
 - None currently running
 
 ## Remaining
-- [ ] Phase INSTALL-AUTOSTART-AND-OPERATIONS-3: Phase 3: Live operations verification and gate
+- [x] No remaining phases
 
 ## Blockers
 - Manifest reconciliation added 4 pending task(s): NT-6, NT-7, NT-8, NT-9
