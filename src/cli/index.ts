@@ -46,7 +46,12 @@ import { runDoctor } from './doctor.js'
 import { runStatus } from './status.js'
 import { createLocalLog, type LocalLog } from './log.js'
 import { EXIT_FAILED, EXIT_OK, EXIT_USAGE, kv, printed, type CommandResult } from './output.js'
-import { readProductVersion, type HubLauncher, type HubReadOptions } from './hub-client.js'
+import {
+  readProductVersion,
+  type HubLauncher,
+  type HubReadOptions,
+  type PortAvailability,
+} from './hub-client.js'
 import { resolveStateDir } from '../storage/paths.js'
 
 /** The commands this product has, in the order `--help` lists them. */
@@ -177,6 +182,16 @@ export interface CliDependencies {
    * is optional for that reason.
    */
   readonly hub?: HubReadOptions
+  /**
+   * Injected so a test can drive doctor's port note either way.
+   *
+   * The default is a real bind attempt on the product's preferred port, which makes the
+   * note a fact about the machine rather than about this code. That is right for an
+   * operator and untestable for a suite, so the seam is here for the same reason `hub`
+   * is: an assertion about which wording appears must not depend on whether a leftover
+   * process happens to be holding 43117 on the machine running the tests.
+   */
+  readonly portAvailability?: () => Promise<PortAvailability>
   /** Injected so a test's expected timestamps do not depend on the wall clock. */
   readonly now?: () => Date
 }
@@ -298,6 +313,9 @@ export async function runCli(argv: readonly string[], dependencies: CliDependenc
           log,
           ...(dependencies.hub === undefined ? {} : { hub: dependencies.hub }),
           ...(dependencies.runtimeVersion === undefined ? {} : { runtimeVersion: dependencies.runtimeVersion }),
+          ...(dependencies.portAvailability === undefined
+            ? {}
+            : { portAvailability: dependencies.portAvailability }),
         })
         break
       default:

@@ -638,10 +638,20 @@ export function parseManagerEnvironment(text) {
   return variables
 }
 
-/** The XDG configuration root both the manager and the product resolve, the same way. */
+/**
+ * The XDG configuration root both the manager and the product resolve, the same way.
+ *
+ * `path.posix`, not `path`. Everything below this point is an XDG path, and an XDG path
+ * is a POSIX path by definition: `~/.config`, `$XDG_STATE_HOME`, `$XDG_CONFIG_HOME` are
+ * Linux conventions with forward slashes whether or not the script happens to be running
+ * on Linux. Using the ambient `path` meant these three functions returned
+ * `\home\dev\.config` on a Windows host while returning `/home/dev/.config` on Linux, so
+ * the same function had two different answers and the Windows CI cell caught it. The
+ * ambient flavour is correct nowhere here, so these are deliberately the POSIX one.
+ */
 export function effectiveConfigRoot(xdgConfigHome, home) {
   const override = typeof xdgConfigHome === 'string' ? xdgConfigHome.trim() : ''
-  return override === '' ? path.join(home, '.config') : override
+  return override === '' ? path.posix.join(home, '.config') : override
 }
 
 /**
@@ -651,18 +661,21 @@ export function effectiveConfigRoot(xdgConfigHome, home) {
  * `path.join` return a *relative* path, so a missing `HOME` would resolve the state
  * directory against the current working directory and this script would then watch and
  * assert against a path that does not exist — a failure that reads as a missing product
- * rather than as a missing variable.
+ * rather than as a missing variable. `path.posix.join` for the reason given on
+ * `effectiveConfigRoot`.
  */
 export function resolveRealStateDir(env = process.env) {
   const xdgStateHome = typeof env['XDG_STATE_HOME'] === 'string' ? env['XDG_STATE_HOME'].trim() : ''
   const base =
-    xdgStateHome === '' ? path.join(env['HOME'] ?? homedir(), '.local', 'state') : xdgStateHome
-  return path.join(base, 'agent-ping')
+    xdgStateHome === ''
+      ? path.posix.join(env['HOME'] ?? homedir(), '.local', 'state')
+      : xdgStateHome
+  return path.posix.join(base, 'agent-ping')
 }
 
 /** The opencode global plugin directory, resolved the product's way. See resolveRealStateDir. */
 export function resolveRealPluginDir(env = process.env) {
-  return path.join(
+  return path.posix.join(
     effectiveConfigRoot(env[XDG_CONFIG_HOME_ENV_VAR], env['HOME'] ?? homedir()),
     OPENCODE_DIR_NAME,
     PLUGIN_DIR_NAME,

@@ -306,9 +306,14 @@ describe('every check fails on its own, exits non-zero, and prints a remedy that
     chmodSync(cli.stateDir, 0o700)
   })
 
-  it('port: a hub that is not answering is a failure naming the port and the remedy', async () => {
+  it('port: a hub that is not answering is a failure, naming the state directory and the remedy', async () => {
     const cli = await harness()
-    const code = await cli.run(['doctor'])
+    // The preferred port is free, stated rather than assumed. The previous version of
+    // this test asserted that the remedy names 127.0.0.1:43117, which the product only
+    // does when something else is holding that port - so the test passed on any machine
+    // with a leftover listener and failed on every clean one. The Windows and macOS CI
+    // cells are what found it. Both branches are now driven explicitly, below.
+    const code = await cli.run(['doctor'], { portAvailability: async () => 'free' })
     const text = cli.lastText()
 
     expect(code, text).not.toBe(0)
@@ -316,9 +321,37 @@ describe('every check fails on its own, exits non-zero, and prints a remedy that
     expect(row(text, 'port')).toContain('no hub runtime file at')
     const remedy = remedyFor(text, 'port')
     expect(remedy).toMatch(/start agent-ping|agent-ping install/)
-    // The remedy names the port the product prefers, which is the fact a developer
-    // needs when something else holds it (the runbook's breakage 2).
+    // Nothing claims a collision, because there is none. Asserted so the free branch
+    // cannot quietly acquire the wording the next test is about.
+    expect(text).not.toContain('is in use by another process')
+  })
+
+  it('port: when something else holds the preferred port, the remedy names it and how to find the holder', async () => {
+    // The fact a developer needs when their live port is not the documented one (the
+    // runbook's breakage 2), and it is only reachable by driving the collision branch.
+    const cli = await harness()
+    const code = await cli.run(['doctor'], { portAvailability: async () => 'in-use' })
+    const text = cli.lastText()
+
+    expect(code, text).not.toBe(0)
+    expect(verdictFor(text, 'port')).toBe('fail')
+    expect(row(text, 'port')).toContain('is in use by another process')
     expect(text).toContain('127.0.0.1:43117')
+    // And how to find it, which is a per-platform command rather than a guess.
+    const remedy = remedyFor(text, 'port')
+    expect(remedy).toContain('127.0.0.1:43117')
+    expect(remedy).toMatch(/ss -ltnp|netstat|Get-NetTCPConnection/)
+  })
+
+  it('port: a machine that cannot answer the probe is told so, rather than told the port is free', async () => {
+    // `unknown` is a real third answer. A stack that refuses the probe is not a machine
+    // on which to claim the port is free, and the product says exactly that.
+    const cli = await harness()
+    await cli.run(['doctor'], { portAvailability: async () => 'unknown' })
+    const text = cli.lastText()
+
+    expect(row(text, 'port')).toContain('could not determine whether 127.0.0.1:43117 is free')
+    expect(text).not.toContain('is in use by another process')
   })
 
   it('port: a hub on a fallback port is reported as serving, with the reason it moved', async () => {

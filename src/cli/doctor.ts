@@ -66,6 +66,7 @@ import {
   readHub,
   type HubReadOptions,
   type HubUnreachable,
+  type PortAvailability,
 } from './hub-client.js'
 import { AUTOSTART_MODULE_SPECIFIER, type AutostartControl } from './autostart-control.js'
 import type { LocalLog } from './log.js'
@@ -113,6 +114,18 @@ export interface DoctorOptions {
   readonly autostart: AutostartControl
   /** The loopback read. Defaults to a real GET against the published port. */
   readonly hub?: HubReadOptions
+  /**
+   * Injected so a test can drive the port-availability note either way.
+   *
+   * The default is a real bind attempt on the product's preferred port, which makes
+   * the note a fact about the machine rather than about this code - correct, and
+   * untestable. A test that wanted the "something else holds the port" wording had to
+   * arrange for something to actually hold it, and the only thing that reliably did was
+   * a leftover process on the developer's own machine. So the note is now injectable,
+   * and the wording is asserted on all three platforms whether or not 43117 happens to
+   * be free on the runner.
+   */
+  readonly portAvailability?: () => Promise<PortAvailability>
   readonly log?: LocalLog
 }
 
@@ -268,6 +281,7 @@ async function portCheck(
   running: boolean,
   port: number | null,
   platform: NodeJS.Platform,
+  availabilityProbe: () => Promise<PortAvailability> = () => probePortAvailability(),
 ): Promise<CheckLine> {
   if (running && port !== null) {
     return {
@@ -286,7 +300,7 @@ async function portCheck(
     remedy: failure?.remedy ?? 'run `agent-ping install` to start the hub and enable the unit that starts it at login',
   }
   if (failure !== null && failure.kind !== 'no-runtime-file') return base
-  const availability = await probePortAvailability()
+  const availability = await availabilityProbe()
   if (availability === 'in-use') {
     return {
       ...base,
@@ -486,6 +500,7 @@ export async function runDoctor(options: DoctorOptions): Promise<CommandResult> 
       reading.kind === 'running',
       reading.kind === 'running' ? reading.record.port : null,
       platform,
+      options.portAvailability,
     ),
     pluginCheck(options, pluginPaths),
     await autostartCheck(options.autostart),

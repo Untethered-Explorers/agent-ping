@@ -118,14 +118,27 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # BEFORE the test suite, and the order matters.
+      #
+      # `tests/scripts/verify-opencode-live.test.ts` drives the real script, which
+      # starts the *built* product rather than the TypeScript sources - it needs
+      # `dist/main/main/index.js` to exist or it reports a missing dependency and five
+      # assertions fail. On a developer machine that is invisible, because `dist/` is
+      # left over from the last build; on a clean runner it is five red tests. The first
+      # run of this workflow found it that way.
+      #
+      # This is also the order the contributor workflow in the README already documents
+      # (`npm run build && npm test && ...`), so the matrix and the local instructions
+      # now agree. Anything else that needs the build should be built here rather than
+      # relying on a suite that happens to run first.
+      - name: Build
+        run: npm run build
+
       # The whole Vitest suite, both projects (node and jsdom). POSIX-only mode
       # assertions skip themselves on the Windows cell rather than failing there; the
       # behaviour they accompany is asserted on all three.
       - name: Test
         run: npm test
-
-      - name: Build
-        run: npm run build
 
       # The publishing guard. It reads the built tree, so it runs after the build and
       # is the check that would catch a `files` allowlist or a launch-policy
