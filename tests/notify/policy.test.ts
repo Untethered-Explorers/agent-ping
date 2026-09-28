@@ -77,7 +77,7 @@
 // built artefacts yet. docs/runbooks/notification-surface.md says so in the same words,
 // and NT-9 owns the observation (NT-FR-03, APX-CON-06).
 
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { request, type IncomingHttpHeaders } from 'node:http'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -116,6 +116,7 @@ import type {
 import type { DeliveryAttemptRecord, DeliveryStatus, NotificationRequest as HubNotificationRequest } from '@/hub/delivery'
 import type { MetricsPayload } from '@/hub/routes/metrics'
 import type { Notifier } from '@/hub/delivery'
+import { removeTree } from '../helpers/remove-tree'
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -285,7 +286,7 @@ afterEach(async () => {
     await hub.close().catch(() => undefined)
   }
   for (const directory of temporaryDirectories.splice(0)) {
-    rmSync(directory, { recursive: true, force: true })
+    removeTree(directory)
   }
   diagnostics.length = 0
 })

@@ -41,7 +41,6 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
-  rmSync,
   writeFileSync,
 } from 'node:fs'
 import { request, type IncomingMessage, type ServerResponse } from 'node:http'
@@ -80,6 +79,7 @@ import {
 import { openEventStore, type EventStore, type NewEvent } from '@/storage/eventStore'
 import { DATABASE_FILE_NAME, STATE_DIR_ENV_VAR } from '@/storage/paths'
 import { SURFACE_DOCUMENT_PATH } from '@/notify/surface/electron-host'
+import { removeTree } from '../helpers/remove-tree'
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -158,7 +158,7 @@ afterEach(async () => {
     await new Promise<void>((resolve) => socket.close(() => resolve()))
   }
   for (const directory of temporaryDirectories.splice(0)) {
-    rmSync(directory, { recursive: true, force: true })
+    removeTree(directory)
   }
 })
 

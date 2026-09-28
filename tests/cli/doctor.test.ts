@@ -63,6 +63,7 @@ import { databaseFilePath } from '@/storage/paths'
 import type { HealthPayload } from '@/hub/routes/read'
 import { LOG_FILE_NAME, ROTATED_LOG_FILE_NAME } from '@/cli/log'
 import { readModuleWithoutProse } from '../helpers/read-module'
+import { removeTree } from '../helpers/remove-tree'
 
 const harnesses: CliHarness[] = []
 
@@ -266,8 +267,8 @@ describe('every check fails on its own, exits non-zero, and prints a remedy that
     const cli = await harness()
     // A file where the state directory should be: the one way to make the directory
     // unusable without root, so the test needs no privilege it might not have.
-    const { rmSync, writeFileSync, mkdirSync } = await import('node:fs')
-    rmSync(cli.stateDir, { recursive: true, force: true })
+    const { writeFileSync, mkdirSync } = await import('node:fs')
+    removeTree(cli.stateDir)
     mkdirSync(path.dirname(cli.stateDir), { recursive: true })
     writeFileSync(cli.stateDir, 'not a directory')
     const log = await import('@/cli/log')

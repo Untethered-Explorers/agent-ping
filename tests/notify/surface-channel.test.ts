@@ -86,7 +86,7 @@
 // and that run - not this file - is what stands behind the claim that a card crossed a
 // real isolation boundary (NT-FR-03, APX-CON-06).
 
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync } from 'node:fs'
 import { request } from 'node:http'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -134,6 +134,7 @@ import {
 import { CARD_LIFETIMES, cardLifetimeFor, type CardLifetimeCell } from '@/notify/surface/lifetime'
 import type { CardModel } from '@/notify/surface/card'
 import { readModuleImports, readModuleWithoutProse, repositoryPath, sourceFilesUnderSrc } from '../helpers/read-module'
+import { removeTree } from '../helpers/remove-tree'
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -157,7 +158,7 @@ function temporaryDirectory(): string {
 
 afterEach(async () => {
   for (const hub of openHubs.splice(0)) await hub.close().catch(() => undefined)
-  for (const directory of temporaryDirectories.splice(0)) rmSync(directory, { recursive: true, force: true })
+  for (const directory of temporaryDirectories.splice(0)) removeTree(directory)
 })
 
 /** A content-free model, and the cell it would be shown under. */

@@ -67,7 +67,7 @@
 // element was really removed. jsdom applies no layout and no paint, so nothing here says
 // what a card looks like (NT-FR-03).
 
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync } from 'node:fs'
 import { request } from 'node:http'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -100,6 +100,7 @@ import { readWriteToken } from '@/hub/security'
 import { openEventStore, type EventStore } from '@/storage/eventStore'
 import type { CounterReading } from '@/storage/counters'
 import { readModuleImports, readModuleWithoutProse, sourceFilesUnderSrc } from '../helpers/read-module'
+import { removeTree } from '../helpers/remove-tree'
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -126,7 +127,7 @@ afterEach(async () => {
   for (const hub of openHubs.splice(0)) await hub.close().catch(() => undefined)
   for (const store of openStores.splice(0)) store.close()
   for (const directory of temporaryDirectories.splice(0)) {
-    rmSync(directory, { recursive: true, force: true })
+    removeTree(directory)
   }
 })
 

@@ -139,6 +139,7 @@ import {
 import { STATE_DIR_ENV_VAR } from '@/storage/paths'
 import { cliHarness, type CliHarness } from './fixtures/command-line'
 import { readModuleImports, readModuleWithoutProse } from '../helpers/read-module'
+import { removeTree } from '../helpers/remove-tree'
 
 type Platform = 'linux' | 'darwin' | 'win32'
 
@@ -211,7 +212,7 @@ const workingDirectory = process.cwd()
 
 afterEach(async () => {
   for (const created of harnesses.splice(0)) await created.close()
-  for (const root of temporaryRoots.splice(0)) rmSync(root, { recursive: true, force: true })
+  for (const root of temporaryRoots.splice(0)) removeTree(root)
   // A case that moved the working directory and did not move back would make every
   // later case's temporary path land somewhere else entirely.
   process.chdir(workingDirectory)

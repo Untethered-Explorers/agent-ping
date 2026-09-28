@@ -44,7 +44,7 @@
 // an event: ingest belongs to HC-3, and the stream does not need it to be proven.
 
 import { spawn } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync } from 'node:fs'
 import { request as httpRequest, type IncomingMessage } from 'node:http'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -83,6 +83,7 @@ import {
   type TimerHandle,
 } from '@/hub/sse'
 import { openEventStore, type EventStore, type NewEvent } from '@/storage/eventStore'
+import { removeTree } from '../helpers/remove-tree'
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -204,7 +205,7 @@ afterEach(async () => {
   }
   for (const store of openStores.splice(0)) store.close()
   for (const directory of temporaryDirectories.splice(0)) {
-    rmSync(directory, { recursive: true, force: true })
+    removeTree(directory)
   }
 })
 

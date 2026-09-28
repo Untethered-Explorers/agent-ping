@@ -56,7 +56,7 @@
 //     handlers it installed - so a test that closes a hub in-process leaves the test
 //     runner with no signal handler of ours on it.
 
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, statSync } from 'node:fs'
 import { request } from 'node:http'
 import { connect } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -88,7 +88,14 @@ const HEADLESS_DESKTOP: HubDesktopState = {
   surface: 'not-mounted',
 }
 import type { Notifier } from '@/hub/delivery'
-import { SHUTDOWN_PORT_BASE, startRealHub, stopStrayHubs, type RealHub } from './fixtures/hub-process'
+import {
+  SHUTDOWN_PORT_BASE,
+  SIGNALS_ARE_DELIVERABLE,
+  startRealHub,
+  stopStrayHubs,
+  type RealHub,
+} from './fixtures/hub-process'
+import { removeTree } from '../helpers/remove-tree'
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -129,7 +136,7 @@ afterEach(async () => {
   for (const store of openStores.splice(0)) store.close()
   for (const counters of openCountersList.splice(0)) counters.close()
   for (const directory of temporaryDirectories.splice(0)) {
-    rmSync(directory, { recursive: true, force: true })
+    removeTree(directory)
   }
 })
 
@@ -313,7 +320,13 @@ const settle = (): Promise<void> => new Promise((resolve) => setImmediate(resolv
 // ---------------------------------------------------------------------------
 
 describe('a termination signal to a real hub leaves nothing running', () => {
-  it('closes the listener, flushes the counters, closes the log and removes the runtime file', async () => {
+  // The ordered-close path. Only reachable where a signal is *delivered* rather than
+  // coerced into a kill: on Windows `child.kill('SIGTERM')` is a `TerminateProcess`, the
+  // child's handler never runs, and the process ends where it stands. Asserting a
+  // Unix shutdown there reported `expected 'SIGTERM' to be null` and read as a product
+  // ignoring its own handler. The contrast test below is the one that must hold
+  // everywhere, because a hard kill is what Windows always delivers.
+  it.skipIf(!SIGNALS_ARE_DELIVERABLE)('closes the listener, flushes the counters, closes the log and removes the runtime file', async () => {
     const stateDir = temporaryDirectory('agent-ping-signal-')
     const attemptsFile = path.join(temporaryDirectory('agent-ping-attempts-'), 'attempts.jsonl')
     const hub = await startRealHub({ stateDir, attemptsFile, notifier: 'ok', preferredPort: SHUTDOWN_PORT_BASE })
@@ -332,7 +345,7 @@ describe('a termination signal to a real hub leaves nothing running', () => {
     expect(await portAnswer(publishedPort)).toBe('answered')
 
     // ---- the signal.
-    hub.signal('SIGTERM')
+    hub.requestGracefulShutdown('SIGTERM')
     const exit = await hub.waitForExit()
 
     // A clean stop, not a death: the process exited on its own with the success code
@@ -376,7 +389,7 @@ describe('a termination signal to a real hub leaves nothing running', () => {
     const restarted = await startRealHub({ stateDir, attemptsFile, notifier: 'ok', preferredPort: SHUTDOWN_PORT_BASE })
     expect(restarted.port).toBeGreaterThan(0)
     expect((await (await restarted.get('/api/pending')).json<{ count: number }>()).count).toBe(1)
-    restarted.signal('SIGTERM')
+    restarted.requestGracefulShutdown('SIGTERM')
     expect((await restarted.waitForExit()).code).toBe(0)
   }, 90_000)
 
@@ -403,16 +416,26 @@ describe('a termination signal to a real hub leaves nothing running', () => {
     expect(existsSync(runtimeFilePath(stateDir))).toBe(true)
     expect(walSize(stateDir)).toBeGreaterThan(0)
 
-    // And the recovery: the next start reclaims the file, replays the block once, and
-    // then a clean stop leaves neither artefact behind.
+    // And the recovery, which is the half that must hold on every platform: the next
+    // start reclaims the file and replays the block once, from a hub that was ended
+    // abruptly. On Windows this is not the interesting case - it is every case, because
+    // that is how Windows ends a process.
     const restarted = await startRealHub({ stateDir, attemptsFile, notifier: 'ok', preferredPort: SHUTDOWN_PORT_BASE })
     expect(readRuntimeFile(stateDir)?.pid).toBe(restarted.pid)
     expect((await restarted.get('/api/pending')).json<{ count: number }>()).toEqual({ count: 1, items: expect.any(Array) })
     await restarted.waitForAttempts(2)
-    restarted.signal('SIGTERM')
-    expect((await restarted.waitForExit()).code).toBe(0)
-    expect(existsSync(runtimeFilePath(stateDir))).toBe(false)
-    expect(walSize(stateDir)).toBeNull()
+
+    // And then a *clean* stop leaves neither artefact behind - the ordered close, which
+    // is only reachable where a signal is delivered.
+    if (SIGNALS_ARE_DELIVERABLE) {
+      restarted.requestGracefulShutdown('SIGTERM')
+      expect((await restarted.waitForExit()).code).toBe(0)
+      expect(existsSync(runtimeFilePath(stateDir))).toBe(false)
+      expect(walSize(stateDir)).toBeNull()
+    } else {
+      restarted.signal('SIGKILL')
+      await restarted.waitForExit()
+    }
   }, 90_000)
 })
 
@@ -1039,7 +1062,10 @@ describe('the fixture hub is the real entry point', () => {
     expect(hub.pid).not.toBe(process.pid)
     expect(readRuntimeFile(stateDir)).toMatchObject({ pid: hub.pid, port: hub.port, host: '127.0.0.1' })
 
-    hub.signal('SIGTERM')
+    // Cleaned up through the same path the other cases use, so this test proves the
+    // process is a real one without asserting a signal that this host may not be able
+    // to deliver.
+    hub.requestGracefulShutdown('SIGTERM')
     expect((await hub.waitForExit()).code).toBe(0)
   }, 60_000)
 })

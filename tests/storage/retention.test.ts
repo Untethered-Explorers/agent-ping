@@ -27,7 +27,7 @@
 // accessor and a test that reached into the store's handle would be the first step
 // towards giving one out.
 
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -41,6 +41,7 @@ import {
   pruneEvents,
   retentionCutoff,
 } from '@/storage/retention'
+import { removeTree } from '../helpers/remove-tree'
 
 // ---------------------------------------------------------------------------
 // A fixed clock, so every boundary in this file is reproducible
@@ -115,7 +116,7 @@ function openTemporaryStore(): { store: EventStore; filePath: string } {
 afterEach(() => {
   for (const store of openStores.splice(0)) store.close()
   for (const directory of temporaryDirectories.splice(0)) {
-    rmSync(directory, { recursive: true, force: true })
+    removeTree(directory)
   }
   temporaryFilePaths.length = 0
   vi.unstubAllEnvs()

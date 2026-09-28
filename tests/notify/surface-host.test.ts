@@ -96,7 +96,7 @@
 // Windows window behaviour from this Linux machine (NT-FR-03, APX-CON-06).
 
 import { createServer } from 'node:http'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync } from 'node:fs'
 import { request } from 'node:http'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -134,6 +134,7 @@ import { CARD_SIZE, SURFACE_CORNERS, isInsideWorkArea, type WorkArea } from '@/n
 import type { Notifier } from '@/hub/delivery'
 import type { TrayBridge } from '@/hub/tray'
 import type { HealthPayload } from '@/hub/routes/read'
+import { removeTree } from '../helpers/remove-tree'
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -162,7 +163,7 @@ afterEach(async () => {
     await hub.close().catch(() => undefined)
   }
   for (const directory of temporaryDirectories.splice(0)) {
-    rmSync(directory, { recursive: true, force: true })
+    removeTree(directory)
   }
   diagnostics.length = 0
 })

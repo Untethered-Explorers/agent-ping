@@ -68,7 +68,7 @@
 // product decides; the bridge itself is NT-4's and NT-5's human gate, and this file
 // claims nothing about it.
 
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { request, type IncomingHttpHeaders } from 'node:http'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -94,6 +94,7 @@ import { WRITE_TOKEN_HEADER } from '@/hub/security'
 import type { MetricsPayload } from '@/hub/routes/metrics'
 import type { PendingItem } from '@/storage/eventStore'
 import type { Notifier } from '@/hub/delivery'
+import { removeTree } from '../helpers/remove-tree'
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -136,7 +137,7 @@ afterEach(async () => {
     await hub.close().catch(() => undefined)
   }
   for (const directory of temporaryDirectories.splice(0)) {
-    rmSync(directory, { recursive: true, force: true })
+    removeTree(directory)
   }
   diagnostics.length = 0
   exits.length = 0

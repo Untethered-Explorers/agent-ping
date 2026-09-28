@@ -52,7 +52,7 @@
 // produce one. That is the point of the suite.
 
 import { createHash } from 'node:crypto'
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -68,6 +68,7 @@ import type { NormalizedEvent } from '@/domain/envelope'
 import { createPendingLifecycle } from '@/domain/pending'
 import { openEventStore, type EventRecord, type EventStore } from '@/storage/eventStore'
 import { readModuleImports, repositoryPath, sourceFilesUnderSrc } from '../helpers/read-module'
+import { removeTree } from '../helpers/remove-tree'
 
 const RUNBOOK = 'docs/runbooks/copilot-support.md'
 const GATE = 'docs/reviews/copilot-gate.json'
@@ -351,7 +352,7 @@ describe('the same report from two harnesses is stored by the same hub path', ()
 
   afterEach(() => {
     for (const store of openStores.splice(0)) store.close()
-    for (const directory of temporaryDirectories.splice(0)) rmSync(directory, { recursive: true, force: true })
+    for (const directory of temporaryDirectories.splice(0)) removeTree(directory)
   })
 
   /** The real store and the real lifecycle, over a scratch file, tracked for cleanup. */

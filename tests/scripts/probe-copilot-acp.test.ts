@@ -15,11 +15,12 @@
 // handshake recording, the loud non-zero exits, permission recorded distinctly from session
 // updates, and the version plus timestamps in the artefact.
 import { spawnSync } from 'node:child_process'
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { removeTree } from '../helpers/remove-tree'
 
 const repoRoot = fileURLToPath(new URL('../../', import.meta.url))
 const probePath = path.join(repoRoot, 'scripts', 'probe-copilot-acp.mjs')
@@ -213,7 +214,7 @@ function probeTranscript(name: string, transcript: unknown): { run: RunResult; a
 }
 
 afterAll(() => {
-  rmSync(scratch, { recursive: true, force: true })
+  removeTree(scratch)
 })
 
 describe('records the handshake from a captured transcript', () => {

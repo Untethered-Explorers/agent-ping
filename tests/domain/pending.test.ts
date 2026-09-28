@@ -40,7 +40,7 @@
 // accessor and a test that reached into its handle would be the first step towards
 // giving one out.
 
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -66,6 +66,7 @@ import {
   PendingLifecycleError,
   createPendingLifecycle,
 } from '@/domain/pending'
+import { removeTree } from '../helpers/remove-tree'
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -159,7 +160,7 @@ function closeEveryStore(): void {
 afterEach(() => {
   closeEveryStore()
   for (const directory of temporaryDirectories.splice(0)) {
-    rmSync(directory, { recursive: true, force: true })
+    removeTree(directory)
   }
 })
 

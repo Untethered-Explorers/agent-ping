@@ -46,7 +46,7 @@
 // has no query surface and inventing one in a test would prove nothing about the
 // product.
 
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync } from 'node:fs'
 import { request } from 'node:http'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -81,6 +81,7 @@ import {
 } from '@/hub/routes/ingest'
 import { MUTATING_ROUTE, MUTATING_ROUTES, RouteRegistry } from '@/hub/server'
 import type { HubServices } from '@/hub/routes/read'
+import { removeTree } from '../helpers/remove-tree'
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -117,7 +118,7 @@ afterEach(async () => {
   }
   for (const store of openStores.splice(0)) store.close()
   for (const directory of temporaryDirectories.splice(0)) {
-    rmSync(directory, { recursive: true, force: true })
+    removeTree(directory)
   }
 })
 

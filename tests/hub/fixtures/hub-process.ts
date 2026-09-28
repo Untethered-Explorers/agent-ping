@@ -19,11 +19,12 @@
 //     be deleted
 
 import { spawn, type ChildProcess } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync } from 'node:fs'
 import { request } from 'node:http'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { removeTree } from '../../helpers/remove-tree'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = path.join(HERE, '..', '..', '..')
@@ -59,8 +60,27 @@ export interface RealHub {
   waitForAttempts(count: number, timeoutMs?: number): Promise<readonly AttemptLine[]>
   get(pathname: string): Promise<Fetched>
   post(pathname: string, body: unknown): Promise<Fetched>
-  /** Deliver a real signal to the process. */
+  /**
+   * Deliver a real signal to the process.
+   *
+   * On a host that cannot deliver signals this is an *unconditional kill* however the
+   * argument is spelled - see `SIGNALS_ARE_DELIVERABLE`. Use it for a hub that is
+   * meant to die abruptly, which is assertable everywhere; use
+   * `requestGracefulShutdown` for the ordered-close path, which throws rather than
+   * pretending.
+   */
   signal(signal: NodeJS.Signals): void
+  /**
+   * Ask for the ordered shutdown a service manager asks for, and fail loudly on a host
+   * that cannot deliver the signal. Throws rather than coercing a kill.
+   */
+  requestGracefulShutdown(signal?: 'SIGTERM' | 'SIGINT'): void
+  /**
+   * End the process, claiming nothing about how: SIGTERM where a signal is deliverable,
+   * an outright kill where it is not. For cleanup between assertions whose subject is
+   * not the shutdown.
+   */
+  stop(): Promise<{ code: number | null; signal: NodeJS.Signals | null }>
   /** How the process ended, resolved once it has. */
   waitForExit(timeoutMs?: number): Promise<{ code: number | null; signal: NodeJS.Signals | null }>
 }
@@ -123,6 +143,27 @@ function installReaper(): void {
  */
 export const RESTART_REPLAY_PORT_BASE = 43_317
 export const SHUTDOWN_PORT_BASE = 43_417
+
+/**
+ * Whether this host can *deliver* a signal to another process, as opposed to only
+ * being able to end it.
+ *
+ * The distinction is the whole of the Windows difference, and it is not a detail. On
+ * Linux and macOS `child.kill('SIGTERM')` raises SIGTERM in the child, the child's
+ * `process.on('SIGTERM')` handler runs, and the hub performs its ordered close. On
+ * Windows `child.kill()` calls `TerminateProcess` for *every* signal name: there is no
+ * signal delivery, no handler runs, and the process ends where it stands. Node still
+ * reports `signal: 'SIGTERM'` in the child's `exit` event, so the coercion is invisible
+ * unless a test goes looking for it - which is why the first Windows CI cell reported
+ * `expected 'SIGTERM' to be null` and read as a product that ignored its own handler.
+ *
+ * So a graceful shutdown is assertable only where this is true, and a hard kill is
+ * assertable everywhere. The product's guarantee is deliberately the second kind: a hub
+ * that is ended abruptly is reclaimed by the runtime-file liveness check
+ * (`src/hub/runtime-file.ts`, ADR-001), which is the path Windows always takes and the
+ * one that has to hold.
+ */
+export const SIGNALS_ARE_DELIVERABLE = process.platform !== 'win32'
 
 export interface StartRealHubOptions {
   /** A temporary state directory. One is made when this is absent. */
@@ -216,6 +257,41 @@ export async function startRealHub(options: StartRealHubOptions = {}): Promise<R
         body: JSON.stringify(body),
       }),
     signal: (signal: NodeJS.Signals): void => {
+      child.kill(signal)
+    },
+    /**
+     * End the process without claiming anything about how.
+     *
+     * For a test whose subject is something else - a replay count, a delivery verdict -
+     * and which needs the hub gone so the port and the state directory are free.
+     * Delivers SIGTERM where a signal is deliverable and falls back to an outright kill
+     * where it is not, and returns the exit for a caller that does want to look. A
+     * `signal('SIGTERM')` followed by `expect(code).toBe(0)` in a test about replay
+     * counts is asserting a Unix shutdown on a host that has none, which is how the
+     * Windows cell reported `expected null to be 0` for cases whose subject was never
+     * the shutdown.
+     */
+    stop: async (): Promise<{ code: number | null; signal: NodeJS.Signals | null }> => {
+      child.kill(SIGNALS_ARE_DELIVERABLE ? 'SIGTERM' : 'SIGKILL')
+      return exit
+    },
+    /**
+     * Ask for an ordered shutdown the way a service manager would.
+     *
+     * Throws where a signal cannot be delivered rather than coercing a `TerminateProcess`
+     * into something the caller will read as a graceful exit. A test that needs the
+     * graceful path on a host without signal delivery has a platform problem to state,
+     * not a test to make pass.
+     */
+    requestGracefulShutdown: (signal: 'SIGTERM' | 'SIGINT' = 'SIGTERM'): void => {
+      if (!SIGNALS_ARE_DELIVERABLE) {
+        throw new Error(
+          `${process.platform} cannot deliver ${signal} to another process: child.kill() is a ` +
+            'TerminateProcess there, so the hub would end without running its ordered close and the ' +
+            'caller would read a hard kill as a graceful shutdown. Assert the reclamation guarantee ' +
+            'instead, or skip - do not assert a Unix shutdown on a host that has none.',
+        )
+      }
       child.kill(signal)
     },
     waitForExit: async (timeoutMs = 20_000) => {
@@ -367,5 +443,5 @@ function sleep(ms: number): Promise<void> {
 
 /** Remove a state directory and everything in it. */
 export function removeDirectory(directory: string): void {
-  rmSync(directory, { recursive: true, force: true })
+  removeTree(directory)
 }

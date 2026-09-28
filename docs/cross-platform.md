@@ -267,6 +267,30 @@ For anything that starts a child process, answer explicitly:
 this repository; it avoids the shell entirely and therefore avoids the whole class of
 quoting and signal problems.
 
+### Signals are not deliverable on Windows
+
+The one place in this repository where a platform difference changes a *guarantee*
+rather than a spelling. `child.kill('SIGTERM')` raises SIGTERM in the child on Linux and
+macOS, the child's handler runs, and the hub performs its ordered close. On Windows
+`child.kill()` is `TerminateProcess` for every signal name: nothing is delivered, no
+handler runs, and the process ends where it stands. Node accepts the spelling
+`'SIGTERM'` there and performs the same unconditional terminate, so writing the name
+does not make the request graceful.
+
+So `SHUTDOWN_SIGNALS` in `src/hub/lifecycle.ts` is a Unix courtesy, and the guarantee
+this product actually makes is the other one: a hub ended abruptly is reclaimed by the
+runtime-file liveness check, and that is the path Windows always takes.
+
+Two rules follow for anything added here:
+
+- A test whose subject is the shutdown runs only where a signal is deliverable, and says
+  why. A test whose subject is something else — a replay count, a delivery verdict —
+  ends its hub with a method that claims nothing about how, rather than asserting an
+  exit code that only one platform can produce.
+- Do not "fix" this by adding a shutdown route. The write surface is a closed union of
+  one route (ADR-002), and a second one is a decision for a human to accept in writing,
+  not a portability patch.
+
 ---
 
 ## 10. Networking
@@ -455,5 +479,7 @@ Run this before declaring work complete.
 - [ ] Tests independent of the developer's OS, shell, locale, timezone and home directory
 - [ ] Platform branches driven through injected parameters
 - [ ] POSIX-only assertions guarded rather than deleted, so they still run where they apply
+- [ ] Tests that need a delivered signal confined to a host that delivers them
+- [ ] Tests that only need a process gone do not assert an exit code
 - [ ] The CI matrix green on all three platforms
 - [ ] Claims about macOS and Windows backed by something stronger than a Linux run

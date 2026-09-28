@@ -80,6 +80,7 @@ import {
   type HttpMethod,
 } from '@/hub/server'
 import type { HubServices } from '@/hub/routes/read'
+import { removeTree } from '../helpers/remove-tree'
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -107,7 +108,7 @@ afterEach(async () => {
   for (const counters of openCountersList.splice(0)) counters.close()
   for (const feed of openFeeds.splice(0)) feed.close()
   for (const directory of temporaryDirectories.splice(0)) {
-    rmSync(directory, { recursive: true, force: true })
+    removeTree(directory)
   }
 })
 

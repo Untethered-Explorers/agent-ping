@@ -18,7 +18,7 @@
 // it, a refactor that swallowed an exception in the collection phase produces a
 // passing run that drove nothing.
 
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -37,12 +37,13 @@ import {
   JOURNEY_LEDGER_PATH,
   OBSERVATION_LEDGER_PATH,
 } from '../../scripts/verify-dashboard-e2e.mjs'
+import { removeTree } from '../helpers/remove-tree'
 
 const repoRoot = fileURLToPath(new URL('../../', import.meta.url))
 const scratch = mkdtempSync(path.join(tmpdir(), 'agent-ping-dashboard-e2e-test-'))
 
 afterAll(() => {
-  rmSync(scratch, { recursive: true, force: true })
+  removeTree(scratch)
 })
 
 const everyJourney = (outcome = 'passed') =>

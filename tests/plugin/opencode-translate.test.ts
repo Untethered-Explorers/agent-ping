@@ -39,7 +39,7 @@
 // opencode 1.18.32 ships - is quoted row by row in the table's `evidence` fields, and
 // the union itself is written out below as OPENCODE_1_18_32_EVENTS.
 
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -63,6 +63,7 @@ import {
 } from '@/plugin/opencode/translate'
 import * as workSignalModule from '@/plugin/opencode/work-signal'
 import { AGENT_PING_PLUGIN } from '@/plugin/opencode/index'
+import { removeTree } from '../helpers/remove-tree'
 
 // ---------------------------------------------------------------------------
 // Content that must never be recorded
@@ -355,7 +356,7 @@ const directories: string[] = []
 afterEach(() => {
   for (const service of openServices.splice(0)) service.close().catch(() => undefined)
   for (const store of openStores.splice(0)) store.close()
-  for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
+  for (const directory of directories.splice(0)) removeTree(directory)
   vi.restoreAllMocks()
 })
 

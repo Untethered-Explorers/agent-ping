@@ -55,7 +55,7 @@
 //     composition root wires the platform notifier by default, so the suite asks for
 //     that state explicitly where it is the thing under test.
 
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync } from 'node:fs'
 import { request } from 'node:http'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -92,6 +92,7 @@ import {
   stopStrayHubs,
   type RealHub,
 } from './fixtures/hub-process'
+import { removeTree } from '../helpers/remove-tree'
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -120,7 +121,7 @@ afterEach(async () => {
   }
   for (const store of openStores.splice(0)) store.close()
   for (const directory of temporaryDirectories.splice(0)) {
-    rmSync(directory, { recursive: true, force: true })
+    removeTree(directory)
   }
 })
 
@@ -1027,8 +1028,10 @@ describe('a hub killed with a pending block replays it exactly once after a rest
     expect((await (await second.get('/api/events?limit=50')).json<{ count: number }>()).count).toBe(1)
     expect((await (await second.get('/api/sessions')).json<{ count: number }>()).count).toBe(1)
 
-    second.signal('SIGTERM')
-    expect((await second.waitForExit()).code).toBe(0)
+    // Cleanup, not a subject: this case is about the replay count. `stop()` ends the
+    // process in whatever way this host can, without asserting a clean shutdown that
+    // Windows cannot deliver.
+    await second.stop()
 
     // ---- run 3: still exactly one replay per run, and the block is still one block.
     // A replay is not a "notified" mark: a developer who missed both toasts must be
@@ -1044,8 +1047,7 @@ describe('a hub killed with a pending block replays it exactly once after a rest
     expect((await (await third.get('/api/pending')).json<{ count: number }>()).count).toBe(1)
     expect((await (await third.get('/api/events?limit=50')).json<{ count: number }>()).count).toBe(1)
 
-    third.signal('SIGTERM')
-    expect((await third.waitForExit()).code).toBe(0)
+    await third.stop()
   }, 90_000)
 
   it('makes a notifier failure in the replaying run visible there', async () => {
@@ -1070,8 +1072,7 @@ describe('a hub killed with a pending block replays it exactly once after a rest
     const attempts = await second.waitForAttempts(2)
     expect(attempts[1]).toMatchObject({ source: 'restart-replay' })
 
-    second.signal('SIGTERM')
-    expect((await second.waitForExit()).code).toBe(0)
+    await second.stop()
   }, 90_000)
 })
 

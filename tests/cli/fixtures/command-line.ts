@@ -22,7 +22,7 @@
 // pretending to, which is what makes "install verifies health" a claim about a hub
 // rather than about a stub.
 
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { runCli, type CliDependencies, type CommandIo } from '@/cli/index'
@@ -35,6 +35,7 @@ import {
 import { STATE_DIR_ENV_VAR } from '@/storage/paths'
 import type { HubLaunchOutcome, HubLauncher } from '@/cli/hub-client'
 import { writeTokenFilePath } from '@/hub/security'
+import { removeTree } from '../../helpers/remove-tree'
 
 /** What the recording autostart control was asked, in order. */
 export interface AutostartCalls {
@@ -238,7 +239,7 @@ export async function cliHarness(options: CliHarnessOptions = {}): Promise<CliHa
       for (const hub of hubs.splice(0)) {
         await hub.close()
       }
-      rmSync(root, { recursive: true, force: true })
+      removeTree(root)
     },
   }
 }

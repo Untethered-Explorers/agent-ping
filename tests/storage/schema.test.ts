@@ -31,12 +31,13 @@
 // and local log assertions owned by hub-engineer, dashboard-engineer and
 // packaging-engineer. This is the storage half of the boundary.
 
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { SqliteDatabase } from '@/storage/db'
 import { applyMigrations, openDatabase, readMigrations, readSchemaVersion, type OpenDatabase } from '@/storage/db'
+import { removeTree } from '../helpers/remove-tree'
 
 // ---------------------------------------------------------------------------
 // The expected schema, written out literally
@@ -365,7 +366,7 @@ function openTemporaryDatabase(): OpenDatabase {
 afterEach(() => {
   for (const opened of openHandles.splice(0)) opened.close()
   for (const directory of temporaryDirectories.splice(0)) {
-    rmSync(directory, { recursive: true, force: true })
+    removeTree(directory)
   }
 })
 

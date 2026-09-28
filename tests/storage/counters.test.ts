@@ -25,7 +25,7 @@
 // the wrong reason. The store is open on the same file throughout, which is how
 // the hub runs this: one log, several accessors, no shared handle.
 
-import { copyFileSync, mkdtempSync, readdirSync, rmSync } from 'node:fs'
+import { copyFileSync, mkdtempSync, readdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -33,6 +33,7 @@ import Database from 'better-sqlite3'
 import { DATABASE_FILE_NAME, STATE_DIR_ENV_VAR } from '@/storage/paths'
 import { openEventStore, type EventStore } from '@/storage/eventStore'
 import { COUNTER_NAMES, openCounters, type Counters } from '@/storage/counters'
+import { removeTree } from '../helpers/remove-tree'
 
 const NOW = '2026-09-26T12:00:00.000Z'
 const LATER = '2026-09-26T12:05:00.000Z'
@@ -78,7 +79,7 @@ afterEach(() => {
   for (const counters of openCountersHandles.splice(0)) counters.close()
   for (const store of openStores.splice(0)) store.close()
   for (const directory of temporaryDirectories.splice(0)) {
-    rmSync(directory, { recursive: true, force: true })
+    removeTree(directory)
   }
   vi.unstubAllEnvs()
 })

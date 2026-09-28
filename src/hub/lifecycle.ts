@@ -84,6 +84,30 @@ export type HubState = (typeof HUB_STATES)[number]
  * would exit when its parent shell closed. Anything else keeps Node's default
  * behaviour, which is to terminate - the one thing a daemon must always be able to
  * do.
+ *
+ * WHERE THESE CAN ACTUALLY BE DELIVERED, AND WHAT HAPPENS WHERE THEY CANNOT
+ *
+ * These handlers run wherever a signal reaches the process, which is Linux and macOS.
+ * On Windows there is no signal delivery between processes at all: another process
+ * ending this one calls `TerminateProcess`, the handlers above never run, and the
+ * process ends where it stands - with the store open and the runtime file still there.
+ * Node's `child.kill()` accepts the name 'SIGTERM' on Windows and performs that same
+ * unconditional terminate, so even the *spelling* of a graceful request does not make
+ * one.
+ *
+ * That is not a gap in this module, because the product's guarantee was never "this hub
+ * always stops cleanly". It is the opposite one: a hub that is ended abruptly is
+ * reclaimed by the runtime-file liveness check (`src/hub/runtime-file.ts`, ADR-001),
+ * and that path is the one Windows always takes. The ordered close is a courtesy a
+ * Unix service manager gets; the reclamation is the guarantee.
+ *
+ * So a Windows stop leaves a runtime file behind *by design*, and the next start
+ * reclaims it. A change that wanted a graceful Windows stop would have to add a
+ * cross-platform channel for it - a loopback shutdown route, or a Windows service
+ * control handler - and either of those is an architectural decision with security
+ * weight, not a portability patch. It is deliberately not attempted here: the write
+ * surface is a closed union of one route (ADR-002) and a second one is a decision for
+ * a human to accept in writing.
  */
 export const SHUTDOWN_SIGNALS = ['SIGTERM', 'SIGINT'] as const
 

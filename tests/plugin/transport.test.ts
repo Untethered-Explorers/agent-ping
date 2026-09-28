@@ -49,7 +49,7 @@
 //     read from the source.
 
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -86,6 +86,7 @@ import {
   toIngestBody,
   type HubTransport,
 } from '@/plugin/transport/http'
+import { removeTree } from '../helpers/remove-tree'
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -315,7 +316,7 @@ afterEach(async () => {
   for (const hub of hubs.splice(0)) await hub.close().catch(() => undefined)
   for (const server of servers.splice(0)) await server.close().catch(() => undefined)
   for (const store of stores.splice(0)) store.close()
-  for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
+  for (const directory of directories.splice(0)) removeTree(directory)
   vi.restoreAllMocks()
 })
 

@@ -18,7 +18,7 @@
 //
 // The four acceptance criteria map to the describe blocks below by name.
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -27,13 +27,14 @@ import { afterAll, describe, expect, it } from 'vitest'
 // @ts-expect-error the script under test is plain JavaScript with no declaration file; its
 // exports are the contract this suite exercises and the ones it names are all it uses.
 import * as live from '../../scripts/verify-opencode-live.mjs'
+import { removeTree } from '../helpers/remove-tree'
 
 const repoRoot = fileURLToPath(new URL('../../', import.meta.url))
 const scriptPath = path.join(repoRoot, 'scripts', 'verify-opencode-live.mjs')
 const scratch = mkdtempSync(path.join(tmpdir(), 'agent-ping-opencode-verify-test-'))
 
 afterAll(() => {
-  rmSync(scratch, { recursive: true, force: true })
+  removeTree(scratch)
 })
 
 /** Hard ceiling on a child run, so a wedged script fails this suite instead of hanging it. */

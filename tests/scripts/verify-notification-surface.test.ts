@@ -18,7 +18,7 @@
 //     evidence file, a bad command line is its own exit code, and the machine-readable
 //     summary on stdout is parseable on its own.
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -27,13 +27,14 @@ import { afterAll, describe, expect, it } from 'vitest'
 // @ts-expect-error the script under test is plain JavaScript with no declaration file; its
 // exports are the contract this suite exercises and the ones it names are all it uses.
 import * as surface from '../../scripts/verify-notification-surface.mjs'
+import { removeTree } from '../helpers/remove-tree'
 
 const repoRoot = fileURLToPath(new URL('../../', import.meta.url))
 const scriptPath = path.join(repoRoot, 'scripts', 'verify-notification-surface.mjs')
 const scratch = mkdtempSync(path.join(tmpdir(), 'agent-ping-surface-verify-test-'))
 
 afterAll(() => {
-  rmSync(scratch, { recursive: true, force: true })
+  removeTree(scratch)
 })
 
 /**

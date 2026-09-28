@@ -60,7 +60,7 @@
 //     created, modified or removed; a sibling plugin and opencode's own config file
 //     survive an install and a removal.
 
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 
@@ -100,6 +100,7 @@ import {
   type VerifyObservation,
   type VerifyResult,
 } from '@/plugin/install/global-plugin'
+import { removeTree } from '../helpers/remove-tree'
 
 // ---------------------------------------------------------------------------
 // A temporary home, and a real install into it
@@ -145,7 +146,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  for (const dir of temporaries) rmSync(dir, { recursive: true, force: true })
+  for (const dir of temporaries) removeTree(dir)
   temporaries.length = 0
 })
 
@@ -633,7 +634,7 @@ describe('what the installer touches', () => {
       // test in this file and for the shared teardown that removes `temporaries`.
       if (previousTmpdir === undefined) delete process.env['TMPDIR']
       else process.env['TMPDIR'] = previousTmpdir
-      rmSync(scratchRoot, { recursive: true, force: true })
+      removeTree(scratchRoot)
     }
   }, 180_000)
 })

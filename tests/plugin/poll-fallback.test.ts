@@ -62,7 +62,7 @@
 //     Asserted in code, read from the source, as the sibling suites do.
 
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync } from 'node:fs'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -110,6 +110,7 @@ import {
   type PollTimerHandle,
 } from '@/plugin/opencode/poll-fallback'
 import { createHubTransport } from '@/plugin/transport/http'
+import { removeTree } from '../helpers/remove-tree'
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -183,7 +184,7 @@ function temporaryDirectory(prefix: string): string {
 
 afterEach(async () => {
   for (const server of servers.splice(0)) server.close()
-  for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
+  for (const directory of directories.splice(0)) removeTree(directory)
   for (const hub of hubs.splice(0)) await hub.close()
   store?.close()
   store = null

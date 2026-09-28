@@ -56,7 +56,7 @@
 //     the query parameter, the target's length bound, the payload builder with an
 //     injected clock, and the baseline the snapshot watcher compares against.
 
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { request, type IncomingHttpHeaders } from 'node:http'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -80,6 +80,7 @@ import { METRICS_ROUTES, readMetrics, type MetricsPayload } from '@/hub/routes/m
 import { RouteRegistry } from '@/hub/server'
 import { WRITE_TOKEN_HEADER } from '@/hub/security'
 import type { Notifier } from '@/hub/delivery'
+import { removeTree } from '../helpers/remove-tree'
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -107,7 +108,7 @@ afterEach(async () => {
   }
   for (const store of openStores.splice(0)) store.close()
   for (const directory of temporaryDirectories.splice(0)) {
-    rmSync(directory, { recursive: true, force: true })
+    removeTree(directory)
   }
   diagnostics.length = 0
 })

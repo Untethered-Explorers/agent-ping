@@ -53,6 +53,7 @@ import {
   type PendingItem,
   type SessionSummary,
 } from '@/storage/eventStore'
+import { removeTree } from '../helpers/remove-tree'
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -119,7 +120,7 @@ function openTemporaryStore(): EventStore {
 afterEach(() => {
   for (const store of openStores.splice(0)) store.close()
   for (const directory of temporaryDirectories.splice(0)) {
-    rmSync(directory, { recursive: true, force: true })
+    removeTree(directory)
   }
   vi.unstubAllEnvs()
 })

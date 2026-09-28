@@ -101,6 +101,7 @@ import * as guard from '../../scripts/prepack-check.mjs'
 // npm itself, resolved through the running npm's own JavaScript entry rather than a
 // bare `npm`, which is `npm.cmd` on Windows and cannot be spawned without a shell.
 import { npmTool } from '../../scripts/lib/node-tool.mjs'
+import { removeTree } from '../helpers/remove-tree'
 
 const repoRoot = fileURLToPath(new URL('../../', import.meta.url))
 const scriptPath = path.join(repoRoot, 'scripts', 'prepack-check.mjs')
@@ -122,7 +123,7 @@ afterEach(async () => {
 
 afterAll(() => {
   for (const directory of temporaryDirectories.splice(0)) {
-    rmSync(directory, { recursive: true, force: true })
+    removeTree(directory)
   }
 })
 

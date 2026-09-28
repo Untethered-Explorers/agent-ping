@@ -53,13 +53,13 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
-  rmSync,
   writeFileSync,
 } from 'node:fs'
 import { request } from 'node:http'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { removeTree } from '../helpers/remove-tree'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = path.join(HERE, '..', '..')
@@ -264,7 +264,7 @@ export async function startHubForJourneys(options: StartHubOptions = {}): Promis
       child.kill('SIGKILL')
       await exit.catch(() => undefined)
       if (options.keepState === true) throw cause
-      for (const directory of temporaryDirectories) rmSync(directory, { recursive: true, force: true })
+      for (const directory of temporaryDirectories) removeTree(directory)
       throw cause
     }
     if (published === null) {
@@ -274,7 +274,7 @@ export async function startHubForJourneys(options: StartHubOptions = {}): Promis
         `the hub fixture did not publish a port in ${stateDir} within 30 s. ` +
         `stderr: ${stderr.trim() || '(empty)'}`
       if (options.keepState === true) throw new E2EHubError(message)
-      for (const directory of temporaryDirectories) rmSync(directory, { recursive: true, force: true })
+      for (const directory of temporaryDirectories) removeTree(directory)
       throw new E2EHubError(message)
     }
     live.origin = `http://${published.host}:${published.port}`
@@ -367,7 +367,7 @@ export async function startHubForJourneys(options: StartHubOptions = {}): Promis
     close: async (): Promise<void> => {
       await stop()
       if (options.keepState !== true) {
-        for (const directory of temporaryDirectories) rmSync(directory, { recursive: true, force: true })
+        for (const directory of temporaryDirectories) removeTree(directory)
       }
     },
   }
