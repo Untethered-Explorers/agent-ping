@@ -696,7 +696,18 @@ describe("every generated unit names this install's packaged binary and asks for
       await m.control.enable()
       // The login link is what makes the unit enabled, and it is written relative
       // the way `systemctl enable` writes it, so a restored home directory works.
-      expect(readlinkSync(unit.links[0]?.path ?? '')).toBe(`..${POSIX.sep}${LINUX_UNIT_NAME}`)
+      //
+      // Compared with the separators normalised, because the link is *written* in POSIX
+      // form by `makeLink` - which is right, this is a Linux unit - but `readlinkSync`
+      // on NTFS hands the target back in the host's own separators. So the string
+      // differs by spelling and names the same relative link, and an exact comparison
+      // reported `..\agent-ping.service` against `../agent-ping.service` on the Windows
+      // cell: a filesystem normalising what it was given, reported as a product writing
+      // the wrong link. The claim under test is that the target is the unit by a
+      // relative path, which is what the normalised comparison checks.
+      expect(readlinkSync(unit.links[0]?.path ?? '').split('\\').join('/')).toBe(
+        `../${LINUX_UNIT_NAME}`,
+      )
       // And it is a symlink, not a second copy of the unit: two files with the
       // same content is exactly the duplicate IO-FR-06 forbids.
       expect(isSymlink(unit.links[0]?.path ?? ''), 'the login link is a symlink, not a second copy').toBe(true)
