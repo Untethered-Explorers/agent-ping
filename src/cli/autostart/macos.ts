@@ -73,14 +73,26 @@ import {
  */
 export const MACOS_AGENT_LABEL = 'local.agent-ping.hub'
 
+/**
+ * This module writes a *macOS* agent, so every path in it is written in POSIX form.
+ *
+ * The same rule, and the same reason, as in `linux.ts`: not the ambient `path`, which
+ * is `path.win32` on a Windows host, and which disagreed with the `pathApiFor('darwin')`
+ * that `src/cli/autostart/index.ts` used to create the containing directory. Joining
+ * with the ambient flavour gave a backslashed plist path on a Windows host, so the
+ * directory was never created and the write failed with ENOENT. `windows.ts` has always
+ * used `path.win32` for the same reason.
+ */
+const POSIX = path.posix
+
 /** The per-user agent directory, from launchd's own convention. */
 export function resolveLaunchAgentsDirectory(home: string): string {
-  return path.join(home, 'Library', 'LaunchAgents')
+  return POSIX.join(home, 'Library', 'LaunchAgents')
 }
 
 /** The agent plist this install owns. */
 export function resolveMacosUnitPath(home: string): string {
-  return path.join(resolveLaunchAgentsDirectory(home), `${MACOS_AGENT_LABEL}.plist`)
+  return POSIX.join(resolveLaunchAgentsDirectory(home), `${MACOS_AGENT_LABEL}.plist`)
 }
 
 /**

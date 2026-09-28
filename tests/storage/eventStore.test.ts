@@ -179,12 +179,27 @@ describe('resolving the database file (EL-FR-11, IO-FR-07)', () => {
     expect(resolveStateDir({}, 'linux', home)).toBe('/home/dev/.local/state/agent-ping')
     expect(resolveStateDir({ XDG_STATE_HOME: '/xdg/state' }, 'linux', home)).toBe('/xdg/state/agent-ping')
     expect(resolveStateDir({}, 'darwin', home)).toBe('/home/dev/Library/Application Support/agent-ping')
+    // `path.win32.join` and not the ambient `path.join`: the branch describes a Windows
+    // machine, so it is written in Windows separators whether or not the test is running
+    // on one. That is what makes the three assertions above hold on a Windows host too.
     expect(resolveStateDir({ LOCALAPPDATA: 'C:\\Users\\dev\\AppData\\Local' }, 'win32', home)).toBe(
-      path.join('C:\\Users\\dev\\AppData\\Local', 'agent-ping'),
+      path.win32.join('C:\\Users\\dev\\AppData\\Local', 'agent-ping'),
+    )
+    expect(resolveStateDir({}, 'win32', 'C:\\Users\\dev')).toBe(
+      'C:\\Users\\dev\\AppData\\Local\\agent-ping',
     )
     // The override wins over every platform rule, and a quoted ~ resolves.
     expect(resolveStateDir({ [STATE_DIR_ENV_VAR]: '~/state' }, 'linux', home)).toBe('/home/dev/state')
     expect(resolveStateDir({ [STATE_DIR_ENV_VAR]: '/tmp/explicit' }, 'darwin', home)).toBe('/tmp/explicit')
+  })
+
+  it('answers with the requested platform separators, not the host ones', () => {
+    // The property the three assertions above depend on, stated on its own so a
+    // regression is a failure with this name rather than a surprise inside the layout
+    // test. Asking for Linux on a Windows host used to answer with backslashes.
+    expect(resolveStateDir({}, 'linux', '/home/dev')).not.toContain('\\')
+    expect(resolveStateDir({}, 'darwin', '/home/dev')).not.toContain('\\')
+    expect(resolveStateDir({}, 'win32', 'C:\\Users\\dev')).toContain('\\')
   })
 
   // The two mode assertions below are guarded on Windows, and that guard is the

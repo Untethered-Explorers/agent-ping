@@ -68,6 +68,23 @@ export const LINUX_UNIT_NAME = 'agent-ping.service'
 export const LINUX_WANTS_TARGET = 'default.target'
 
 /**
+ * This module writes a *Linux* unit, so every path in it is written in POSIX form.
+ *
+ * Not the ambient `path`, which is `path.win32` on a Windows host. `tests/cli/
+ * autostart.test.ts` drives all three platforms from whichever one it is running on,
+ * and `src/cli/autostart/index.ts` already created the unit's directory with
+ * `pathApiFor('linux')` - that is, `path.posix`. Joining the path with the ambient
+ * flavour instead produced a backslashed path on a Windows host, and then
+ * `path.posix.dirname` of that string found no `/` in it, returned `.`, created no
+ * directory, and the unit write failed with ENOENT sixteen times over. The two halves
+ * disagreed about which platform the path belonged to.
+ *
+ * `windows.ts` has always done this deliberately with `path.win32`. This is the same
+ * rule, applied to the other two.
+ */
+const POSIX = path.posix
+
+/**
  * systemd's own quoting for a command-line word.
  *
  * A path with a space has to be quoted or systemd splits it into two arguments and
@@ -92,7 +109,7 @@ function systemdQuote(value: string): string {
  */
 function expandHome(value: string, home: string): string {
   if (value === '~') return home
-  if (value.startsWith('~/') || value.startsWith(`~${path.sep}`)) return path.join(home, value.slice(2))
+  if (value.startsWith('~/') || value.startsWith(`~${POSIX.sep}`)) return POSIX.join(home, value.slice(2))
   return value
 }
 
@@ -108,13 +125,13 @@ export function resolveLinuxUnitDirectory(env: NodeJS.ProcessEnv, home: string):
   const base =
     xdgConfigHome !== undefined && xdgConfigHome.trim() !== ''
       ? expandHome(xdgConfigHome.trim(), home)
-      : path.join(home, '.config')
-  return path.join(base, 'systemd', 'user')
+      : POSIX.join(home, '.config')
+  return POSIX.join(base, 'systemd', 'user')
 }
 
 /** The unit file this install owns, at systemd's per-user convention path. */
 export function resolveLinuxUnitPath(context: Pick<PlatformUnitContext, 'env' | 'home'>): string {
-  return path.join(resolveLinuxUnitDirectory(context.env, context.home), LINUX_UNIT_NAME)
+  return POSIX.join(resolveLinuxUnitDirectory(context.env, context.home), LINUX_UNIT_NAME)
 }
 
 /**
@@ -169,7 +186,7 @@ export function resolveLinuxUnit(context: PlatformUnitContext): AutostartUnit {
 
   const links: readonly AutostartLink[] = [
     {
-      path: path.join(path.dirname(unitPath), `${LINUX_WANTS_TARGET}.wants`, LINUX_UNIT_NAME),
+      path: POSIX.join(POSIX.dirname(unitPath), `${LINUX_WANTS_TARGET}.wants`, LINUX_UNIT_NAME),
       target: unitPath,
     },
   ]
@@ -179,8 +196,8 @@ export function resolveLinuxUnit(context: PlatformUnitContext): AutostartUnit {
   // above it (`~/.config`) is deliberately not listed - it is a directory this
   // product did not create and has no business removing.
   const ownedDirectories: readonly string[] = [
-    path.dirname(resolveLinuxUnitDirectory(context.env, context.home)),
-    path.dirname(unitPath),
+    POSIX.dirname(resolveLinuxUnitDirectory(context.env, context.home)),
+    POSIX.dirname(unitPath),
   ]
   return { platform: 'linux', kind: 'systemd user unit', unitPath, content, links, ownedDirectories }
 }
