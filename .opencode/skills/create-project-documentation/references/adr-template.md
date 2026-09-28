@@ -1,26 +1,49 @@
-# ADR-NNN: Decision Title
+*One record holds one decision. Name files `NNNN-kebab-title.md` under `docs/adr/`, and keep the `ADR-NNNN` prefix in the title so a copied record still identifies itself. Populate every section; if one has nothing to record, say so in the line rather than deleting the heading. Superseding is bidirectional: set the old record's status to `Superseded by ADR-NNNN` and reference both records from each other's `Links`.*
 
-- **Status:** Proposed | Accepted | Superseded | Deprecated
-- **Date:** YYYY-MM-DD
-- **Decision owners:** Team or role
+# ADR-NNN: Short Title Of The Solved Problem And Solution
 
-## Context
+- **Status:** Proposed | Rejected | Accepted | Deprecated | Superseded by ADR-NNNN
+- **Deciders:** Everyone involved in the decision
+- **Date:** YYYY-MM-DD when the decision was last updated, not when it was first written
 
-What problem, constraint, or requirement requires a decision?
+**Technical Story:** Originating ticket, issue, or requirement
 
-## Decision
+## Context and Problem Statement
 
-State the decision clearly and concretely.
+The situation that forces a decision, in two or three sentences. Phrase it as the question that must be answered.
 
-## Alternatives Considered
+## Decision Drivers
 
-- Alternative and why it was not selected.
+- The forces, facing concerns, or quality attributes that constrain the choice.
 
-## Consequences
+## Considered Options
 
-- Benefits.
-- Costs, risks, and operational implications.
+- The options genuinely evaluated, including the ones not selected.
 
-## Implementation References
+## Decision Outcome
 
-- Links to source, configuration, tests, or user/operator docs.
+Chosen option: "[option]", because [which decision driver it satisfies, or why it comes out best].
+
+### Positive Consequences
+
+- What improves, and what follow-up work this creates.
+
+### Negative Consequences
+
+- What worsens, what quality attribute is compromised, and what risk is now carried.
+
+## Pros and Cons of the Options
+
+### [Option 1]
+
+- Good, because [argument].
+- Bad, because [argument].
+
+### [Option 2]
+
+- Good, because [argument].
+- Bad, because [argument].
+
+## Links
+
+- Supersedes, Superseded by, Related, or Implemented by [links to source, configuration, tests, or other ADRs].
