@@ -61,6 +61,7 @@ import { request } from 'node:http'
 import { connect } from 'node:net'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 import { startHub, type RunningHub } from '@/main/index'
 import { openCounters, type Counters } from '@/storage/counters'
@@ -945,7 +946,7 @@ describe('health reports the state the shutdown is in', () => {
     // bound server at request time, and the identity a hub serves before it binds says
     // it is not listening rather than claiming a port it does not have.
     const source = readFileSync(
-      path.join(path.dirname(new URL(import.meta.url).pathname), '..', '..', 'src', 'main', 'index.ts'),
+      fileURLToPath(new URL('../../src/main/index.ts', import.meta.url)),
       'utf8',
     )
 
@@ -1034,7 +1035,7 @@ describe('the shutdown path reaches nothing outside this process', () => {
     // during a shutdown would be a supervisor, and this product is a sidecar
     // (ADR-001). The only process calls in this file are the test's own.
     const source = readFileSync(
-      path.join(path.dirname(new URL(import.meta.url).pathname), '..', '..', 'src', 'hub', 'lifecycle.ts'),
+      fileURLToPath(new URL('../../src/hub/lifecycle.ts', import.meta.url)),
       'utf8',
     )
     for (const forbidden of ['spawn', 'exec(', 'execFile', 'fork', 'child_process']) {
@@ -1062,10 +1063,10 @@ describe('the fixture hub is the real entry point', () => {
     expect(hub.pid).not.toBe(process.pid)
     expect(readRuntimeFile(stateDir)).toMatchObject({ pid: hub.pid, port: hub.port, host: '127.0.0.1' })
 
-    // Cleaned up through the same path the other cases use, so this test proves the
-    // process is a real one without asserting a signal that this host may not be able
-    // to deliver.
-    hub.requestGracefulShutdown('SIGTERM')
-    expect((await hub.waitForExit()).code).toBe(0)
+    // Cleaned up through the method that claims nothing about how. This test's subject
+    // is that the hub is a real process publishing a discoverable port; asking for a
+    // signal-delivered shutdown here would be asserting a Unix courtesy on a host that
+    // has none, and `requestGracefulShutdown` throws there on purpose.
+    await hub.stop()
   }, 60_000)
 })

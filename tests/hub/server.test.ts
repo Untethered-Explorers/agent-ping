@@ -149,6 +149,26 @@ async function startFixtureHub(
   return hub
 }
 
+/**
+ * Start a hub and register it for closing in `afterEach`.
+ *
+ * Every hub in this file must go through here or be registered by hand. A hub that is
+ * not is a hub whose SQLite connection and bound socket are still open when the cleanup
+ * hook tries to delete its state directory, which on Windows is an outright refusal
+ * rather than a wait: `EPERM, Permission denied: \\?\C:\...\agent-ping-state-...`. The
+ * first Windows CI cell reported three such failures and the obvious reading was "the
+ * test's cleanup is too eager". It was not - `tests/helpers/remove-tree` retries for two
+ * seconds and still could not delete the directory, because something in the product was
+ * genuinely still holding it. That is the helper doing its job.
+ */
+async function trackedHub(
+  options: Partial<Parameters<typeof startHub>[0]> = {},
+): Promise<RunningHub> {
+  const hub = await startHub({ dashboardRoot: dashboardFixture(), ...options })
+  openHubs.push(hub)
+  return hub
+}
+
 afterEach(async () => {
   for (const hub of openHubs.splice(0)) {
     await hub.close().catch(() => undefined)
@@ -601,7 +621,7 @@ describe('the hub entry point (HC-FR-01)', () => {
       stateDir,
     )
 
-    const hub = await startHub({ stateDir, dashboardRoot: null })
+    const hub = await trackedHub({ stateDir })
 
     expect(hub.reclaimedStaleRuntimeFile).toBe(true)
     // The dead pid is kept, because it is the one fact about the crashed instance
@@ -658,7 +678,7 @@ describe('the hub entry point (HC-FR-01)', () => {
     expect(store.readPending()).toHaveLength(1)
     // And it can be started again immediately, which is the restart half of the
     // sidecar promise.
-    const restarted = await startHub({ stateDir: hub.stateDir, dashboardRoot: null })
+    const restarted = await trackedHub({ stateDir: hub.stateDir })
     expect(restarted.runtimeFilePath).toBe(hub.runtimeFilePath)
     expect(restarted.store.readPending()).toHaveLength(1)
   })
@@ -671,9 +691,8 @@ describe('the hub entry point (HC-FR-01)', () => {
 
   it('resolves its state directory through the one resolver, and honours the override', async () => {
     const stateDir = temporaryDirectory('agent-ping-state-')
-    const hub = await startHub({
+    const hub = await trackedHub({
       env: { [STATE_DIR_ENV_VAR]: stateDir } as NodeJS.ProcessEnv,
-      dashboardRoot: null,
     })
     expect(hub.stateDir).toBe(stateDir)
     expect(hub.databaseFilePath).toBe(path.join(stateDir, DATABASE_FILE_NAME))
