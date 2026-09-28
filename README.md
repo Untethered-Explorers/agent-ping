@@ -76,13 +76,19 @@ and the claims are tabulated in
 Four things in this repository are **known not to be verified**, and each is recorded
 rather than glossed:
 
-1. **Nothing has ever run on macOS or Windows.** Every observation comes from one Linux
-   desktop. The notification surface is one code path across all three platforms and only
-   the window manager differs, but that is a statement about the code, not an observation.
-   The same goes for autostart: the macOS and Windows units are unit-tested against a
-   temporary home and have had no live service manager of their own. The same script, run on
-   those machines, is what would earn the claim — see
-   [`docs/runbooks/io-5-operations-review.md`](docs/runbooks/io-5-operations-review.md) §2a.
+1. **The product has never been run on macOS or Windows.** Every observation of the
+   running product comes from one Linux desktop. What *is* now automated is the portable
+   half: [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs typecheck, lint, the
+   whole test suite, the build and the prepack guard on `ubuntu-latest`, `macos-latest`
+   and `windows-latest`, so the state layout, the store, the classifier, the loopback
+   boundary, the CLI and the bytes of all three autostart units are checked on each. That
+   is a statement about the code compiling and its suite passing, not about the hub, the
+   card, the tray or a login having worked there. The notification surface is one code
+   path across all three platforms and only the window manager differs, but that is a
+   statement about the code too. The same live scripts, run on those machines, is what
+   would earn the stronger claim — see
+   [`docs/runbooks/io-5-operations-review.md`](docs/runbooks/io-5-operations-review.md) §2a
+   and [`docs/cross-platform.md`](docs/cross-platform.md) §15.
 2. **No login has been observed anywhere.** `systemctl --user start` is not a log out and
    back in. A reboot or a session restart is the only evidence for that, and it is the
    operations review's to collect.
@@ -461,12 +467,15 @@ src/
   cli/         install, uninstall, status, doctor; the state directory and the log
 tests/         one suite per area, run by scripts/run-tests.mjs; tests/e2e for Playwright
 scripts/       the build, the test runner, the prepack guard and the verify-* probes
+               lib/ holds the shared tool resolver; *.d.mts declares a script's
+               contract for the TypeScript side
 docs/          the guides, ADRs, requirements, evidence and build log
+.github/       the CI workflow: the three-platform matrix
 ```
 
 Tooling and editor configuration live in `package.json`, `tsconfig.json`,
-`tsconfig.build.json`, `vite.config.ts`, `vitest.config.ts`, `playwright.config.ts` and
-`eslint.config.js`.
+`tsconfig.build.json`, `vite.config.ts`, `vitest.config.ts`, `playwright.config.ts`,
+`eslint.config.js` and `.gitattributes`.
 
 ## How to contribute
 
@@ -490,10 +499,16 @@ There is no `CONTRIBUTING.md` yet, so this is the workflow.
    and the [runbooks](docs/runbooks/) and
    [deferred-gates register](docs/reviews/deferred-gates.md) are where that distinction is
    kept.
-5. **Review.** There is no automated PR process configured; open a pull request. For a
-   change that touches the notification path, the loopback boundary, the schema or the
-   envelope, expect the corresponding ADR and its tests to be part of the change, not a
-   follow-up.
+5. **Review.** Open a pull request;
+   [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs the same gates on Linux,
+   macOS and Windows, and the Node version it uses is read from `engines.node` in
+   `package.json` rather than repeated in the workflow. `fail-fast` is off so a change
+   that breaks one platform reports which one instead of hiding the other two. A step
+   that needs a shell must say so — see
+   [`docs/cross-platform.md`](docs/cross-platform.md) for why the workflow's steps carry
+   no shell syntax. For a change that touches the notification path, the loopback
+   boundary, the schema or the envelope, expect the corresponding ADR and its tests to be
+   part of the change, not a follow-up.
 
 ## What's next
 
@@ -526,6 +541,7 @@ repository's own accounting, and
 |----------|------------|
 | [docs/user-guide.md](docs/user-guide.md) | **Day-to-day use:** the three classes, the dashboard, keyboard and screen-reader use, privacy, troubleshooting. |
 | [docs/admin-guide.md](docs/admin-guide.md) | **Operating it:** installation, configuration, state and backups, health and monitoring, upgrades, per-platform autostart, hardening. |
+| [docs/cross-platform.md](docs/cross-platform.md) | **Changing it:** the Linux, macOS and Windows support contract, the platform-neutral implementation rules, and the audit checklist. |
 | [CHANGELOG.md](CHANGELOG.md) | Change history, in Keep a Changelog form. Everything so far is under `[Unreleased]`. |
 | [docs/releases/UNRELEASED.md](docs/releases/UNRELEASED.md) | The release notes prepared for `0.1.0`, undated because no tag exists. |
 | [docs/IDEA.md](docs/IDEA.md) | The idea of record: the problem, the boundaries, the questions left open on purpose. |

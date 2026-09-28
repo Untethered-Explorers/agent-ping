@@ -152,6 +152,9 @@ an entry here. Every such claim, and its verification state, is in
 
 **Documentation**
 
+- A cross-platform development guide (`docs/cross-platform.md`) stating the
+  Linux/macOS/Windows contract and the rules for changing the code without assuming an
+  operating system, and a matching section in `AGENTS.md`.
 - Twelve architecture decision records and their index (`docs/adr/`).
 - A product idea of record and a PRD with a requirement-ID matrix (`docs/IDEA.md`,
   `docs/PRD.md`).
@@ -160,6 +163,64 @@ an entry here. Every such claim, and its verification state, is in
   a per-task build log with every unverified check enumerated
   (`docs/PROGRESS.md`).
 - This changelog, the user guide, the administrator guide and the release notes.
+
+**Portability**
+
+This release was prepared against a three-platform contract that nothing was enforcing.
+The following were found and fixed; each would have failed on a platform other than the
+one that wrote them.
+
+- **Every build and test entry point could not run on Windows.** `scripts/build.mjs` and
+  `scripts/run-tests.mjs` spawned tools through `node_modules/.bin`, which is a generated
+  `.cmd` batch shim there, and Node refuses to spawn a `.cmd` without a shell — `EINVAL`
+  since the CVE-2024-27980 fix in 18.20.2. The new `scripts/lib/node-tool.mjs` reads each
+  tool's `bin` field out of its own `package.json` and runs that file with
+  `process.execPath`: an executable plus an argument array, no shell, identical on all
+  three platforms. `npm` itself is resolved through `npm_execpath`. Contract in
+  `scripts/lib/node-tool.d.mts`; 14 tests, including one that fails if a `.bin` join or a
+  bare `npm` spawn reappears.
+- **Four suites asserted POSIX permission modes unguarded** (11 assertions across
+  `tests/cli/install.test.ts`, `tests/cli/doctor.test.ts`, `tests/cli/autostart.test.ts`
+  and `tests/hub/security.test.ts`). NTFS reports 0o666/0o444 derived from the read-only
+  attribute, so each would have failed on a filesystem behaving correctly. The guards
+  follow the pattern `tests/storage/eventStore.test.ts` already used, and the octal
+  assertions were split out of their tests rather than skipping the behaviour beside
+  them — path resolution, containment, token shape and idempotence are still asserted on
+  Windows.
+- **A preflight test hard-coded a POSIX `PATH`** (`tests/scripts/verify-notification-surface.test.ts`),
+  which on Windows is a single entry naming a directory that does not exist.
+  `resolveOnPath` now recognises a backslash path as a path, and the test builds its
+  `PATH` from the ambient delimiter.
+- **The Copilot hook probe interpolated an unquoted path into a shell command**
+  (`scripts/probe-copilot-hooks.mjs`), which splits on any space in the capture
+  directory. Now single-quoted for the POSIX shell that executes it.
+- **Three verification scripts read `process.env.HOME` directly**
+  (`verify-opencode-live.mjs`, `verify-autostart-linux.mjs`), which is commonly absent on
+  Windows. Now `os.homedir()`. In `resolveRealStateDir`/`resolveRealPluginDir` the
+  fallback was an empty string, which made `path.join` return a *relative* path — the
+  script would have watched and asserted against a path that does not exist, reading as a
+  missing product rather than a missing variable.
+- **`repositoryShortName` handled Windows separators but had never been asserted on
+  one.** The production helper already had coverage; the prototype copy did not.
+- **`.gitattributes` added** (`text=auto eol=lf`, binaries marked, and `-text` on
+  `*.cmd`, `*.bat`, `*.service` and `*.plist`). A Windows checkout could rewrite every
+  text file to CRLF, which the byte-for-byte autostart tests and the prepack guard read.
+
+**Continuous integration**
+
+- `.github/workflows/ci.yml` runs `npm ci`, typecheck, lint, the whole Vitest suite, the
+  build and the prepack guard on `ubuntu-latest`, `macos-latest` and `windows-latest`.
+  The Node version is read from `engines.node` in `package.json` so the matrix cannot
+  drift onto a version the package no longer claims to support; `fail-fast` is off so a
+  change that breaks one platform reports which one. No step contains shell syntax, and
+  the file says why.
+- The live verification scripts are deliberately **not** in the matrix: they need a real
+  `systemd --user` manager, a display and a status area, none of which a hosted runner
+  has. A job containing them would be permanently red while proving nothing.
+- This narrows what is unverified. It does not discharge anything: the product itself has
+  still never been run on macOS or Windows, and the register in
+  `docs/reviews/deferred-gates.md` is unchanged. See
+  [Known limitations at this version](#known-limitations-at-this-version).
 
 ### Changed
 
@@ -204,8 +265,11 @@ an entry here. Every such claim, and its verification state, is in
 Recorded rather than glossed, with the register that owns each one in
 [`docs/reviews/deferred-gates.md`](docs/reviews/deferred-gates.md):
 
-- No observation of any kind on macOS or Windows. Every live result in this
-  repository comes from one Linux desktop.
+- No observation of any kind of the **running product** on macOS or Windows. Every live
+  result in this repository comes from one Linux desktop. The CI matrix does check the
+  portable half on all three operating systems — it compiles, lints, tests, builds and
+  passes the prepack guard there — which is a statement about the code, not about the
+  hub, the card, the tray or a login having worked on those machines.
 - No login has ever been observed starting the hub, on any platform.
 - Three human review gates (`OA-6`, `LD-5`, `IO-5`) were closed by attestation rather
   than by review, and two of them were closed before the software they review existed.

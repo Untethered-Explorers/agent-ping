@@ -11,6 +11,9 @@ verified against real software, see
 [`docs/reviews/deferred-gates.md`](reviews/deferred-gates.md) — read it before
 treating any `complete` in a status file as a pass.
 
+For the rules that govern changing the code on any of the three supported platforms,
+see [the cross-platform guide](cross-platform.md).
+
 ## Responsibilities and architecture
 
 agent-ping is a **local-only sidecar**. One install, one user, one machine, one
@@ -364,6 +367,25 @@ one of those paths byte for byte** — including on its failure paths. It needs 
 graphical session: the unit's `ExecStart` is the packaged Electron runtime, so a
 machine with no `DISPLAY` is a fault of the environment, not a skip.
 
+### What CI checks, and what it does not
+
+`.github/workflows/ci.yml` runs `npm ci`, `typecheck`, `lint`, the whole Vitest suite,
+the build and the prepack guard on `ubuntu-latest`, `macos-latest` and `windows-latest`.
+The Node version is read from the `engines.node` field in `package.json` rather than
+repeated in the workflow, so the matrix cannot drift onto a version the package no
+longer claims to support.
+
+None of the scripts above are in that matrix, and that is a deliberate omission rather
+than a gap. `verify-autostart-linux.mjs` needs a real `systemd --user` manager and a
+hosted runner has none; the other three need a display and a status area. A job
+containing them would be permanently red while proving nothing.
+
+So a green matrix means the **portable half** of the support contract holds on all three
+operating systems — the state layout, the store, the classifier, the loopback boundary,
+the CLI, and the bytes of all three autostart units. It does not mean the card has been
+seen on a Mac or that a login has ever started the hub. What is still owed is
+[`docs/reviews/deferred-gates.md`](reviews/deferred-gates.md).
+
 ## Upgrades and rollback
 
 **There is no previous release.** This is the first version, so there is no upgrade
@@ -488,6 +510,7 @@ procedure that closes it — is
 | Document | What it is |
 | --- | --- |
 | [User guide](user-guide.md) | Day-to-day use |
+| [Cross-platform development](cross-platform.md) | The three-platform support contract and the rules for changing the code without assuming an OS |
 | [ADR index](adr/README.md) | The twelve durable decisions and their implementation state |
 | [docs/PROGRESS.md](PROGRESS.md) | The build log, with every unverified check enumerated |
 | [docs/reviews/deferred-gates.md](reviews/deferred-gates.md) | What this project owes |
