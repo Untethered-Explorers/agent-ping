@@ -113,7 +113,7 @@ import {
 } from 'node:fs'
 import { request as httpRequest } from 'node:http'
 import { createRequire } from 'node:module'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -644,17 +644,26 @@ export function effectiveConfigRoot(xdgConfigHome, home) {
   return override === '' ? path.join(home, '.config') : override
 }
 
-/** This account's own agent-ping state directory, resolved the product's way. */
+/**
+ * This account's own agent-ping state directory, resolved the product's way.
+ *
+ * `HOME` falls back to `homedir()` rather than to an empty string. An empty string makes
+ * `path.join` return a *relative* path, so a missing `HOME` would resolve the state
+ * directory against the current working directory and this script would then watch and
+ * assert against a path that does not exist — a failure that reads as a missing product
+ * rather than as a missing variable.
+ */
 export function resolveRealStateDir(env = process.env) {
   const xdgStateHome = typeof env['XDG_STATE_HOME'] === 'string' ? env['XDG_STATE_HOME'].trim() : ''
-  const base = xdgStateHome === '' ? path.join(env['HOME'] ?? '', '.local', 'state') : xdgStateHome
+  const base =
+    xdgStateHome === '' ? path.join(env['HOME'] ?? homedir(), '.local', 'state') : xdgStateHome
   return path.join(base, 'agent-ping')
 }
 
-/** The opencode global plugin directory, resolved the product's way. */
+/** The opencode global plugin directory, resolved the product's way. See resolveRealStateDir. */
 export function resolveRealPluginDir(env = process.env) {
   return path.join(
-    effectiveConfigRoot(env[XDG_CONFIG_HOME_ENV_VAR], env['HOME'] ?? ''),
+    effectiveConfigRoot(env[XDG_CONFIG_HOME_ENV_VAR], env['HOME'] ?? homedir()),
     OPENCODE_DIR_NAME,
     PLUGIN_DIR_NAME,
   )
@@ -861,9 +870,12 @@ export function preflight(options = {}) {
   )
 
   // The environment the manager itself was started with, which is what decides its unit
-  // search path. Parsed from the same call and compared with this shell's.
+  // search path. Parsed from the same call and compared with this shell's. `homedir()`
+  // rather than `process.env.HOME`: this script is invoked from a service-manager context
+  // and from a CI step, and neither guarantees HOME is in the environment, while a
+  // `systemd --user` manager can be reading the account's real home either way.
   const managerVariables = managerReachable ? parseManagerEnvironment(managerEnv.stdout) : null
-  const shellHome = process.env['HOME'] ?? ''
+  const shellHome = homedir()
   const shellRoot = effectiveConfigRoot(process.env[XDG_CONFIG_HOME_ENV_VAR], shellHome)
   const managerRoot =
     managerVariables === null
@@ -1899,7 +1911,7 @@ async function runMain(args, startedAt) {
 
   const realPluginDir = resolveRealPluginDir()
   const electronProfileDir = path.join(
-    effectiveConfigRoot(process.env[XDG_CONFIG_HOME_ENV_VAR], process.env['HOME'] ?? ''),
+    effectiveConfigRoot(process.env[XDG_CONFIG_HOME_ENV_VAR], homedir()),
     'agent-ping',
   )
   const wantsDir =

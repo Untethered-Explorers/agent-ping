@@ -98,6 +98,9 @@ import { COUNTER_NAMES } from '@/storage/counters'
 // @ts-expect-error the guard under test is plain JavaScript with no declaration file; the
 // exports this suite exercises are its contract, and the ones it names are all it uses.
 import * as guard from '../../scripts/prepack-check.mjs'
+// npm itself, resolved through the running npm's own JavaScript entry rather than a
+// bare `npm`, which is `npm.cmd` on Windows and cannot be spawned without a shell.
+import { npmTool } from '../../scripts/lib/node-tool.mjs'
 
 const repoRoot = fileURLToPath(new URL('../../', import.meta.url))
 const scriptPath = path.join(repoRoot, 'scripts', 'prepack-check.mjs')
@@ -167,6 +170,14 @@ function buildScratchTree(): string {
   }
   mkdirSync(path.join(root, 'scripts'), { recursive: true })
   copyFileSync(path.join(repoRoot, 'scripts', 'build.mjs'), path.join(root, 'scripts', 'build.mjs'))
+  // build.mjs imports the shared tool resolver, and the scratch tree runs the real
+  // build: copying only build.mjs would leave that import unresolved and the run
+  // would fail on a missing module rather than on anything about the package.
+  mkdirSync(path.join(root, 'scripts', 'lib'), { recursive: true })
+  copyFileSync(
+    path.join(repoRoot, 'scripts', 'lib', 'node-tool.mjs'),
+    path.join(root, 'scripts', 'lib', 'node-tool.mjs'),
+  )
   // The two paths the allowlist has to keep out that no build would ever produce.
   write(root, 'tests/packaging/package.test.ts', '// a placeholder: the name is what the allowlist is judged on\n')
   write(root, 'docs/PRD.md', '# a placeholder: the name is what the allowlist is judged on\n')
@@ -905,9 +916,10 @@ function fencedCommandLines(text: string): string[] {
  * the answer it is being compared against.
  */
 function npmPackList(root: string): string[] {
+  const npm = npmTool()
   const result = spawnSync(
-    'npm',
-    ['pack', '--dry-run', '--ignore-scripts', '--json'],
+    npm.command,
+    [...npm.args, 'pack', '--dry-run', '--ignore-scripts', '--json'],
     { cwd: root, encoding: 'utf8' },
   )
   if (result.status !== 0) {

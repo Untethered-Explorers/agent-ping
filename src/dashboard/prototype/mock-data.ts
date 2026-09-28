@@ -44,6 +44,11 @@ export const PROTOTYPE_NOW = '2026-09-26T12:00:00.000Z'
  * The directory basename of a repository path, which is the identity the
  * dashboard groups and labels by (APX-CON-09).
  *
+ * Both separators are handled, and a Windows path is a directory a developer is
+ * standing in rather than a string to normalise first: `C:\Users\dev\Projects\
+ * agent-ping` and `/home/dev/Projects/agent-ping` must produce the same identity,
+ * or the same repository is grouped as two on the platform that has never run this.
+ *
  * LD-1 replaces this with connector-engineer's identity helper once the
  * connector lands; the prototype needs it here only so the rule is exercised
  * rather than restated as a second hardcoded string.
@@ -59,6 +64,11 @@ export function repositoryShortName(path: string): string {
  * Three rows across two repositories, covering the three interesting cases the
  * design review needs: a blocked session and a finished session in the same
  * repository, and a running session in a second one.
+ *
+ * The paths are literal strings, not paths this process resolved: they are the
+ * display and grouping input the renderer is given, and a real session's
+ * `repoFullPath` arrives from the harness on whichever platform the developer is
+ * on. See `repositoryShortName` for why the Windows form has to work too.
  *
  * The finished session is listed *first* on purpose. Ordering is a property of
  * the renderer (see `orderSessions` in scene.ts), so the fixture must not hand

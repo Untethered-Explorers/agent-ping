@@ -17,6 +17,7 @@ import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { nodeTool } from './lib/node-tool.mjs'
 
 const repoRoot = fileURLToPath(new URL('..', import.meta.url))
 
@@ -30,8 +31,11 @@ const PLAYWRIGHT_CONFIGS = [
   'playwright.config.mjs',
 ]
 
-const bin = (name) =>
-  path.join(repoRoot, 'node_modules', '.bin', process.platform === 'win32' ? `${name}.cmd` : name)
+// Resolved through each tool's own package manifest, not through `node_modules/.bin`:
+// on Windows those are `.cmd` batch shims, which Node will not spawn without a shell.
+// See scripts/lib/node-tool.mjs for why a shell is not the answer here.
+const vitestTool = nodeTool('vitest', 'vitest')
+const playwrightTool = nodeTool('@playwright/test', 'playwright')
 
 const toPosix = (value) => value.split(path.sep).join('/').replace(/^\.\//, '')
 
@@ -40,9 +44,12 @@ const isE2EPath = (value) => {
   return normalized === E2E_ROOT || normalized.startsWith(`${E2E_ROOT}/`)
 }
 
-function run(command, args, label) {
-  process.stdout.write(`\n[test] ${label}: ${path.basename(command)} ${args.join(' ')}\n`)
-  const result = spawnSync(command, args, { cwd: repoRoot, stdio: 'inherit' })
+function run(tool, toolArgs, label) {
+  process.stdout.write(`\n[test] ${label}: ${path.basename(toolArgs[0] ?? tool.command)} ${toolArgs.join(' ')}\n`)
+  const result = spawnSync(tool.command, [...tool.args, ...toolArgs], {
+    cwd: repoRoot,
+    stdio: 'inherit',
+  })
   if (result.error) {
     process.stderr.write(`\n[test] ${label} could not start: ${result.error.message}\n`)
     return 1
@@ -72,7 +79,7 @@ if (e2ePaths.length > 0) {
     )
     process.exit(1)
   }
-  if (!existsSync(bin('playwright'))) {
+  if (!playwrightTool.exists) {
     process.stderr.write(
       `\n[test] ${E2E_ROOT} is a Playwright project, but the Playwright CLI is not installed.\n` +
         `[test] Run \`npm install\` with @playwright/test as a devDependency (LD-4), then retry.\n`,
@@ -85,12 +92,12 @@ let status = 0
 
 if (e2ePaths.length > 0) {
   status =
-    run(bin('playwright'), ['test', ...e2ePaths, ...flags], `browser suite (${e2ePaths.join(', ')})`) ||
+    run(playwrightTool, ['test', ...e2ePaths, ...flags], `browser suite (${e2ePaths.join(', ')})`) ||
     status
 }
 
 if (paths.length === 0 || vitestPaths.length > 0) {
-  if (!existsSync(bin('vitest'))) {
+  if (!vitestTool.exists) {
     process.stderr.write('\n[test] the Vitest CLI is not installed; run `npm install` first\n')
     process.exit(1)
   }
@@ -100,7 +107,7 @@ if (paths.length === 0 || vitestPaths.length > 0) {
   const label = watch
     ? `watch mode${vitestPaths.length > 0 ? ` (${vitestPaths.join(', ')})` : ''}`
     : `vitest${vitestPaths.length > 0 ? ` (${vitestPaths.join(', ')})` : ' (whole suite)'}`
-  status = run(bin('vitest'), vitestArgs, label) || status
+  status = run(vitestTool, vitestArgs, label) || status
 }
 
 if (status !== 0) {

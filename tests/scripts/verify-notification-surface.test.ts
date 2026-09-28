@@ -961,19 +961,34 @@ describe('parseArgs(): the command line, with no way to tolerate a failure', () 
 })
 
 describe('resolveOnPath(): a preflight that reports the desktop honestly', () => {
+  // A PATH built from a real directory, joined with the ambient delimiter, rather than
+  // a hard-coded ':' string. `path.delimiter` is ';' on Windows, and a literal
+  // colon-separated PATH there is a single entry naming a directory that does not
+  // exist — so the lookup would answer null and the assertion would fail on the one
+  // platform it was written without meaning to test.
+  const realDir = path.dirname(process.execPath)
+  const aPath = (...entries: string[]): string => entries.join(path.delimiter)
+
   it('finds a command in the first PATH entry that has it', () => {
-    const found = surface.resolveOnPath('sh', { PATH: '/nowhere:/bin' })
-    expect(found).toBe('/bin/sh')
+    // `node` is the one executable this suite can name portably: it is the binary
+    // already running, so it exists on every platform without depending on a shell,
+    // a tool name, or an absolute path spelling.
+    const found = surface.resolveOnPath(path.basename(process.execPath), { PATH: aPath('/nowhere', realDir) })
+    expect(found).toBe(process.execPath)
   })
 
   it('reads null rather than a bare name, so a preflight cannot claim a tool it never resolved', () => {
-    expect(surface.resolveOnPath('definitely-not-installed-xyz', { PATH: '/bin' })).toBeNull()
+    expect(surface.resolveOnPath('definitely-not-installed-xyz', { PATH: realDir })).toBeNull()
     expect(surface.resolveOnPath('xwininfo', { PATH: '' })).toBeNull()
   })
 
   it('accepts a path with a separator as given, and answers whether it exists', () => {
-    expect(surface.resolveOnPath('/bin/sh', { PATH: '' })).toBe('/bin/sh')
-    expect(surface.resolveOnPath('/definitely/not/here', { PATH: '' })).toBeNull()
+    // Both separator spellings, because a path handed to this function is a path on
+    // the machine that ran it, and a Windows path is backslashed.
+    expect(surface.resolveOnPath(process.execPath, { PATH: '' })).toBe(process.execPath)
+    expect(surface.resolveOnPath(path.join(realDir, 'definitely-not-here'), { PATH: '' })).toBeNull()
+    // A Windows-shaped path is a path to check, not a bare name to look up on PATH.
+    expect(surface.resolveOnPath('C:\\definitely\\not\\here', { PATH: '' })).toBeNull()
   })
 })
 

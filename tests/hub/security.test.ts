@@ -421,14 +421,26 @@ describe('the per-install write token (HC-FR-06)', () => {
     // operator can transcribe it from a file.
     expect(issued.token).toMatch(new RegExp(`^[0-9a-f]{${WRITE_TOKEN_BYTES * 2}}$`))
     expect(issued.token).toHaveLength(WRITE_TOKEN_BYTES * 2)
-    // The file is `0o600` inside a `0o700` directory. A world-readable token is not a
-    // token, and this is the only moment it could be one.
-    expect(statSync(issued.filePath).mode & 0o777).toBe(0o600)
-    expect(statSync(stateDir).mode & 0o777).toBe(0o700)
     // Exactly one line, and reading it back gives the same value.
     expect(readFileSync(issued.filePath, 'utf8')).toBe(`${issued.token}\n`)
     expect(readWriteToken(stateDir)).toBe(issued.token)
     expect(ensureWriteToken({ stateDir })).toEqual({ ...issued, created: false })
+  })
+
+  // Split out from the test above rather than skipping that one, so the token's
+  // shape, its path and its idempotence stay asserted on a Windows host. Only the
+  // octal modes move here: NTFS reports 0o666/0o444 derived from the read-only
+  // attribute rather than a permission bit, so a 0o600 assertion there would fail on
+  // a filesystem behaving correctly. See tests/storage/eventStore.test.ts.
+  it.skipIf(process.platform === 'win32')('writes the token into an owner-only file in an owner-only directory', () => {
+    const stateDir = temporaryDirectory('agent-ping-state-')
+
+    const issued = ensureWriteToken({ stateDir })
+
+    // The file is `0o600` inside a `0o700` directory. A world-readable token is not a
+    // token, and this is the only moment it could be one.
+    expect(statSync(issued.filePath).mode & 0o777).toBe(0o600)
+    expect(statSync(stateDir).mode & 0o777).toBe(0o700)
   })
 
   it('issues a different value per install and survives a restart unchanged', async () => {

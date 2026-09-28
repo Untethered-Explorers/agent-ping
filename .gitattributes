@@ -1,0 +1,55 @@
+# Line endings and file modes, decided once for three platforms.
+#
+# Without this file, a checkout on Windows can rewrite every text file to CRLF, and the
+# byte-for-byte autostart tests, the prepack guard and the schema file all read those
+# bytes. A repository that passes on Linux and fails on Windows for that reason alone is
+# exactly the accidental platform assumption this project does not want.
+#
+# `eol=lf` in the working tree on every platform, including Windows. Nothing this
+# repository ships or generates needs CRLF: the autostart units are written by
+# `writeFileSync` at install time rather than checked in, and a `.cmd` file that Git
+# has rewritten is a file whose bytes this project no longer controls.
+
+# Normalise every text file to LF in the repository and in the working tree.
+* text=auto eol=lf
+
+# Never touched by a checkout. These are either binary or files whose exact bytes are
+# part of a contract.
+*.png binary
+*.ico binary
+*.jpg binary
+*.woff binary
+*.woff2 binary
+*.db binary
+*.db-wal binary
+*.db-shm binary
+
+# The generated-configuration surface. Nothing here is checked in today, and the
+# `-text` is a guard: if one is ever added, a checkout must not rewrite the interpreter's
+# file. A `cmd.exe` batch file, a systemd unit and a launchd property list are each read
+# by a different interpreter, and a CRLF introduced by a checkout is a change to what
+# that interpreter sees.
+*.cmd -text
+*.bat -text
+*.service -text
+*.plist -text
+
+# Source and configuration that is compared as text, where CRLF would be a real defect.
+*.ts text eol=lf
+*.tsx text eol=lf
+*.mts text eol=lf
+*.mjs text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.jsonl text eol=lf
+*.sql text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Build output and dependencies. Not text, not ours, and `node_modules` is not tracked
+# in any case; the rule keeps a future submodule or vendored tree from being rewritten.
+dist/** -text
+node_modules/** -text
+test-results/** -text
+coverage/** -text

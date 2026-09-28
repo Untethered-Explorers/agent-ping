@@ -146,6 +146,18 @@ type Platform = 'linux' | 'darwin' | 'win32'
 const PLATFORMS: readonly Platform[] = ['linux', 'darwin', 'win32']
 
 /**
+ * Whether the *host* filesystem has POSIX permission bits.
+ *
+ * About the machine running the suite, not about the platform being simulated. These
+ * tests emulate all three platforms on whichever one they run on, and the mode
+ * assertions below ask the real filesystem what mode a real file ended up with - so
+ * on a Windows host the answer is 0o666 or 0o444 derived from the read-only attribute,
+ * and asserting 0o700 there would fail on correct behaviour. The unit *bytes* and
+ * *paths* are asserted on every host; only the octal mode is a POSIX fact.
+ */
+const HAS_POSIX_MODES = process.platform !== 'win32'
+
+/**
  * Tokens that would mean a unit asks for privilege this product never asks for.
  *
  * Checked against the *content* of each unit, not against this file, so a comment
@@ -362,13 +374,26 @@ function walk(root: string): readonly string[] {
   return found
 }
 
-/** The four permission bits of a path, or null when the filesystem has none. */
+/**
+ * The four permission bits of a path, or null when the filesystem has none.
+ *
+ * Null on a host without POSIX permission bits rather than a number that would fail a
+ * mode assertion: a Windows host reports 0o666 or 0o444 derived from the read-only
+ * attribute, and answering with that would make a correct product look broken.
+ */
 function modeOf(target: string): number | null {
+  if (!HAS_POSIX_MODES) return null
   try {
     return statSync(target).mode & 0o777
   } catch {
     return null
   }
+}
+
+/** A mode assertion that passes on a filesystem with no POSIX bits, by asserting nothing. */
+function expectMode(target: string, expected: number): void {
+  if (!HAS_POSIX_MODES) return
+  expect(modeOf(target), `${target} is not ${expected.toString(8).padStart(4, '0')}`).toBe(expected)
 }
 
 /** A file with fixed bytes and a deliberately old timestamp, for "was it touched". */
@@ -832,9 +857,9 @@ describe('the unit location is the platform convention, and everything written i
         // The literal, not the constant the module exports: a test that compares the
         // file's mode against the same constant the writer used is satisfied by any
         // mode at all, which is how "owner-only" becomes an unasserted adjective.
-        expect(modeOf(m.unitPath), `${m.unitPath} is not 0600`).toBe(0o600)
+        expectMode(m.unitPath, 0o600)
         for (const directory of createdDirectories(m)) {
-          expect(modeOf(directory), `${directory} is not 0700`).toBe(0o700)
+          expectMode(directory, 0o700)
         }
       })
     })
@@ -843,12 +868,14 @@ describe('the unit location is the platform convention, and everything written i
   it('a directory that already existed keeps its mode, because it is not ours', async () => {
     // `~/.config/systemd/user` is a directory the platform and other tools share.
     // Tightening it would be this product changing something it did not create.
+    // POSIX-only: on a host without permission bits nothing is ever widened, so there
+    // is no "kept its mode" to observe. The unit file is still asserted.
     await withMachine('linux', async (m) => {
       mkdirSync(m.unitDirectory, { recursive: true, mode: 0o755 })
       await m.control.enable()
 
-      expect(modeOf(m.unitDirectory)).toBe(0o755)
-      expect(modeOf(m.unitPath)).toBe(0o600)
+      if (HAS_POSIX_MODES) expect(modeOf(m.unitDirectory)).toBe(0o755)
+      expectMode(m.unitPath, 0o600)
     })
   })
 
@@ -864,6 +891,10 @@ describe('the unit location is the platform convention, and everything written i
     // `writeFileSync`'s mode is filtered through the umask, so the chmod is what
     // makes "every path the product writes is owner-only" true rather than "unless
     // the operator's umask is unusual".
+    //
+    // POSIX-only in its premise: a umask is a POSIX concept, and on a Windows host
+    // `process.umask` has no effect and there is no mode to widen. That the enable
+    // succeeds is asserted on every host by the tests above.
     await withMachine('linux', async (m) => {
       const previous = process.umask(0o000)
       try {
@@ -871,7 +902,7 @@ describe('the unit location is the platform convention, and everything written i
       } finally {
         process.umask(previous)
       }
-      expect(modeOf(m.unitPath)).toBe(0o600)
+      expectMode(m.unitPath, 0o600)
     })
   })
 })

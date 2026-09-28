@@ -1166,10 +1166,17 @@ function scrubHomePaths(value) {
  * four would be worse than no preflight at all. So the lookup walks `PATH` the way a shell
  * does, and returns the directory it resolved to so the evidence file records which copy
  * answered.
+ *
+ * `path.delimiter` and both separators, because this is a preflight about the machine a
+ * developer is sitting at and that machine is not necessarily the one the script was
+ * authored on: `PATH` entries are `;`-separated on Windows, and a path handed in with a
+ * backslash is a path there rather than a bare command name to look up.
  */
 export function resolveOnPath(command, environment = process.env) {
   if (typeof command !== 'string' || command === '') return null
-  if (command.includes('/')) return existsSync(command) ? command : null
+  if (command.includes('/') || command.includes('\\')) {
+    return existsSync(command) ? command : null
+  }
   for (const directory of (environment.PATH ?? '').split(path.delimiter)) {
     if (directory === '') continue
     const candidate = path.join(directory, command)

@@ -284,7 +284,11 @@ describe('every check fails on its own, exits non-zero, and prints a remedy that
     expect(remedy ?? text).toMatch(/AGENT_PING_STATE_DIR|state directory|chmod/)
   }, 30_000)
 
-  it('database: a state directory readable by other users is a failure (IO-FR-07)', async () => {
+  // POSIX-only: the fault this test manufactures is a permission bit, and NTFS has
+  // none. `chmodSync(…, 0o755)` there is not a widening, and `doctor` correctly
+  // reports no mode fault - so the whole scenario is a POSIX scenario. See
+  // tests/storage/eventStore.test.ts for the same guard written the first time.
+  it.skipIf(process.platform === 'win32')('database: a state directory readable by other users is a failure (IO-FR-07)', async () => {
     const cli = await harness()
     const { chmodSync } = await import('node:fs')
     await cli.run(['status'])
@@ -654,11 +658,19 @@ describe('doctor reports and never repairs (Open Question 3)', () => {
     // A broad chmod first, because a wide state directory is the one fault a run could
     // silently fix by tightening it - and Open Question 3 says a report-only tool must
     // not. Then the digest, then four runs with the checks broken in four different ways.
+    //
+    // The widening is the one shape here that is POSIX-only: NTFS has no permission
+    // bits, so `chmod 755` is not a widening and there is no mode fault to report. The
+    // claim under test - that a doctor run changes nothing in the state directory,
+    // whatever is wrong with it - is not POSIX-only, so the test still runs there and
+    // still asserts that; only the verdict assertion that depends on the widening is
+    // conditional.
     const { chmodSync } = await import('node:fs')
-    chmodSync(cli.stateDir, 0o755)
+    const hasPosixModes = process.platform !== 'win32'
+    if (hasPosixModes) chmodSync(cli.stateDir, 0o755)
     const before = digestTree(cli.stateDir, [LOG_FILE_NAME, ROTATED_LOG_FILE_NAME])
     await cli.run(['doctor'])
-    expect(verdictFor(cli.lastText(), 'database'), cli.lastText()).toBe('fail')
+    if (hasPosixModes) expect(verdictFor(cli.lastText(), 'database'), cli.lastText()).toBe('fail')
     await cli.run(['doctor'], { runtimeVersion: 'v16.0.0' })
     await cli.run(['doctor'], { autostart: brokenAutostart() })
     await cli.run(['doctor'])
@@ -666,13 +678,13 @@ describe('doctor reports and never repairs (Open Question 3)', () => {
 
     expect(after, 'a doctor run must change nothing in the state directory').toBe(before)
     // Including the mode it was widened to: reporting a fault is not fixing it.
-    expect(statSync(cli.stateDir).mode & 0o777).toBe(0o755)
+    if (hasPosixModes) expect(statSync(cli.stateDir).mode & 0o777).toBe(0o755)
     // The plugin directory too: doctor reads it and never writes it.
     const pluginDir = resolveGlobalPluginDir({ env: cli.env, platform: cli.platform, home: cli.home })
     const pluginBefore = digestTree(path.dirname(pluginDir))
     await cli.run(['doctor'])
     expect(digestTree(path.dirname(pluginDir))).toBe(pluginBefore)
-    chmodSync(cli.stateDir, 0o700)
+    if (hasPosixModes) chmodSync(cli.stateDir, 0o700)
   }, 120_000)
 
   it('names no repair it performed, and offers none in its remedies', () => {

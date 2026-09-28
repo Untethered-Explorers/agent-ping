@@ -799,6 +799,19 @@ describe('DP-2 prototype: the mock data is deterministic', () => {
     expect(repositoryShortName('agent-ping')).toBe('agent-ping')
   })
 
+  it('derives the same identity from a Windows path as from a POSIX one', () => {
+    // A harness on Windows reports a backslash path, and the same repository must
+    // group as one row rather than as two. Asserted here because the separator
+    // handling is implemented in the prototype and would otherwise only ever be
+    // exercised on the platform it was written on.
+    expect(repositoryShortName('C:\\Users\\dev\\Projects\\agent-ping')).toBe('agent-ping')
+    expect(repositoryShortName('C:\\Users\\dev\\Projects\\agent-ping\\')).toBe('agent-ping')
+    expect(repositoryShortName('D:\\work\\knowledge-dungeon')).toBe('knowledge-dungeon')
+    expect(repositoryShortName('C:\\Users\\dev\\Projects\\agent-ping')).toBe(
+      repositoryShortName('/home/dev/Projects/agent-ping'),
+    )
+  })
+
   it('stacks the groups without overlapping them', () => {
     const { groups, rows } = buildScene(PROTOTYPE_REPOSITORIES, { width: 960, height: 540, now: PROTOTYPE_NOW })
     const second = groups[1]

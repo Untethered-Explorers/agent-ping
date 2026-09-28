@@ -15,15 +15,13 @@ import { spawnSync } from 'node:child_process'
 import { copyFileSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { nodeTool } from './lib/node-tool.mjs'
 
 const repoRoot = fileURLToPath(new URL('..', import.meta.url))
 
 /** Node-hosted concerns, compiled by tsc. The dashboard and plugin are not. */
 const TSC_ROOTS = ['src/main', 'src/hub', 'src/storage', 'src/domain', 'src/notify', 'src/cli']
 const DASHBOARD_ROOTS = ['src/dashboard']
-
-const bin = (name) =>
-  path.join(repoRoot, 'node_modules', '.bin', process.platform === 'win32' ? `${name}.cmd` : name)
 
 function walk(dir, onFile) {
   if (!existsSync(dir)) return
@@ -58,9 +56,12 @@ function htmlEntries(roots) {
   return found
 }
 
-function run(command, args, label) {
+function run(tool, toolArgs, label) {
   process.stdout.write(`\n[build] ${label}\n`)
-  const result = spawnSync(command, args, { cwd: repoRoot, stdio: 'inherit' })
+  const result = spawnSync(tool.command, [...tool.args, ...toolArgs], {
+    cwd: repoRoot,
+    stdio: 'inherit',
+  })
   if (result.error) {
     process.stderr.write(`\n[build] ${label} could not start: ${result.error.message}\n`)
     return 1
@@ -75,15 +76,22 @@ function run(command, args, label) {
 const steps = []
 let status = 0
 
+// Resolved once, through the tool's own package manifest rather than the `.bin`
+// shim directory: on Windows those shims are `.cmd` batch files, which Node refuses
+// to spawn without a shell, and adding a shell to work around that is exactly what
+// this repository's cross-platform rules forbid. See scripts/lib/node-tool.mjs.
+const tsc = nodeTool('typescript', 'tsc')
+const vite = nodeTool('vite', 'vite')
+
 // 1. Electron main and CLI via tsc.
 const mainSources = tsSources(TSC_ROOTS)
 if (mainSources.length === 0) {
   steps.push({ name: 'main (tsc)', outcome: 'skipped', detail: `no TypeScript sources under ${TSC_ROOTS.join(', ')}` })
-} else if (!existsSync(bin('tsc'))) {
+} else if (!tsc.exists) {
   status = fail('the TypeScript compiler is not installed; run `npm install` first')
   steps.push({ name: 'main (tsc)', outcome: 'failed', detail: 'tsc not installed' })
 } else {
-  const code = run(bin('tsc'), ['-p', 'tsconfig.build.json'], `main (tsc): ${mainSources.length} source file(s) -> dist/main`)
+  const code = run(tsc, ['-p', 'tsconfig.build.json'], `main (tsc): ${mainSources.length} source file(s) -> dist/main`)
   status = code || status
   steps.push({ name: 'main (tsc)', outcome: code === 0 ? 'built' : 'failed', detail: code === 0 ? `${mainSources.length} source file(s) -> dist/main` : `exit ${code}` })
 }
@@ -92,7 +100,7 @@ if (mainSources.length === 0) {
 const dashboardEntries = htmlEntries(DASHBOARD_ROOTS)
 if (dashboardEntries.length === 0) {
   steps.push({ name: 'dashboard (vite)', outcome: 'skipped', detail: `no HTML entry under ${DASHBOARD_ROOTS.join(', ')}` })
-} else if (!existsSync(bin('vite'))) {
+} else if (!vite.exists) {
   status = fail('the Vite CLI is not installed; run `npm install` first')
   steps.push({ name: 'dashboard (vite)', outcome: 'failed', detail: 'vite not installed' })
 } else {
@@ -108,7 +116,7 @@ if (dashboardEntries.length === 0) {
         '[build] vite.config.ts belongs to dashboard-engineer (DP-2); until it exists this step cannot succeed.\n',
     )
   }
-  const code = run(bin('vite'), ['build'], `dashboard (vite): ${dashboardEntries.join(', ')}`)
+  const code = run(vite, ['build'], `dashboard (vite): ${dashboardEntries.join(', ')}`)
   status = code || status
   steps.push({ name: 'dashboard (vite)', outcome: code === 0 ? 'built' : 'failed', detail: code === 0 ? dashboardEntries.join(', ') : `exit ${code}` })
 }

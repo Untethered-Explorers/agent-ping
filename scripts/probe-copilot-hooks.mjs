@@ -1251,11 +1251,26 @@ function scrubPaths(value) {
 }
 
 /**
+ * One word for a POSIX shell, single-quoted.
+ *
+ * The hook command is a shell command by the harness's own contract, so the capture
+ * directory reaches a shell. A bare path is a bug the moment the temporary directory
+ * contains a space, a parenthesis or an apostrophe - a Windows account name routinely
+ * does, and the failure looks like a hook that never fired rather than a quoting bug.
+ * Single quotes are literal in POSIX shells; the only escape needed is the embedded
+ * quote itself.
+ */
+function posixQuote(value) {
+  return `'${value.replace(/'/g, `'\\''`)}'`
+}
+
+/**
  * The hook file, installed for every declared trigger. Each entry appends its own stdin to its
  * own file, so an event that fires several times leaves several lines and an event that never
  * fires leaves no file. `cat` is used deliberately: it exits non-zero if the target directory is
  * missing, so a probe mistake surfaces in the CLI log as a hook failure instead of looking like
- * a signal that did not fire.
+ * a signal that did not fire. The path is quoted, and the redirect is not a substitute for that
+ * quoting: `>>` protects the last word only, so an unquoted directory with a space still splits.
  */
 function buildHookConfig(captureDir) {
   const hooks = {}
@@ -1263,7 +1278,7 @@ function buildHookConfig(captureDir) {
     hooks[event] = [
       {
         type: 'command',
-        bash: `cat >> ${path.join(captureDir, `${event}.jsonl`)}`,
+        bash: `cat >> ${posixQuote(path.join(captureDir, `${event}.jsonl`))}`,
         timeoutSec: 10,
       },
     ]

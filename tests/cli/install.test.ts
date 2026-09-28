@@ -461,7 +461,7 @@ const STATE_DIRECTORY_TOKENS: readonly string[] = ['XDG_STATE_HOME', 'LOCALAPPDA
 const PRODUCT_STATE_LAYOUT_TOKENS: readonly string[] = ['Library', 'AppData']
 
 describe('every path the product writes resolves through the overridable state directory', () => {
-  it('creates it at 0700 from AGENT_PING_STATE_DIR, and writes nothing outside it', async () => {
+  it('resolves it from AGENT_PING_STATE_DIR, and writes nothing outside it', async () => {
     const cli = await harness()
     // The environment variable alone, with no stateDir parameter reaching the command.
     expect(cli.env['AGENT_PING_STATE_DIR']).toBe(cli.stateDir)
@@ -472,12 +472,24 @@ describe('every path the product writes resolves through the overridable state d
     // The log is the only thing a status writes; the point is that it is inside the
     // override and nowhere else.
     expect(written).toContain(LOG_FILE_NAME)
-    expect((statSync(cli.stateDir).mode & 0o777)).toBe(0o700)
-    expect((statSync(path.join(cli.stateDir, LOG_FILE_NAME)).mode & 0o777)).toBe(0o600)
     // Nothing leaked into the temporary home: the state directory is the only place the
     // product keeps anything of its own.
     const homeEntries = existsSync(path.join(cli.home, '.local')) ? readdirSync(path.join(cli.home, '.local', 'state')) : []
     expect(homeEntries).toEqual([])
+  })
+
+  // The octal modes are the only POSIX-only fact in this group, so they are the only
+  // part guarded: NTFS reports 0o666/0o444 derived from the read-only attribute rather
+  // than a permission bit, and asserting 0o700 there would fail on a filesystem
+  // behaving correctly. Split out from the test above rather than skipping that one,
+  // so the path resolution and containment stay asserted on Windows.
+  it.skipIf(process.platform === 'win32')('creates the state directory 0700 and the log 0600', async () => {
+    const cli = await harness()
+    const code = await cli.run(['status'])
+    expect(code, cli.lastText()).toBe(0)
+
+    expect(statSync(cli.stateDir).mode & 0o777).toBe(0o700)
+    expect(statSync(path.join(cli.stateDir, LOG_FILE_NAME)).mode & 0o777).toBe(0o600)
   })
 
   it('resolves every state path through src/storage/paths.ts, and nowhere else', () => {

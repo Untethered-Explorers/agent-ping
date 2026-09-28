@@ -187,6 +187,14 @@ describe('resolving the database file (EL-FR-11, IO-FR-07)', () => {
     expect(resolveStateDir({ [STATE_DIR_ENV_VAR]: '/tmp/explicit' }, 'darwin', home)).toBe('/tmp/explicit')
   })
 
+  // The two mode assertions below are guarded on Windows, and that guard is the
+  // pattern every other POSIX-mode assertion in this suite's siblings must copy.
+  // NTFS has no POSIX permission bits: `statSync().mode & 0o777` reports 0o666 or
+  // 0o444 derived from the read-only attribute, so a `toBe(0o700)` here would fail
+  // on a filesystem that is behaving correctly and would name a product fault that
+  // does not exist. The *behaviour* being asserted - the directory is created, the
+  // file is created, the store opens - is asserted on every platform; only the
+  // octal mode is a POSIX-only fact.
   it.skipIf(process.platform === 'win32')('creates the state directory and the file owner-only', () => {
     const stateDir = path.join(temporaryDirectory(), 'state')
     vi.stubEnv(STATE_DIR_ENV_VAR, stateDir)

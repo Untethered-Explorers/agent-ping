@@ -13,6 +13,10 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+// npm itself, resolved the same way scripts/run-tests.mjs resolves every other tool:
+// through the running npm's own JavaScript entry rather than a bare `npm`, which is
+// `npm.cmd` on Windows and cannot be spawned without a shell.
+import { npmTool } from '../../scripts/lib/node-tool.mjs'
 
 const repoRoot = fileURLToPath(new URL('../../', import.meta.url))
 
@@ -71,7 +75,8 @@ function npmTest(paths: string[]): RunResult {
   const inherited = Object.fromEntries(
     Object.entries(process.env).filter(([key]) => !key.startsWith('VITEST')),
   )
-  const result = spawnSync('npm', ['test', '--', ...paths], {
+  const npm = npmTool()
+  const result = spawnSync(npm.command, [...npm.args, 'test', '--', ...paths], {
     cwd: repoRoot,
     encoding: 'utf8',
     // A nested run must not inherit the outer run's worker state.
