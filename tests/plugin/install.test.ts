@@ -63,6 +63,17 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+
+/**
+ * The joiner for an XDG path, which is POSIX on every platform.
+ *
+ * opencode resolves its own base directories with xdg-basedir, which uses forward
+ * slashes on Windows too, so the directory `resolveGlobalPluginDir` names is a POSIX
+ * path and the expectations here have to be built the same way. With the ambient joiner
+ * these assertions compared a correct POSIX answer against a backslashed one on a
+ * Windows host, which is thirteen failing tests and no product defect.
+ */
+const POSIX = path.posix
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   GENERATED_SENTINEL,
@@ -102,7 +113,7 @@ const temporaries: string[] = []
 function temporaryHome(): { home: string; env: NodeJS.ProcessEnv } {
   const home = mkdtempSync(path.join(tmpdir(), 'agent-ping-home-'))
   temporaries.push(home)
-  return { home, env: { [XDG_CONFIG_HOME_ENV_VAR]: path.join(home, '.config') } as NodeJS.ProcessEnv }
+  return { home, env: { [XDG_CONFIG_HOME_ENV_VAR]: POSIX.join(home, '.config') } as NodeJS.ProcessEnv }
 }
 
 function pluginDirOf(env: NodeJS.ProcessEnv, home: string): string {
@@ -110,11 +121,11 @@ function pluginDirOf(env: NodeJS.ProcessEnv, home: string): string {
 }
 
 function pluginFileOf(env: NodeJS.ProcessEnv, home: string): string {
-  return path.join(pluginDirOf(env, home), PLUGIN_FILE_NAME)
+  return POSIX.join(pluginDirOf(env, home), PLUGIN_FILE_NAME)
 }
 
 function metadataFileOf(env: NodeJS.ProcessEnv, home: string): string {
-  return path.join(pluginDirOf(env, home), METADATA_FILE_NAME)
+  return POSIX.join(pluginDirOf(env, home), METADATA_FILE_NAME)
 }
 
 function install(env: NodeJS.ProcessEnv, home: string, version = VERSION, extra = {}): InstallResult {
@@ -160,12 +171,12 @@ describe('a fresh install into a temporary home', () => {
     const { home, env } = temporaryHome()
     install(env, home)
     expect(pluginDirOf(env, home)).toBe(
-      path.join(env[XDG_CONFIG_HOME_ENV_VAR] as string, 'opencode', PLUGIN_DIR_NAME),
+      POSIX.join(env[XDG_CONFIG_HOME_ENV_VAR] as string, 'opencode', PLUGIN_DIR_NAME),
     )
     // Spelled out rather than derived from the resolver under test, so a resolver that
     // is wrong in both places still fails here.
     expect(pluginFileOf(env, home)).toBe(
-      path.join(env[XDG_CONFIG_HOME_ENV_VAR] as string, 'opencode', PLUGIN_DIR_NAME, PLUGIN_FILE_NAME),
+      POSIX.join(env[XDG_CONFIG_HOME_ENV_VAR] as string, 'opencode', PLUGIN_DIR_NAME, PLUGIN_FILE_NAME),
     )
   }, 60_000)
 
@@ -499,7 +510,7 @@ describe('what the installer touches', () => {
     const configDir = resolveOpencodeConfigDir({ env, home })
     mkdirSync(configDir, { recursive: true })
     const opencodeConfig = path.join(configDir, 'opencode.json')
-    const sibling = path.join(pluginDirOf(env, home), 'theirs.ts')
+    const sibling = POSIX.join(pluginDirOf(env, home), 'theirs.ts')
     writeFileSync(opencodeConfig, '{"model":"x"}\n', 'utf8')
     mkdirSync(path.dirname(sibling), { recursive: true })
     writeFileSync(sibling, 'export const Theirs = async () => ({})\n', 'utf8')
@@ -515,7 +526,7 @@ describe('what the installer touches', () => {
     // how "removes our files" stays short of "removes the user's plugin directory".
     expect(readFileSync(sibling, 'utf8')).toBe('export const Theirs = async () => ({})\n')
     expect(readFileSync(opencodeConfig, 'utf8')).toBe('{"model":"x"}\n')
-    expect(existsSync(path.join(pluginDirOf(env, home), PLUGIN_FILE_NAME))).toBe(false)
+    expect(existsSync(POSIX.join(pluginDirOf(env, home), PLUGIN_FILE_NAME))).toBe(false)
     expect(existsSync(pluginDirOf(env, home))).toBe(true)
   }, 120_000)
 
@@ -558,8 +569,8 @@ describe('what the installer touches', () => {
     expect(readdirSync(stageDir)).toEqual([])
     expect(listTree(home).map((entry) => path.relative(home, entry)).sort()).toEqual(
       [
-        path.join('.config', 'opencode', PLUGIN_DIR_NAME, METADATA_FILE_NAME),
-        path.join('.config', 'opencode', PLUGIN_DIR_NAME, PLUGIN_FILE_NAME),
+        POSIX.join('.config', 'opencode', PLUGIN_DIR_NAME, METADATA_FILE_NAME),
+        POSIX.join('.config', 'opencode', PLUGIN_DIR_NAME, PLUGIN_FILE_NAME),
       ].sort(),
     )
   }, 120_000)
@@ -774,29 +785,29 @@ describe('resolving the global plugin directory', () => {
   })
 
   it.each(PLATFORMS)('is <home>/.config/opencode/plugins on %s without the variable', (platform) => {
-    const home = path.join(path.sep, 'home', 'dev')
+    const home = POSIX.join(path.sep, 'home', 'dev')
     expect(resolveOpencodeConfigDir({ env: {}, platform, home })).toBe(
-      path.join(home, '.config', 'opencode'),
+      POSIX.join(home, '.config', 'opencode'),
     )
     expect(resolveGlobalPluginDir({ env: {}, platform, home })).toBe(
-      path.join(home, '.config', 'opencode', PLUGIN_DIR_NAME),
+      POSIX.join(home, '.config', 'opencode', PLUGIN_DIR_NAME),
     )
   })
 
   it.each(PLATFORMS)('honours XDG_CONFIG_HOME on %s, which opencode honours', (platform) => {
-    const xdg = path.join(path.sep, 'tmp', 'xdg-probe')
+    const xdg = POSIX.join(path.sep, 'tmp', 'xdg-probe')
     const env = { [XDG_CONFIG_HOME_ENV_VAR]: xdg }
-    expect(resolveGlobalPluginDir({ env, platform, home: path.join(path.sep, 'home', 'dev') })).toBe(
-      path.join(xdg, 'opencode', PLUGIN_DIR_NAME),
+    expect(resolveGlobalPluginDir({ env, platform, home: POSIX.join(path.sep, 'home', 'dev') })).toBe(
+      POSIX.join(xdg, 'opencode', PLUGIN_DIR_NAME),
     )
   })
 
   it.each(PLATFORMS)('ignores an empty or blank XDG_CONFIG_HOME on %s', (platform) => {
-    const home = path.join(path.sep, 'home', 'dev')
+    const home = POSIX.join(path.sep, 'home', 'dev')
     for (const value of ['', '   ']) {
       const env = { [XDG_CONFIG_HOME_ENV_VAR]: value }
       expect(resolveGlobalPluginDir({ env, platform, home })).toBe(
-        path.join(home, '.config', 'opencode', PLUGIN_DIR_NAME),
+        POSIX.join(home, '.config', 'opencode', PLUGIN_DIR_NAME),
       )
     }
   })
@@ -807,7 +818,7 @@ describe('resolving the global plugin directory', () => {
     // the plugin where opencode never reads it, which is the silent failure this whole
     // resolution exists to prevent.
     const env = { APPDATA: path.join(path.sep, 'Users', 'dev', 'AppData', 'Roaming'), LOCALAPPDATA: path.join(path.sep, 'Users', 'dev', 'AppData', 'Local') }
-    const resolved = resolveGlobalPluginDir({ env, platform, home: path.join(path.sep, 'home', 'dev') })
+    const resolved = resolveGlobalPluginDir({ env, platform, home: POSIX.join(path.sep, 'home', 'dev') })
     expect(resolved).not.toContain('AppData')
   })
 
@@ -816,10 +827,10 @@ describe('resolving the global plugin directory', () => {
     // `opencode debug paths` on 1.18.32 leaves `config` at the home path when it is set.
     // Installing there would be "wherever this invocation points", the opposite of one
     // global install (ADR-006).
-    const home = path.join(path.sep, 'home', 'dev')
-    const env = { OPENCODE_CONFIG_DIR: path.join(path.sep, 'tmp', 'custom-cfg') }
+    const home = POSIX.join(path.sep, 'home', 'dev')
+    const env = { OPENCODE_CONFIG_DIR: POSIX.join(path.sep, 'tmp', 'custom-cfg') }
     expect(resolveGlobalPluginDir({ env, home })).toBe(
-      path.join(home, '.config', 'opencode', PLUGIN_DIR_NAME),
+      POSIX.join(home, '.config', 'opencode', PLUGIN_DIR_NAME),
     )
   })
 
