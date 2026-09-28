@@ -1,0 +1,140 @@
+# The three-platform support contract, checked.
+#
+# WHY THIS FILE EXISTS AND WHAT IT DELIBERATELY DOES NOT CLAIM
+#
+# `package.json` declares `"os": ["darwin", "linux", "win32"]` and three per-platform
+# autostart implementations exist in `src/cli/autostart/`. Until now that contract was
+# prose: nothing ran on anything but the machine that wrote it. This workflow runs the
+# same commands on all three, so "supported" means "the suite passes there" rather than
+# "the manifest says so".
+#
+# It still does NOT mean the product has been *observed* on macOS or Windows. What runs
+# here is typecheck, lint, the Vitest suite, the build and the prepack guard - no
+# Electron, no display, no tray, no service manager. The claims in the README about what
+# has and has not been run against real software are unchanged, and the register of what
+# is still owed is docs/reviews/deferred-gates.md. A green cell here means the portable
+# half of the contract holds on that OS. It does not mean the card has ever been seen on
+# a Mac.
+#
+# WHAT IS DELIBERATELY NOT IN THIS MATRIX
+#
+#   scripts/verify-autostart-linux.mjs
+#     Needs a real `systemd --user` manager reached over a session bus. A hosted runner
+#     has none, so this job would be permanently red while proving nothing. It stays a
+#     manual gate on a Linux desktop; see docs/admin-guide.md.
+#
+#   npm run test:e2e (Playwright)
+#     The browser journey needs a display decision per platform and a Chromium download
+#     per runner image. Adding it is a deliberate next step, not an omission here, and
+#     it is left out rather than added as a non-blocking job that could be failing
+#     unnoticed for months.
+#
+#   verify-notification-surface.mjs
+#     Needs a real X display and a real status area. Same reasoning.
+#
+# WHY `npm ci` AND NOT `npm install`
+# A lockfile-respecting install is the only way the matrix tests the committed state.
+# `npm install` would silently resolve a different tree and a green cell would describe
+# a dependency set nobody ships.
+#
+# WHY NO STEP BELOW USES SHELL SYNTAX
+#
+# The default `run` shell is `bash -e` on Linux and macOS and `pwsh` on Windows, so
+# the runner is not running one language across the matrix. That is fine only because
+# no step in this file contains shell syntax: no pipes, no redirection, no globs, no
+# variable expansion, no `&&`, no quoting tricks. Every step is `run: <program> <args>`.
+#
+# This is a rule for this file rather than a comment about it. A step that later grows
+# a `| tee` or an `&&` chain will work on two of the three runners and silently not run
+# on the third, which is precisely the class of defect the cross-platform contract exists
+# to prevent. Force `shell: bash` explicitly if a step ever genuinely needs a shell, so
+# the dependency is declared instead of inherited.
+#
+# The one step that is not a bare program is the platform report at the end, and it is
+# a `node -e` whose argument is a single-quoted JavaScript string: PowerShell passes that
+# through unchanged, and the single quotes keep the JavaScript string literal intact
+# under bash as well.
+
+name: ci
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+# A new push supersedes an in-flight run of the same ref. The superseded run is not
+# worth finishing, and three operating systems multiply the wall-clock cost of leaving
+# them going.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # One at a time per platform, but the three run concurrently with each other.
+      # A matrix without this reports the first failure and cancels the rest, which
+      # loses exactly the information this workflow exists to produce: which of the
+      # three platforms a change broke.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    env:
+      # Colour off, so a log line is the same string on every runner and a
+      # platform-specific difference in one cannot be mistaken for a product
+      # difference. CI logs are read as text.
+      FORCE_COLOR: '0'
+      NO_COLOR: '1'
+      # npm's own update notifier writes to stderr and is not a test signal.
+      NO_UPDATE_NOTIFIER: '1'
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      # The version the product's `engines.node` field requires, and the version its
+      # published package declares. Reading it here rather than repeating a literal is
+      # what keeps this file from quietly testing a Node the product no longer claims
+      # to support.
+      - name: Set up Node from the package's own engines field
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: package.json
+          cache: npm
+
+      - name: Install from the lockfile
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      # The whole Vitest suite, both projects (node and jsdom). POSIX-only mode
+      # assertions skip themselves on the Windows cell rather than failing there; the
+      # behaviour they accompany is asserted on all three.
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      # The publishing guard. It reads the built tree, so it runs after the build and
+      # is the check that would catch a `files` allowlist or a launch-policy
+      # regression on a platform nobody builds from by hand.
+      - name: Prepack guard
+        run: npm run prepack
+
+      - name: Report the platform the run actually used
+        # A cell that silently ran on a different OS than its name claims is a green
+        # result about the wrong machine. Printed so the log itself carries the
+        # evidence rather than the job title.
+        run: node -e "process.stdout.write('os=' + process.platform + ' arch=' + process.arch + ' node=' + process.version + '\n')"
