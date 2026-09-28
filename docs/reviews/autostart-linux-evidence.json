@@ -1,0 +1,425 @@
+{
+  "machine": {
+    "platform": "linux-x64",
+    "node": "v22.22.2",
+    "repoVersion": "0.1.0",
+    "display": ":1",
+    "systemdVersion": "systemd 255 (255.4-1ubuntu8.17)",
+    "sessionType": "x11"
+  },
+  "temporary": {
+    "root": "/tmp/agent-ping-autostart-verify-tY1wyQ",
+    "stateDir": "/tmp/agent-ping-autostart-verify-tY1wyQ/state",
+    "repoFullPath": "/tmp/agent-ping-autostart-verify-tY1wyQ/repo"
+  },
+  "unit": {
+    "path": "/home/mcfuzzysquirrel/.config/systemd/user/agent-ping.service",
+    "wantsLink": "/home/mcfuzzysquirrel/.config/systemd/user/default.target.wants/agent-ping.service",
+    "managerBefore": null,
+    "managerAfter": "enabled",
+    "managerAfterUninstall": "not-found"
+  },
+  "plugin": {
+    "file": "/home/mcfuzzysquirrel/.config/opencode/plugins/agent-ping.ts",
+    "metadata": "/home/mcfuzzysquirrel/.config/opencode/plugins/package.json",
+    "existedBefore": null
+  },
+  "stateDir": {
+    "database": "/tmp/agent-ping-autostart-verify-tY1wyQ/state/agent-ping.db",
+    "runtimeFile": "/tmp/agent-ping-autostart-verify-tY1wyQ/state/hub-runtime.json"
+  },
+  "commands": [
+    {
+      "label": "install",
+      "command": "/home/mcfuzzysquirrel/.nvm/versions/node/v22.22.2/bin/node /home/mcfuzzysquirrel/Projects/agent-ping/dist/main/cli/index.js install",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 1142,
+      "error": null,
+      "header": "agent-ping install: 3 changes.",
+      "rows": {
+        "plugin": "wrote /home/mcfuzzysquirrel/.config/opencode/plugins/agent-ping.ts (agent-ping 0.1.0)",
+        "autostart": "enabled /home/mcfuzzysquirrel/.config/systemd/user/agent-ping.service",
+        "hub": "started and serving at http://127.0.0.1:43120"
+      },
+      "remedies": {}
+    },
+    {
+      "label": "doctor",
+      "command": "/home/mcfuzzysquirrel/.nvm/versions/node/v22.22.2/bin/node /home/mcfuzzysquirrel/Projects/agent-ping/dist/main/cli/index.js doctor",
+      "exit": 1,
+      "signal": null,
+      "durationMs": 96,
+      "error": null,
+      "header": "agent-ping doctor 0.1.0 on linux",
+      "rows": {
+        "state": "directory /tmp/agent-ping-autostart-verify-tY1wyQ/state",
+        "runtime": "ok node v22.22.2",
+        "database": "ok /tmp/agent-ping-autostart-verify-tY1wyQ/state/agent-ping.db, state directory mode 700, writable",
+        "port": "ok 127.0.0.1:43120 is serving this agent-ping; the preferred 43117 was not available",
+        "plugin": "ok agent-ping 0.1.0 at /home/mcfuzzysquirrel/.config/opencode/plugins/agent-ping.ts",
+        "autostart": "ok enabled (/home/mcfuzzysquirrel/.config/systemd/user/agent-ping.service)",
+        "notification": "surface ok the hub created its card window and a notifier is wired behind it",
+        "tray": "fail this run asked for a tray and the desktop did not give it one, so the pending count is not on the desktop",
+        "remedy:": "this is not a missing runtime: the desktop refused the icon. Check that the session has a status area (a StatusNotifierItem host on Linux) and re-run `agent-ping doctor` (NT-FR-05, NT-FR-11)"
+      },
+      "remedies": {}
+    },
+    {
+      "label": "install (second run)",
+      "command": "/home/mcfuzzysquirrel/.nvm/versions/node/v22.22.2/bin/node /home/mcfuzzysquirrel/Projects/agent-ping/dist/main/cli/index.js install",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 611,
+      "error": null,
+      "header": "agent-ping install: nothing was changed.",
+      "rows": {
+        "plugin": "agent-ping 0.1.0 is already installed at /home/mcfuzzysquirrel/.config/opencode/plugins/agent-ping.ts; not one byte was touched",
+        "autostart": "already enabled (/home/mcfuzzysquirrel/.config/systemd/user/agent-ping.service)",
+        "hub": "already running at http://127.0.0.1:43120"
+      },
+      "remedies": {}
+    },
+    {
+      "label": "install (with a mismatched plugin version)",
+      "command": "/home/mcfuzzysquirrel/.nvm/versions/node/v22.22.2/bin/node /home/mcfuzzysquirrel/Projects/agent-ping/dist/main/cli/index.js install",
+      "exit": 1,
+      "signal": null,
+      "durationMs": 180,
+      "error": null,
+      "header": "agent-ping install: 1 of 3 steps failed.",
+      "rows": {
+        "plugin": "agent-ping 0.1.0 was not installed: /home/mcfuzzysquirrel/.config/opencode/plugins/agent-ping.ts already holds agent-ping 0.0.0-io4-verified-elsewhere, and replacing another version is a decision rather than a default. Uninstall first, or install again with force.",
+        "autostart": "already enabled (/home/mcfuzzysquirrel/.config/systemd/user/agent-ping.service)",
+        "hub": "already running at http://127.0.0.1:43120"
+      },
+      "remedies": {
+        "plugin": "run `agent-ping uninstall` first, or run `agent-ping install --force` once you have decided to replace agent-ping 0.0.0-io4-verified-elsewhere"
+      }
+    },
+    {
+      "label": "uninstall",
+      "command": "/home/mcfuzzysquirrel/.nvm/versions/node/v22.22.2/bin/node /home/mcfuzzysquirrel/Projects/agent-ping/dist/main/cli/index.js uninstall",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 78,
+      "error": null,
+      "header": "agent-ping uninstall: 3 changes.",
+      "rows": {
+        "plugin": "removed 2 files from /home/mcfuzzysquirrel/.config/opencode/plugins",
+        "autostart": "removed /home/mcfuzzysquirrel/.config/systemd/user/agent-ping.service",
+        "state": "removed agent-ping.log, hub-write-token from /tmp/agent-ping-autostart-verify-tY1wyQ/state; database: kept /tmp/agent-ping-autostart-verify-tY1wyQ/state/agent-ping.db; pass --purge to remove it (Open Question 4: a mistaken uninstall must be recoverable)"
+      },
+      "remedies": {}
+    }
+  ],
+  "baseline": {
+    "preexisting": [
+      "the default.target.wants directory (/home/mcfuzzysquirrel/.config/systemd/user/default.target.wants)",
+      "the systemd per-user unit directory (/home/mcfuzzysquirrel/.config/systemd/user)",
+      "the Electron per-user profile directory (/home/mcfuzzysquirrel/.config/agent-ping)"
+    ],
+    "createdByThisRun": [
+      "the opencode plugin file (/home/mcfuzzysquirrel/.config/opencode/plugins/agent-ping.ts)",
+      "the plugin install record (/home/mcfuzzysquirrel/.config/opencode/plugins/package.json)",
+      "the opencode plugin directory (/home/mcfuzzysquirrel/.config/opencode/plugins)",
+      "the unit wants symlink (/home/mcfuzzysquirrel/.config/systemd/user/default.target.wants/agent-ping.service)",
+      "the systemd user unit (/home/mcfuzzysquirrel/.config/systemd/user/agent-ping.service)",
+      "this account's own agent-ping state directory (/home/mcfuzzysquirrel/.local/state/agent-ping)"
+    ]
+  },
+  "watched": [
+    {
+      "label": "the opencode plugin file (/home/mcfuzzysquirrel/.config/opencode/plugins/agent-ping.ts)",
+      "target": "/home/mcfuzzysquirrel/.config/opencode/plugins/agent-ping.ts",
+      "before": {
+        "kind": "absent"
+      },
+      "after": {
+        "kind": "absent"
+      }
+    },
+    {
+      "label": "the plugin install record (/home/mcfuzzysquirrel/.config/opencode/plugins/package.json)",
+      "target": "/home/mcfuzzysquirrel/.config/opencode/plugins/package.json",
+      "before": {
+        "kind": "absent"
+      },
+      "after": {
+        "kind": "absent"
+      }
+    },
+    {
+      "label": "the opencode plugin directory (/home/mcfuzzysquirrel/.config/opencode/plugins)",
+      "target": "/home/mcfuzzysquirrel/.config/opencode/plugins",
+      "before": {
+        "kind": "absent"
+      },
+      "after": {
+        "kind": "absent"
+      }
+    },
+    {
+      "label": "the unit wants symlink (/home/mcfuzzysquirrel/.config/systemd/user/default.target.wants/agent-ping.service)",
+      "target": "/home/mcfuzzysquirrel/.config/systemd/user/default.target.wants/agent-ping.service",
+      "before": {
+        "kind": "absent"
+      },
+      "after": {
+        "kind": "absent"
+      }
+    },
+    {
+      "label": "the default.target.wants directory (/home/mcfuzzysquirrel/.config/systemd/user/default.target.wants)",
+      "target": "/home/mcfuzzysquirrel/.config/systemd/user/default.target.wants",
+      "before": {
+        "kind": "directory",
+        "mode": 493
+      },
+      "after": {
+        "kind": "directory",
+        "mode": 493
+      }
+    },
+    {
+      "label": "the systemd user unit (/home/mcfuzzysquirrel/.config/systemd/user/agent-ping.service)",
+      "target": "/home/mcfuzzysquirrel/.config/systemd/user/agent-ping.service",
+      "before": {
+        "kind": "absent"
+      },
+      "after": {
+        "kind": "absent"
+      }
+    },
+    {
+      "label": "the systemd per-user unit directory (/home/mcfuzzysquirrel/.config/systemd/user)",
+      "target": "/home/mcfuzzysquirrel/.config/systemd/user",
+      "before": {
+        "kind": "directory",
+        "mode": 493
+      },
+      "after": {
+        "kind": "directory",
+        "mode": 493
+      }
+    },
+    {
+      "label": "this account's own agent-ping state directory (/home/mcfuzzysquirrel/.local/state/agent-ping)",
+      "target": "/home/mcfuzzysquirrel/.local/state/agent-ping",
+      "before": {
+        "kind": "absent"
+      },
+      "after": {
+        "kind": "absent"
+      }
+    },
+    {
+      "label": "the Electron per-user profile directory (/home/mcfuzzysquirrel/.config/agent-ping)",
+      "target": "/home/mcfuzzysquirrel/.config/agent-ping",
+      "before": {
+        "kind": "directory",
+        "mode": 448
+      },
+      "after": {
+        "kind": "directory",
+        "mode": 448
+      }
+    }
+  ],
+  "restore": [
+    "the unit wants symlink (/home/mcfuzzysquirrel/.config/systemd/user/default.target.wants/agent-ping.service): unchanged",
+    "the default.target.wants directory (/home/mcfuzzysquirrel/.config/systemd/user/default.target.wants): unchanged",
+    "the systemd user unit (/home/mcfuzzysquirrel/.config/systemd/user/agent-ping.service): unchanged",
+    "the opencode plugin file (/home/mcfuzzysquirrel/.config/opencode/plugins/agent-ping.ts): unchanged",
+    "the plugin install record (/home/mcfuzzysquirrel/.config/opencode/plugins/package.json): unchanged",
+    "the opencode plugin directory (/home/mcfuzzysquirrel/.config/opencode/plugins): unchanged",
+    "this account's own agent-ping state directory (/home/mcfuzzysquirrel/.local/state/agent-ping): unchanged",
+    "the systemd per-user unit directory (/home/mcfuzzysquirrel/.config/systemd/user): unchanged",
+    "the Electron per-user profile directory (/home/mcfuzzysquirrel/.config/agent-ping): unchanged"
+  ],
+  "residue": [],
+  "pending": {
+    "before": {
+      "items": [
+        {
+          "eventId": "fa62b715-db2d-47eb-b7d9-fa5fed94b2c0",
+          "sessionId": "ses_io4_28wm3-muknb814",
+          "class": "needs-you",
+          "subtype": null,
+          "rawEventType": "permission.asked",
+          "occurredAt": "2026-09-28T02:46:00.088Z",
+          "receivedAt": "2026-09-28T02:46:00.091Z",
+          "dedupeKey": "opencode:ses_io4_28wm3-muknb814:blk_io4_28wm3-muknb814",
+          "ackState": "unacknowledged",
+          "resolutionState": "unresolved",
+          "harness": "opencode",
+          "repoShortName": "repo",
+          "repoFullPath": "/tmp/agent-ping-autostart-verify-tY1wyQ/repo"
+        }
+      ],
+      "count": 1
+    },
+    "after": {
+      "items": [
+        {
+          "eventId": "fa62b715-db2d-47eb-b7d9-fa5fed94b2c0",
+          "sessionId": "ses_io4_28wm3-muknb814",
+          "class": "needs-you",
+          "subtype": null,
+          "rawEventType": "permission.asked",
+          "occurredAt": "2026-09-28T02:46:00.088Z",
+          "receivedAt": "2026-09-28T02:46:00.091Z",
+          "dedupeKey": "opencode:ses_io4_28wm3-muknb814:blk_io4_28wm3-muknb814",
+          "ackState": "unacknowledged",
+          "resolutionState": "unresolved",
+          "harness": "opencode",
+          "repoShortName": "repo",
+          "repoFullPath": "/tmp/agent-ping-autostart-verify-tY1wyQ/repo"
+        }
+      ],
+      "count": 1
+    },
+    "historyBefore": [
+      {
+        "eventId": "fa62b715-db2d-47eb-b7d9-fa5fed94b2c0",
+        "sessionId": "ses_io4_28wm3-muknb814",
+        "class": "needs-you",
+        "subtype": null,
+        "rawEventType": "permission.asked",
+        "occurredAt": "2026-09-28T02:46:00.088Z",
+        "receivedAt": "2026-09-28T02:46:00.091Z",
+        "dedupeKey": "opencode:ses_io4_28wm3-muknb814:blk_io4_28wm3-muknb814",
+        "ackState": "unacknowledged",
+        "resolutionState": "unresolved"
+      }
+    ],
+    "historyAfter": [
+      {
+        "eventId": "fa62b715-db2d-47eb-b7d9-fa5fed94b2c0",
+        "sessionId": "ses_io4_28wm3-muknb814",
+        "class": "needs-you",
+        "subtype": null,
+        "rawEventType": "permission.asked",
+        "occurredAt": "2026-09-28T02:46:00.088Z",
+        "receivedAt": "2026-09-28T02:46:00.091Z",
+        "dedupeKey": "opencode:ses_io4_28wm3-muknb814:blk_io4_28wm3-muknb814",
+        "ackState": "unacknowledged",
+        "resolutionState": "unresolved"
+      }
+    ]
+  },
+  "health": {
+    "before": {
+      "status": "ok",
+      "instanceId": "6bda5017-b40e-4fba-9880-a0c181fdcda7",
+      "pid": 3774774,
+      "host": "127.0.0.1",
+      "port": 43120,
+      "origin": "http://127.0.0.1:43120",
+      "startedAt": "2026-09-28T02:45:59.347Z",
+      "uptimeSeconds": 1,
+      "requests": 0,
+      "database": {
+        "filePath": "/tmp/agent-ping-autostart-verify-tY1wyQ/state/agent-ping.db",
+        "schemaVersion": 1,
+        "rebuiltFromMigrations": false,
+        "readable": true,
+        "sessionCount": 0,
+        "pendingCount": 0
+      },
+      "server": {
+        "host": "127.0.0.1",
+        "port": 43120,
+        "origin": "http://127.0.0.1:43120",
+        "listening": true,
+        "state": "running",
+        "servedRequests": 0
+      },
+      "dashboard": {
+        "available": true,
+        "root": "/home/mcfuzzysquirrel/Projects/agent-ping/dist/dashboard"
+      },
+      "desktop": {
+        "bridge": "present",
+        "tray": "unavailable",
+        "surface": "available"
+      },
+      "delivery": {
+        "status": "ok",
+        "wired": true,
+        "attempted": 0,
+        "delivered": 0,
+        "failed": 0,
+        "timedOut": 0,
+        "suppressed": 0,
+        "notWired": 0,
+        "replayed": 0,
+        "inFlight": 0,
+        "lastAttemptAt": null,
+        "lastFailure": null
+      }
+    },
+    "after": {
+      "status": "ok",
+      "instanceId": "ae60c4cb-70f3-4033-840d-fa638f95f305",
+      "pid": 3774893,
+      "host": "127.0.0.1",
+      "port": 43120,
+      "origin": "http://127.0.0.1:43120",
+      "startedAt": "2026-09-28T02:46:00.862Z",
+      "uptimeSeconds": 0,
+      "requests": 0,
+      "database": {
+        "filePath": "/tmp/agent-ping-autostart-verify-tY1wyQ/state/agent-ping.db",
+        "schemaVersion": 1,
+        "rebuiltFromMigrations": false,
+        "readable": true,
+        "sessionCount": 1,
+        "pendingCount": 1
+      },
+      "server": {
+        "host": "127.0.0.1",
+        "port": 43120,
+        "origin": "http://127.0.0.1:43120",
+        "listening": true,
+        "state": "starting",
+        "servedRequests": 0
+      },
+      "dashboard": {
+        "available": true,
+        "root": "/home/mcfuzzysquirrel/Projects/agent-ping/dist/dashboard"
+      },
+      "desktop": {
+        "bridge": "present",
+        "tray": "unavailable",
+        "surface": "available"
+      },
+      "delivery": {
+        "status": "ok",
+        "wired": true,
+        "attempted": 1,
+        "delivered": 0,
+        "failed": 0,
+        "timedOut": 0,
+        "suppressed": 0,
+        "notWired": 0,
+        "replayed": 0,
+        "inFlight": 1,
+        "lastAttemptAt": null,
+        "lastFailure": null
+      }
+    }
+  },
+  "serviceManager": {
+    "before": {
+      "command": "not-found",
+      "exit": 4
+    },
+    "after": {
+      "startExit": 0,
+      "active": "active"
+    },
+    "activeAfterStart": "active"
+  },
+  "requiredProductChanges": []
+}

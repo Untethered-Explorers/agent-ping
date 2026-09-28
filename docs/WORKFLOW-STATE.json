@@ -1,12 +1,12 @@
 {
   "runId": "7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8",
   "startedAt": "2026-09-26T10:43:05.421Z",
-  "lastUpdatedAt": "2026-09-28T02:12:07.625Z",
+  "lastUpdatedAt": "2026-09-28T02:48:21.593Z",
   "manifestPath": "/home/mcfuzzysquirrel/Projects/agent-ping/docs/EXECUTION-MANIFEST.json",
   "manifestVersion": "1.0",
   "harness": "opencode",
   "status": "running",
-  "currentPhase": "INSTALL-AUTOSTART-AND-OPERATIONS-2",
+  "currentPhase": "INSTALL-AUTOSTART-AND-OPERATIONS-3",
   "tasks": {
     "DP-1": {
       "taskId": "DP-1",
@@ -1539,10 +1539,38 @@
     },
     "IO-4": {
       "taskId": "IO-4",
-      "status": "pending",
+      "status": "complete",
       "ownerAgent": "qa-engineer",
-      "attempt": 0,
-      "outputFiles": []
+      "attempt": 1,
+      "outputFiles": [
+        "scripts/verify-autostart-linux.mjs",
+        "tests/scripts/verify-autostart-linux.test.ts",
+        "README.md",
+        "docs/runbooks/io-5-operations-review.md",
+        "docs/reviews/autostart-linux-evidence.json"
+      ],
+      "startedAt": "2026-09-28T02:12:07.686Z",
+      "attemptHistory": [
+        {
+          "attempt": 1,
+          "outcome": "passed",
+          "resultPath": "docs/artifacts/IO-4.2026-09-28T02-48-21-584Z.attempt-1.result.json"
+        }
+      ],
+      "completedAt": "2026-09-28T02:48:21.593Z",
+      "agentOutput": "I'll start by reading the execution file.\nNow I'll write the verification script.\nNow the live run.\nNow let me clean up the residue from the crashed attempt by hand, then re-run from a genuinely clean baseline.\nNow the test suite.\n## Result\n\n**IO-4 delivered and live-verified on this machine.** `scripts/verify-autostart-linux.mjs` (24 declared assertions, 7 groups) drives a real `systemd --user` manager: `agent-ping install` writes the plugin and a user unit the live manager reports `enabled`, brings up a hub; a `needs-you` signal posted through the product's own `POST /api/ingest` becomes one pending item; the hub is stopped and started **through the manager**; the item, its history row and the pending count come back identical and once; a second install prints \"nothing was changed\"; a mismatched plugin version is reported with both ways forward and not replaced; `uninstall` removes the plugin and unit (manager then reports `not-found`) and keeps the database. All 24 passed on Linux/X11 in ~4.5 s, exit 0, with every real-machine path restored.\n\n### Files created\n- `scripts/verify-autostart-linux.mjs`\n- `tests/scripts/verify-autostart-linux.test.ts`\n- `docs/reviews/autostart-linux-evidence.json` (the live run's own evidence)\n\n### Files changed\n- `docs/runbooks/io-5-operations-review.md` — new §2a; the same script must be run on macOS and Windows for either to be claimed\n- `README.md` — Linux live-verified, macOS/Windows unearned, new \"no login observed\" entry\n\n### Decisions worth flagging\n- The unit directory **cannot** be temporary: a live `systemd --user` manager ignores a client's `XDG_CONFIG_HOME` (measured here — `is-enabled` says `not-found` for a file sitting right there). The state dir *is* temporary; the unit/plugin paths are written where the manager reads them and restored byte for byte, with the preflight refusing to run if the shell and manager disagree.\n- `--simulate-missing-service-manager` exists so \"the service manager is unavailable\" is a claim a test can make; the suite spawns the real script with it.\n\n### Validation\n`npm test -- tests/scripts/verify-autostart-linux.test.ts` 41/41; `npm run typecheck` 0; `npm run lint` 0; whole suite 1825/1825 in 49 files; live run exit 0 with the machine verified clean afterwards.\n\n```forge-result\n{\"summary\":\"IO-4 complete. scripts/verify-autostart-linux.mjs drives a real systemd --user manager through install, health, a needs-you item, a service-manager stop/start, a repeat install, a version mismatch, and uninstall, asserting 24 named rows with a pure decide() that fails on any shortfall, mismatch or absent dependency; tests/scripts/verify-autostart-linux.test.ts (41 tests) drives that judgement with injected command results and spawns the real script to prove an unavailable service manager exits non-zero. All four acceptance criteria are met. Validation: npm test -- tests/scripts/verify-autostart-linux.test.ts 41/41; npm run typecheck, npm run lint, npm run build exit 0; whole suite 1825/1825 in 49 files. A real live run on this Linux machine passed 24/24 in 4.5 s, exit 0, and left no residue.\",\"unresolved\":[],\"decisions\":[\"The per-user unit directory is deliberately NOT temporary: a live systemd --user manager resolves its search path from the environment it was started with and ignores a client's XDG_CONFIG_HOME, so a unit written anywhere else can never be started by it. The product state IS temporary (AGENT_PING_STATE_DIR), and every real-machine path the run touches is backed up and restored byte for byte on all exit paths, with a `baseline` block in the summary saying which were pre-existing.\",\"The preflight refuses to run when the manager and the shell disagree about the unit directory, or when a hub is already live for this account's own state directory, rather than quietly proving something weaker than the script says.\",\"A restart is only a restart if the process and instance identity change, so that is its own assertion; and the pending claim is 'once, unchanged', so a duplicate and a loss are each a failure.\",\"`--simulate-missing-service-manager` makes the absent-dependency path a claim a test can make by running the script, not by reading its code.\"],\"tests\":[\"npm test -- tests/scripts/verify-autostart-linux.test.ts: exit 0 (41/41)\",\"npm run typecheck: exit 0\",\"npm run lint: exit 0\",\"npm test (whole suite): 1825/1825 in 49 files\",\"node scripts/verify-autostart-linux.mjs (live, this machine): exit 0, 24/24 assertions, residue []\"],\"warnings\":[\"I edited two files this task did not name. docs/runbooks/io-5-operations-review.md said `IO-4` does not exist and that no live service manager had ever run these units, both of which this task made false; README.md repeated the same claim in three places and now also records a fourth known-unverified item, because a login is still unobserved on every platform and the two docs must not disagree with the run.\",\"I added docs/reviews/autostart-linux-evidence.json, a third deliverable, so the README and runbook point at a retained artefact rather than a command. It contains only the product's own content-free fields.\",\"Found and fixed a real defect in my own first draft: the poll timer was unref'd, so the script emptied its event loop, exited 13 mid-run after having SIGTERMed the hub, and its restore never ran. A `keepAlive` handle now holds the process for the duration of the run, and the header records why.\"],\"validationLimitations\":[\"Linux only, one machine, this one (Ubuntu 24.04, systemd 255.4, X11, DISPLAY=:1). No macOS and no Windows observation of any kind is claimed and none was possible: their units remain unit-tested bytes and paths only, and APX-CON-06 keeps the human gate on those platforms. The runbook and README both say the same script must be run on those machines.\",\"No login and no reboot was observed. What is proven is that the live manager accepts, activates, stops and starts the unit; a log out and back in is a different observation and the runbook says so.\",\"The run needs a graphical session (the unit's ExecStart is the packaged Electron runtime). A headless machine has no DISPLAY, which is a fault of the environment, not something this script reports as a pass.\",\"`doctor` exits 1 during the run: the hub the manager started reports desktop.tray fail because this session has no StatusNotifierItem host. The script asserts only doctor's autostart row (ok) and records the whole report and the exit code in the evidence; the tray remedy is IO-5's judgement to make, not mine.\"]}\n```\n",
+      "validationLimitations": [
+        "Linux only, one machine, this one (Ubuntu 24.04, systemd 255.4, X11, DISPLAY=:1). No macOS and no Windows observation of any kind is claimed and none was possible: their units remain unit-tested bytes and paths only, and APX-CON-06 keeps the human gate on those platforms. The runbook and README both say the same script must be run on those machines.",
+        "No login and no reboot was observed. What is proven is that the live manager accepts, activates, stops and starts the unit; a log out and back in is a different observation and the runbook says so.",
+        "The run needs a graphical session (the unit's ExecStart is the packaged Electron runtime). A headless machine has no DISPLAY, which is a fault of the environment, not something this script reports as a pass.",
+        "`doctor` exits 1 during the run: the hub the manager started reports desktop.tray fail because this session has no StatusNotifierItem host. The script asserts only doctor's autostart row (ok) and records the whole report and the exit code in the evidence; the tray remedy is IO-5's judgement to make, not mine."
+      ],
+      "artifactId": "work-io-4-001",
+      "inputArtifactIds": [
+        "work-io-2-001",
+        "work-io-3-001",
+        "work-oa-5-001"
+      ]
     },
     "IO-5": {
       "taskId": "IO-5",

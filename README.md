@@ -49,7 +49,7 @@ and the claims are tabulated in
 | opencode adapter: event translation, transport with visible failure, global plugin install | Built, tested, and **driven against the real `opencode` binary** by OA-5 |
 | PixiJS 8 dashboard prototype, DOM mirror, keyboard model | Built, reviewed (`DP-4`) |
 | Live dashboard wired to the hub (LD-1 → LD-4) | `LD-1` done — renders live state, grouped, with staleness. `LD-2`–`LD-4` (mirror, interactions, browser journey) not started |
-| CLI, npm package, autostart, `doctor` (IO-1 → IO-4) | The package, its `files` allowlist and its prepack guard are done (`IO-1`). `install`, `uninstall`, `status` and `doctor` are built and tested through the command entry point (`IO-2`), including the failure exits. The per-platform autostart units are done (`IO-3`) — a systemd user unit, a launchd user agent and a per-user Startup-folder entry, each idempotent, reversible, owner-only and root-free, **unit-tested against a temporary home and *not* live-verified**; `IO-4`'s live service-manager script is what closes that |
+| CLI, npm package, autostart, `doctor` (IO-1 → IO-4) | The package, its `files` allowlist and its prepack guard are done (`IO-1`). `install`, `uninstall`, `status` and `doctor` are built and tested through the command entry point (`IO-2`), including the failure exits. The per-platform autostart units are done (`IO-3`) — a systemd user unit, a launchd user agent and a per-user Startup-folder entry, each idempotent, reversible, owner-only and root-free. `IO-4` drives a **real `systemd --user` manager**: it installs into a temporary state directory, has the live manager enable, start, stop and start the unit again, and asserts a pending item, its history row and the pending count survive that restart unchanged and once, then that `uninstall` removes the plugin and the unit and keeps the database. **Live-verified on Linux only** |
 | Polling fallback, live run against a real session (OA-4 → OA-6) | `OA-4` and `OA-5` done — real binary, real permission decision, real hub, breadcrumb when the hub is absent. **`OA-6` deferred**: the human journey was not performed |
 | GitHub Copilot CLI ACP spike (CP-1 → CP-2) | Done. `CP-3` **deferred** the adapter, and `CP-4` turned that into a runbook and a test. v1 ships opencode only |
 
@@ -60,26 +60,32 @@ and the claims are tabulated in
 > build missing any required artefact — and the build now passes it, so
 > `npm install -g .` from a built checkout gives you a working command. It now also
 > gives you a login unit: `agent-ping install` writes the plugin, enables autostart
-> and starts the hub. What is **not** yet observed against real software is a login
-> that starts it — the units are implemented and unit-tested against a temporary
-> home, and `IO-4`'s script against a real service manager is the evidence that is
-> still owed.
+> and starts the hub, and on Linux a real `systemd --user` manager has been shown to
+> accept that unit and to start, stop and start it again. What is **not** yet observed
+> against real software is a **login** that starts it, on any platform.
 > [docs/PROGRESS.md](docs/PROGRESS.md) is the running build log, including every check
 > that is *not* yet verified against real software.
 
-Three things in this repository are **known not to be verified**, and each is recorded
+Four things in this repository are **known not to be verified**, and each is recorded
 rather than glossed:
 
 1. **Nothing has ever run on macOS or Windows.** Every observation comes from one Linux
    desktop. The notification surface is one code path across all three platforms and only
    the window manager differs, but that is a statement about the code, not an observation.
-2. **No human has watched the product work end to end.** Three review gates — `OA-6`,
+   The same goes for autostart: the macOS and Windows units are unit-tested against a
+   temporary home and have had no live service manager of their own. The same script, run on
+   those machines, is what would earn the claim — see
+   [`docs/runbooks/io-5-operations-review.md`](docs/runbooks/io-5-operations-review.md) §2a.
+2. **No login has been observed anywhere.** `systemctl --user start` is not a log out and
+   back in. A reboot or a session restart is the only evidence for that, and it is the
+   operations review's to collect.
+3. **No human has watched the product work end to end.** Three review gates — `OA-6`,
    `LD-5` and `IO-5` — were closed without the review being performed, and two of them
    (`LD-5`, `IO-5`) were closed before the software they review had been written. Read
    [`docs/reviews/deferred-gates.md`](docs/reviews/deferred-gates.md) before trusting a
    `complete` in the workflow state; it lists exactly what is owed, and the runbooks that
    discharge it.
-3. **Half the end-to-end evidence was not retained.** `OA-5` declared only its script and
+4. **Half the end-to-end evidence was not retained.** `OA-5` declared only its script and
    test as outputs, so the machine summary of the real-harness run was never committed.
 
 ## How it works
@@ -234,11 +240,33 @@ systemctl --user start agent-ping.service
 ```
 
 **Verification state:** implemented and unit-tested against a temporary home on all
-three platforms (`tests/cli/autostart.test.ts`), and the enable/disable/uninstall
-journey was also driven through the built `agent-ping` command on Linux. **No live
-service manager has run these units, and no login has been observed** — that is
-`IO-4`'s live script on Linux, and a human gate is the only possible evidence on macOS
-and Windows.
+three platforms (`tests/cli/autostart.test.ts`), and on **Linux** driven against a real
+`systemd --user` manager by [`scripts/verify-autostart-linux.mjs`](scripts/verify-autostart-linux.mjs)
+— that run has the live manager report the unit `enabled`, stop and start it again, and a
+pending item, its history row and the pending count survive that restart unchanged and once
+(`docs/reviews/autostart-linux-evidence.json`). **No login has been observed on any
+platform**, and macOS and Windows have had no live service manager at all: the same script
+run on those machines is what would earn either claim, and
+[`docs/runbooks/io-5-operations-review.md`](docs/runbooks/io-5-operations-review.md) §2a says
+what a reviewer has to do there.
+
+#### The live autostart and restart run
+
+```bash
+npm run build
+node scripts/verify-autostart-linux.mjs     # ~5 s; JSON summary on stdout, progress on stderr
+```
+
+It installs into a temporary state directory (`AGENT_PING_STATE_DIR`), so the database, the
+runtime file, the write token and the local log never touch your own. The unit directory
+cannot be made temporary — a live user service manager reads unit files from the environment
+*it* was started with and ignores your shell's `XDG_CONFIG_HOME` — so the run writes the
+plugin, its install record and the unit where a real manager reads them, then **restores
+every one of those paths byte for byte**, including on the failure paths. The summary says
+which of them already existed, so a run on a machine that has agent-ping installed puts that
+install back rather than deleting it. A missing service manager, a missing build artefact or
+a shell whose `XDG_CONFIG_HOME` disagrees with the manager's is a **non-zero exit naming the
+remedy**, never a skip; so is a run that executed fewer than the 24 assertions it declares.
 
 ### The dashboard prototype
 

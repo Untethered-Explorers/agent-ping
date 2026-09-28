@@ -1,10 +1,10 @@
 # Project Progress
 
 ## Current State
-**Phase**: INSTALL-AUTOSTART-AND-OPERATIONS-2
+**Phase**: INSTALL-AUTOSTART-AND-OPERATIONS-3
 **Status**: In Progress
-**Validation Gaps**: 149 unverified check(s) - see "Validation Gaps"
-**Last Updated**: 2026-09-28T02:12:07.631Z
+**Validation Gaps**: 153 unverified check(s) - see "Validation Gaps"
+**Last Updated**: 2026-09-28T02:48:21.599Z
 **Run ID**: 7d107e32-e0b5-4a61-9b30-c0c01b5ddbd8
 **Harness**: opencode
 **Execution Mode**: auto
@@ -90,6 +90,8 @@
   - Files: src/cli/index.ts, src/cli/install.ts, src/cli/doctor.ts, src/cli/status.ts, tests/cli/install.test.ts, tests/cli/doctor.test.ts, README.md, docs/runbooks/io-5-operations-review.md, scripts/prepack-check.mjs, src/hub/routes/read.ts, src/main/index.ts, src/plugin/install/global-plugin.ts, tests/hub/delivery.test.ts, tests/hub/lifecycle.test.ts, tests/hub/security.test.ts, tests/hub/server.test.ts, tests/packaging/package.test.ts, src/cli/autostart-control.ts, src/cli/hub-client.ts, src/cli/log.ts, src/cli/output.ts, tests/cli/fixtures/command-line.ts
 - [x] Phase INSTALL-AUTOSTART-AND-OPERATIONS-2, Task IO-3: Install and remove per-platform autostart units (@packaging-engineer)
   - Files: src/cli/autostart/index.ts, src/cli/autostart/linux.ts, src/cli/autostart/macos.ts, src/cli/autostart/windows.ts, tests/cli/autostart.test.ts, README.md, docs/runbooks/io-5-operations-review.md, scripts/prepack-check.mjs, tests/cli/install.test.ts
+- [x] Phase INSTALL-AUTOSTART-AND-OPERATIONS-3, Task IO-4: Write the live autostart and restart verification script (@qa-engineer)
+  - Files: scripts/verify-autostart-linux.mjs, tests/scripts/verify-autostart-linux.test.ts, README.md, docs/runbooks/io-5-operations-review.md, docs/reviews/autostart-linux-evidence.json
 - [x] Phase COPILOT-CLI-ACP-SPIKE-1, Task CP-1: Probe the real Copilot ACP surface (@connector-engineer)
   - Files: scripts/probe-copilot-acp.mjs, tests/scripts/probe-copilot-acp.test.ts, docs/research/copilot-acp-capture.json, tests/scripts/fixtures/copilot-acp-capture.json
 - [x] Phase COPILOT-CLI-ACP-SPIKE-1, Task CP-2: Probe the Copilot hook surface and write the report (@connector-engineer)
@@ -256,6 +258,10 @@
 - Task IO-3: The residue observation covers the Linux two-directory case. macOS and Windows hold the unit in the convention directory itself, so each declares one owned directory; that their prune behaves the same is argued from the shared engine and rmdir, not observed on those platforms.
 - Task IO-3: The Windows unit path is drive-rooted, so on a POSIX machine the kernel resolves it against the working directory and each test case runs inside a temporary cwd. That makes 'for each platform implementation' an observation on the shared lifecycle, not a claim about a Windows filesystem.
 - Task IO-3: Whole-suite runs are not hermetic: tests/packaging/package.test.ts builds a scratch tree and several suites start real loopback hubs, and stale ld1probe hubs from an earlier task on this machine hold 127.0.0.1:43117, so a hub may bind a fallback port as it did in my live run.
+- Task IO-4: Linux only, one machine, this one (Ubuntu 24.04, systemd 255.4, X11, DISPLAY=:1). No macOS and no Windows observation of any kind is claimed and none was possible: their units remain unit-tested bytes and paths only, and APX-CON-06 keeps the human gate on those platforms. The runbook and README both say the same script must be run on those machines.
+- Task IO-4: No login and no reboot was observed. What is proven is that the live manager accepts, activates, stops and starts the unit; a log out and back in is a different observation and the runbook says so.
+- Task IO-4: The run needs a graphical session (the unit's ExecStart is the packaged Electron runtime). A headless machine has no DISPLAY, which is a fault of the environment, not something this script reports as a pass.
+- Task IO-4: `doctor` exits 1 during the run: the hub the manager started reports desktop.tray fail because this session has no StatusNotifierItem host. The script asserts only doctor's autostart row (ok) and records the whole report and the exit code in the evidence; the tray remedy is IO-5's judgement to make, not mine.
 - Task CP-1: The permission finding is from one run on one machine against one Copilot version. It is evidence, not a proof across versions, and the gate decision should cite the version alongside the claim.
 - Task CP-1: The hook surface is untouched: CP-2 owns the documented Copilot hook triggers and the consolidated report.
 - Task CP-1: The stub-binary deadline test executes a shebang script directly, so it assumes a POSIX-style platform, consistent with the existing tests/tooling/runner-convention.test.ts, which already spawns npm by bare name.

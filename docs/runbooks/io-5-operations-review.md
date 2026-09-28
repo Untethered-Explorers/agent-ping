@@ -27,7 +27,7 @@ Already covered, so you do not rebuild it:
 | `IO-1`, complete | The package publishes, the files allowlist is right, and a prepack check fails when a build artefact is missing |
 | `IO-2`, complete | The four subcommands, driven through the command entry point, unit-tested including the failure exits |
 | `IO-3`, complete | Autostart units per platform, idempotent and reversible, against a temporary home |
-| `IO-4` (pending) | `scripts/verify-autostart-linux.mjs` — login, restart and pending survival on Linux |
+| `IO-4`, complete | `scripts/verify-autostart-linux.mjs` — the real `systemd --user` manager enabling, starting and stopping the unit, and a pending item surviving that restart on **Linux only**. Read §2a before you run it |
 | `OA-5`, complete | The real `opencode` binary reaching a real permission decision against a real hub |
 | `NS-4`, complete | The notification surface, and the manual commands in `docs/runbooks/notification-surface.md` §2 |
 
@@ -60,6 +60,54 @@ commands must now report nothing. Record what you removed; that list is the base
 
 If the product's own `uninstall` already exists at this point, prefer it, and note that you
 used it — that is a data point about `IO-5` itself.
+
+## 2a. The live autostart and restart script
+
+`IO-4` delivered `scripts/verify-autostart-linux.mjs`. It is the evidence for Linux and it
+answers three things §3 would otherwise have you answer by hand: does a real user service
+manager accept the unit, does a pending item survive a restart **through that manager**,
+and does `uninstall` remove what it says it removes.
+
+```bash
+npm run build                              # the script drives the built command, not a checkout
+node scripts/verify-autostart-linux.mjs    # ~5 s; JSON summary on stdout, progress on stderr
+```
+
+Read the summary's `assertions` array, not its `verdict` alone: a green run that ran fewer
+than the 24 declared assertions is a failed run, and the summary says so.
+
+**What it does to your machine, and what it puts back.** It points `AGENT_PING_STATE_DIR`
+at a fresh temporary directory, so the database, the runtime file, the write token and the
+local log are all created there. It cannot point the *unit directory* at a temporary path —
+a running `systemd --user` manager resolves unit files from the environment **it** was
+started with and ignores your shell's `XDG_CONFIG_HOME` — so the run writes the plugin file,
+its install record and the unit where a real manager reads them, then restores every one of
+those paths byte for byte on the way out, including on the failure paths. The summary's
+`baseline` block says which of them were already there (so it *restored* your own install
+rather than deleting it) and which it created and removed. The preflight refuses to run if
+your shell and the user manager disagree about the unit directory, or if a hub is already
+running for this account, because either would make the run prove something other than what
+it says.
+
+Two things it will not do for you, and neither is a defect:
+
+- **It does not log you out and back in.** What it proves is that the live manager accepts
+  the unit, activates it, stops it and starts it again. A real login is still yours to do
+  in §3, and the two are different observations.
+- **It cannot be undone by a `kill -9`.** If the script itself is killed, nothing runs its
+  restore. `agent-ping uninstall` is the remedy: it removes the plugin and the unit and
+  keeps the database.
+
+**Per-platform honesty, and the obligation this creates.** This script is Linux-only by
+construction: it drives `systemctl --user` and the systemd per-user unit layout. The macOS
+and Windows units are implemented and unit-tested against a temporary home
+(`tests/cli/autostart.test.ts`), and **the same contract must be run on those machines
+before either platform is claimed** — on macOS against `launchctl` and
+`~/Library/LaunchAgents/local.agent-ping.hub.plist`, on Windows against the per-user Startup
+folder entry. `APX-CON-06` forbids claiming a platform from a machine that is not it, so a
+macOS or Windows verdict from this Linux run is not available at any price. What this run
+establishes is the *shape* of the evidence each of them owes: 24 named assertions, a printed
+observation for each, a non-zero exit on any failure, and a restore of the machine at the end.
 
 ## 3. The install journey
 
@@ -176,8 +224,8 @@ was not observable rather than reporting a pass for it.*
 
 ## 7. What this runbook cannot tell you yet
 
-`IO-1`, `IO-2` and `IO-3` exist; `IO-4` does not. Confirm from `agent-ping --help`
-before relying on any line above, and update this section rather than trusting it.
+`IO-1`, `IO-2`, `IO-3` and `IO-4` exist. Confirm from `agent-ping --help` before relying on
+any line above, and update this section rather than trusting it.
 
 **Already answered by `IO-2`, and re-checkable from `--help`:**
 
@@ -202,12 +250,24 @@ before relying on any line above, and update this section rather than trusting i
   On Linux the unit is only *enabled* when the `default.target.wants` symlink beside it
   is present, which is what `doctor`'s `autostart` check reads.
 - **Whether a real login actually starts the hub.** The units are implemented and
-  unit-tested against a temporary home, but no live service manager has run them here:
-  `IO-4`'s script is the evidence for Linux and a human gate is the only possible
-  evidence for macOS and Windows. Do not record a login as working on the strength of
-  the unit file alone.
+  unit-tested against a temporary home, and `IO-4`'s script has since had a **live**
+  `systemd --user` manager enable, start, stop and start them again on Linux — so on Linux
+  the unit is known to be a unit that manager accepts, not a file. A real **login** is
+  still unobserved on every platform, including Linux: `systemctl --user start` is not a
+  login, and only you can do that one. macOS and Windows have had no live service manager
+  at all, and a human gate on each of those machines is the only possible evidence there.
+  Do not record a login as working on the strength of the unit file alone, or of `IO-4`.
 - **What `IO-4`'s script already covers on Linux**, so you do not repeat it — and so you
-  know which of your observations are the only evidence for macOS or Windows.
+  know which of your observations are the only evidence for macOS or Windows:
+
+  | `IO-4` observed on Linux (`docs/reviews/autostart-linux-evidence.json`) | What it leaves to you |
+  | --- | --- |
+  | `install` wrote the plugin and the unit, and the live manager reported the unit `enabled` | Whether the printed change list matched what changed on *your* machine, by hand |
+  | The unit was stopped and started again **through the manager**, and the pending item, its history row and the pending count survived unchanged and once | Whether a *login* brings it up |
+  | A second `install` printed "nothing was changed", and a mismatched plugin version was reported as a mismatch and not replaced | Whether either sentence was *useful* to a person reading it |
+  | `uninstall` removed the plugin and the unit, the manager then reported no agent-ping unit, and the database stayed | Whether you would have expected the database to go too |
+  | Every path the run touched outside its temporary state directory was restored | The judgement, which is what this review is |
+  | The hub the manager started answered health on `127.0.0.1`, but its `desktop.tray` was `fail`: **this session has no StatusNotifierItem host**, so `doctor`'s `tray` check failed and `doctor` exited 1 with the other six checks `ok` | Whether the desktop on *your* machine gives the hub a status area, and whether the printed remedy is the one you would have wanted (breakage 4 territory) |
 
 ## 8. Record the verdict
 
