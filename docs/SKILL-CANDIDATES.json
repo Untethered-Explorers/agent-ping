@@ -8,7 +8,7 @@
         "dashboard-engineer"
       ],
       "action": "reuse",
-      "reason": "PixiJS 8.21.0 is the dashboard renderer for both the static prototype and the live page (DP-2, DP-3, LD-1, LD-2), and the installed pixijs router plus its per-topic packages already cover the version-specific mechanics this project depends on: asynchronous Application.init, Graphics/Text layout, ticker lifecycle, renderer teardown and Vite bundling. No project package is needed; a new one would duplicate maintained upstream guidance and drift from the pinned version."
+      "reason": "PixiJS 8.21.0 is the dashboard renderer for both the static prototype and the live page (DP-2, DP-3, LD-1, LD-2), and the installed pixijs router plus its per-topic packages already cover the version-specific mechanics this project depends on: asynchronous Application.init, Graphics/Text layout, ticker lifecycle, renderer teardown and Vite bundling. No project package is needed; a new one would duplicate maintained upstream guidance and drift from the pinned version. NS-1 does not widen this: the card document is plain DOM under the hub's content-security policy, deliberately not a canvas, so it needs no PixiJS guidance at all."
     },
     {
       "name": "canvas-dom-mirror",
@@ -17,7 +17,7 @@
         "dashboard-engineer"
       ],
       "action": "create",
-      "reason": "The same pattern is specified three times with project-specific rules (APX-CON-07, DP-FR-04, DP-FR-05, LD-FR-02, LD-FR-09) and is fragile in a way no general package covers: one focusable entry per visible row in canvas order, icon-plus-text so no state is colour-only, focus retention by row identity when a live update re-renders underneath, and reduced motion for feed-triggered transitions. PixiJS's built-in AccessibilitySystem does not satisfy it, so this is a create rather than a reuse or an extend."
+      "reason": "The same pattern is specified three times with project-specific rules (APX-CON-07, DP-FR-04, DP-FR-05, LD-FR-02, LD-FR-09) and is fragile in a way no general package covers: one focusable entry per visible row in canvas order, icon-plus-text so no state is colour-only, focus retention by row identity when a live update re-renders underneath, and reduced motion for feed-triggered transitions. PixiJS's built-in AccessibilitySystem does not satisfy it, so this is a create rather than a reuse or an extend. The package should also carry its one deliberate exclusion, so the rule is not over-applied: the notification card is DOM already, so APX-CON-07's canvas-plus-mirror obligation does not apply to it and the notification engineer is told not to build one."
     },
     {
       "name": "harness-signal-mapping",
@@ -27,26 +27,29 @@
         "domain-engineer"
       ],
       "action": "create",
-      "reason": "The mapping is written at least three times against one interface - the domain classifier in EL-3, the opencode translation in OA-1, and the authorised Copilot translation in CP-4 - and the connector interface is explicitly specified in Agent Client Protocol terms so a third harness is additive (APX-CON-13). The work-signal accumulator, the shared dedupe key across pushed and polled state, and the requirement that a missing signal degrades visibly rather than silently are project-specific and easy to get subtly wrong per harness."
+      "reason": "The mapping is written against one interface in more than one place - the domain classifier in EL-3, the opencode translation in OA-1, and the OA-4 polling fallback which must collapse to the same dedupe keys - and the connector interface is explicitly specified in Agent Client Protocol terms so a third harness is additive (APX-CON-13). The work-signal accumulator, the shared dedupe key across pushed and polled state, and the requirement that a missing signal degrades visibly rather than silently are project-specific and easy to get subtly wrong per harness. The Copilot occurrence is now conditional rather than current: CP-3 recorded a deferral, so v1 ships opencode only and CP-4 produced a record with no adapter. That makes this package the right home for the third-harness case when it reopens, and the wrong home for a per-harness quick fix, since the whole point is that the class, subtype and dedupe-key table is written once."
     },
     {
       "name": "content-free-schema-guard",
-      "description": "Prove and preserve that nothing in agent-ping can hold conversation content, covering the schema column set, the envelope fields, ingest and metrics payloads, the history panel and the local log.",
+      "description": "Prove and preserve that nothing in agent-ping can hold conversation content, covering the schema column set, the envelope fields, ingest and metrics payloads, the history panel, the renderer channel and the local log.",
       "consumers": [
         "domain-engineer",
-        "hub-engineer"
+        "hub-engineer",
+        "notification-engineer"
       ],
       "action": "create",
-      "reason": "The privacy boundary is the product's central promise (APX-FR-01) and is enforced in at least six separate places: the exact column-set assertion in EL-FR-03, the envelope field assertion in EL-FR-01, the ingest payload test in HC-3, the metrics payload test in HC-6, the history panel test in LD-3 and the local log in IO-FR-09. Each is a place where a well-meaning new column or field silently breaks a promise, so one shared guard procedure keeps them from drifting apart."
+      "reason": "The privacy boundary is the product's central promise (APX-FR-01) and is enforced in at least seven separate places: the exact column-set assertion in EL-FR-03, the envelope field assertion in EL-FR-01, the ingest payload test in HC-3, the metrics payload test in HC-6, the history panel test in LD-3, the local log in IO-FR-09, and the renderer channel's payload assertion in NS-2. Each is a place where a well-meaning new column or field silently breaks a promise, so one shared guard procedure keeps them from drifting apart. NS-2 is the sharpest instance: a channel into a renderer running with contextIsolation true and nodeIntegration false is a hole in the isolation boundary, so its payload must be asserted content-free at the channel and not only at the database."
     },
     {
       "name": "loopback-api-security",
       "description": "Apply and test the loopback-only boundary: bind 127.0.0.1, reject non-loopback remote addresses, require the per-install token on the single write route, send a strict CSP with no permissive cross-origin header, and enumerate routes to prove ack is the only mutation.",
       "consumers": [
-        "hub-engineer"
+        "hub-engineer",
+        "notification-engineer",
+        "dashboard-engineer"
       ],
       "action": "create",
-      "reason": "This is the fragility that turns an apparently local daemon into a remote control, and it is spread across HC-1, HC-4 and the strict-CSP interaction with the PixiJS bundle, constrained by APX-CON-01 and APX-CON-08. The route-enumeration test that proves the mutating set is exactly {ack}, and the rule that a CSP conflict is resolved by narrowing the policy rather than adding unsafe-inline, are project decisions that general Node or Electron guidance will not produce."
+      "reason": "This is the fragility that turns an apparently local daemon into a remote control, and it is spread across HC-1, HC-4 and the strict-CSP interaction with the PixiJS bundle, constrained by APX-CON-01 and APX-CON-08. The route-enumeration test that proves the mutating set is exactly {ack}, and the rule that a CSP conflict is resolved by narrowing the policy rather than adding unsafe-inline, are project decisions that general Node or Electron guidance will not produce. Phase 4 widened the surface in a way the package must now cover explicitly: the card channel is one delivery call plus one dismissal and must never become a third way to change a record, which is why NS-3's dismissal belongs on a narrow HubServices port called from the ack route and the pending-set transition rather than on a new endpoint."
     },
     {
       "name": "live-verification-script",
@@ -55,11 +58,24 @@
         "qa-engineer"
       ],
       "action": "create",
-      "reason": "Four separate tasks require this exact shape - the live opencode session (OA-5), the live autostart and restart run (IO-4), the browser-driven dashboard journey (LD-4) and the Copilot probes - and the discipline is unusually strict in this project: a missing browser, harness or service manager is a non-zero exit rather than a skip, because a green result that exercised nothing is treated as worse than a failure. The pattern is reusable and would otherwise be reinvented, slightly differently, four times."
+      "reason": "Five separate tasks require this exact shape - the live opencode session (OA-5), the live autostart and restart run (IO-4), the browser-driven dashboard journey (LD-4), the notification surface probe (NT-9 and its shipped-build re-proof NS-4), and the Copilot probes - and the discipline is unusually strict in this project: a missing browser, harness, service manager or display is a non-zero exit rather than a skip, because a green result that exercised nothing is treated as worse than a failure. The pattern is reusable and would otherwise be reinvented, slightly differently, five times. One recorded instance of the same rule failing belongs to this package rather than to a new one: OA-5 declared only the script and its test as outputs, so its evidence summary was never committed even though the journeys ran, and a live script whose observations are not retained is not evidence."
+    },
+    {
+      "name": "seam-closure-verification",
+      "description": "Name the seam a task depends on, assert it exists before relying on it, and re-prove the assembled path against the shipped build with no harness-supplied substitute standing in for a product capability.",
+      "consumers": [
+        "qa-engineer",
+        "notification-engineer",
+        "hub-engineer",
+        "dashboard-engineer",
+        "connector-engineer"
+      ],
+      "action": "extend",
+      "reason": "This is an extension of live-verification-script, not a separate package, because both are the same discipline seen from two ends: a green result that exercised nothing is worse than a failure. What live-verification-script does not cover is the authoring half and the follow-up half, and this project has now paid for that twice. NT-6, NT-7 and NT-8 each passed every gate and collectively could not put a card on a screen, because one was told to load a document nobody was told to create, one ran under isolation settings with no preload, and one named an acknowledged end nobody wired back; NT-FR-12 now makes with-no-seam-supplied-by-a-test a requirement, and NS-4 re-runs the same journeys with the harness's own card document, stylesheet, entry module and executeJavaScript bridge deleted so a green result cannot mean the harness did the work again. The same shape appears in a decision record rather than a screen: CP-FR-07 requires a test asserting that the deferral record's own claims are present in its text and that its evidence digests still hold. So the additive guidance is: state a task's declared artefact and the seam it consumes, assert the seam exists rather than assuming it, treat a substituted seam as a bug report naming which product seams are missing, and re-run against the shipped build once they exist."
     },
     {
       "name": "create-project-documentation",
-      "description": "Extend the existing project documentation package to cover the three evidence artefact shapes this project repeats: platform runbooks that state what is not live-verified, human-gate review files, and research probe reports.",
+      "description": "Extend the existing project documentation package to cover the evidence artefact shapes this project repeats: platform runbooks that state what is not live-verified, human-gate review files, the register of human gates that closed without being performed, and research probe reports.",
       "consumers": [
         "notification-engineer",
         "connector-engineer",
@@ -67,16 +83,16 @@
         "qa-engineer"
       ],
       "action": "extend",
-      "reason": "The existing package covers ADRs, user and administrator guides, changelog and release notes, but not the artefacts this project actually repeats: docs/runbooks/notification-surface.md and docs/runbooks/copilot-support.md must state explicitly which behaviour is not live-verified on the authoring machine, and the withdrawn NT-4 and NT-5 gates are the precedent for recording a platform path as abandoned rather than outstanding, seven human gates write docs/reviews/*.json verdicts against a fixed acceptance shape, and docs/research/copilot-acp-probe.md must distinguish an absent signal from an untriggered one and from an unclear one. The honesty rules are project-specific and additive, so the existing package is extended rather than replaced or duplicated."
+      "reason": "The existing package covers ADRs, user and administrator guides, changelog and release notes, but not the artefacts this project actually repeats: docs/runbooks/notification-surface.md and docs/runbooks/copilot-support.md must state explicitly which behaviour is not live-verified on the authoring machine, and the withdrawn NT-4 and NT-5 gates are the precedent for recording a platform path as abandoned rather than outstanding; seven human gates write docs/reviews/*.json verdicts against a fixed acceptance shape; docs/research/copilot-acp-probe.md must distinguish an absent signal from an untriggered one and from an unclear one; and docs/reviews/deferred-gates.md registers the three gates the engine recorded as complete that were never performed, distinguishing a reviewable thing not reviewed from a review of software that did not exist, and stating the discharge procedure because the engine cannot reopen a completed gate. The honesty rules are project-specific and additive, so the existing package is extended rather than replaced or duplicated."
     },
     {
       "name": "human-review-gate",
-      "description": "A repeatable procedure for running and recording the project's human review gates across design, hub safety, adapter reality, dashboard journey, operations and the Copilot authorisation decision, plus the scripted notification-surface probe that replaced the two per-platform notification gates.",
+      "description": "A repeatable procedure for running and recording the project's human review gates, plus the register that keeps a gate closed without being performed from reading as a pass.",
       "consumers": [
         "qa-engineer"
       ],
       "action": "omit",
-      "reason": "Considered and rejected. Each gate is entirely human judgement against a running system, and every gate already carries explicit acceptance criteria and a named review file in its feature document, so there is no agent-executable process to package. More importantly, a reusable procedure for producing these artefacts invites an agent to author or close a verdict it has no standing to give, which is the failure mode the no-fabricated-human-review constraint exists to prevent. The responsibility stays with human reviewers, and qa-engineer is recorded here only to make that boundary explicit."
+      "reason": "Considered and rejected. Each gate is entirely human judgement against a running system, and every gate already carries explicit acceptance criteria and a named review file in its feature document, so there is no agent-executable process to package. More importantly, a reusable procedure for producing these artefacts invites an agent to author or close a verdict it has no standing to give, which is the failure mode the no-fabricated-human-review constraint exists to prevent. That risk is not hypothetical here: the engine marks a human-review task complete the moment a valid attestation exists and never prompts again, so OA-6, LD-5 and IO-5 all read as complete in the workflow state, and LD-5 and IO-5 closed on software that did not exist. The register that makes that visible is documentation and belongs to create-project-documentation; the verdict stays with a human, and qa-engineer is recorded here only to make that boundary explicit."
     }
   ]
 }
