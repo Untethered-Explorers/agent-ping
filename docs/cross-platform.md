@@ -424,8 +424,14 @@ Everything that needs a display, a status area or a service manager is still Lin
   and are not in the matrix.
 
 So the register of what is still owed is unchanged:
-[`docs/reviews/deferred-gates.md`](reviews/deferred-gates.md). The matrix narrows what
-is *unverified*, it does not discharge anything.
+[`docs/reviews/deferred-gates.md`](reviews/deferred-gates.md). The matrix narrows what is
+*unverified*, it does not discharge anything.
+
+The matrix is not green on all three yet. What it has found so far, what was fixed, and
+the 22 Windows failures it still reports — grouped by cause, with the two platform
+differences that are *not* defects — are recorded in
+[`docs/reviews/three-platform-matrix.md`](reviews/three-platform-matrix.md). Read that
+page before concluding anything about Windows behaviour from a manifest field.
 
 ---
 

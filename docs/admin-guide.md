@@ -386,6 +386,11 @@ the CLI, and the bytes of all three autostart units. It does not mean the card h
 seen on a Mac or that a login has ever started the hub. What is still owed is
 [`docs/reviews/deferred-gates.md`](reviews/deferred-gates.md).
 
+It is also not yet all green. The Windows cell is at **22 failing tests**, grouped by
+cause with the order to take them in in
+[`docs/reviews/three-platform-matrix.md`](reviews/three-platform-matrix.md) — read that
+before concluding anything about Windows behaviour from a manifest field.
+
 ## Upgrades and rollback
 
 **There is no previous release.** This is the first version, so there is no upgrade
@@ -511,6 +516,7 @@ procedure that closes it — is
 | --- | --- |
 | [User guide](user-guide.md) | Day-to-day use |
 | [Cross-platform development](cross-platform.md) | The three-platform support contract and the rules for changing the code without assuming an OS |
+| [Three-platform matrix](reviews/three-platform-matrix.md) | What the CI matrix found on macOS and Windows, what was fixed, and the 22 failures it still reports |
 | [ADR index](adr/README.md) | The twelve durable decisions and their implementation state |
 | [docs/PROGRESS.md](PROGRESS.md) | The build log, with every unverified check enumerated |
 | [docs/reviews/deferred-gates.md](reviews/deferred-gates.md) | What this project owes |

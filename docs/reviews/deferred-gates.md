@@ -63,6 +63,15 @@ ran, and no summary was retained. Re-running the script and committing the file 
 human and would restore the missing half of the end-to-end evidence. It is the cheapest
 outstanding item on this page.
 
+## What is *not* in this register
+
+Three-platform portability. The gates above are human reviews a person has to perform;
+portability is a different kind of debt, it is machine-checkable, and it has its own
+register in [`three-platform-matrix.md`](three-platform-matrix.md) — 22 Windows failures
+grouped by cause, plus the two platform differences that are not defects and should not
+be "fixed". Nothing on that page is a gate, and nothing on this page is a portability
+failure.
+
 ## Issue log
 
 For feedback gathered while reading the product before the reviews above happen. Add a row
